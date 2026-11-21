@@ -1,0 +1,39 @@
+Axfterm
+Copyright (c) 2026 Juan Andrés
+
+Axfterm se distribuye bajo licencia dual MIT OR Apache-2.0 (ver LICENSE-MIT y
+LICENSE-APACHE). Este aviso recoge el software y los assets de terceros
+incorporados, con su licencia correspondiente.
+
+Crates de Rust
+--------------
+
+- GPUI y gpui-pre (Apache-2.0) — Zed Industries.
+- gpui-kit (Apache-2.0) — componentes de shell, dock y base.
+- alacritty_terminal (Apache-2.0) — motor VT y estado de pantalla.
+- portable-pty (MIT) — capa PTY multiplataforma (ConPTY en Windows).
+- sysinfo (MIT) — árbol de procesos.
+- toml (MIT OR Apache-2.0) — parseo de configuración.
+- notify (MIT OR Apache-2.0) — hot reload de configuración.
+
+Las versiones exactas se fijan en el `Cargo.lock` versionado. Cada dependencia
+conserva su propio texto de licencia en el paquete de origen; al empaquetar una
+release se incluirá la lista completa generada desde `cargo metadata`.
+
+Assets
+------
+
+- Tabler Icons (MIT) — https://github.com/tabler/tabler-icons
+- simple-icons (CC0 1.0) — https://github.com/simple-icons/simple-icons
+- Nerd Fonts, glifos parcheados (SIL OFL 1.1 u otras licencias de la fuente
+  original, según cada familia) — https://github.com/ryanoasis/nerd-fonts
+
+Los SVG e iconos vendorizados se guardan con la copia de su licencia en el
+directorio de vendor correspondiente.
+
+Marcas
+------
+
+Los nombres y logotipos de terceros (por ejemplo OpenCode y GitHub Copilot) son
+marcas de sus respectivos titulares y se usan únicamente para identificar los
+agentes detectados. Axfterm no está afiliado ni respaldado por ellos.

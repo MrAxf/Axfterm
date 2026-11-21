@@ -1,0 +1,22 @@
+# Rust
+/target/
+**/*.rs.bk
+
+# Distribución
+/dist/
+
+# Logs
+*.log
+
+# Editores e IDE
+.idea/
+.vscode/
+.fleet/
+.DS_Store
+
+# Símbolos de depuración
+*.pdb
+
+# Estado local de herramientas (no forma parte del producto)
+.opencode/
+.agents/

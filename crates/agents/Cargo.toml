@@ -1,0 +1,14 @@
+[package]
+name = "axf_agents"
+description = "Detección local de agentes de IA y su máquina de estados"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true

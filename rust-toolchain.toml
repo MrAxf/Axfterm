@@ -1,0 +1,6 @@
+# Toolchain de desarrollo. La edición 2024 y la MSRV 1.85 se declaran en los
+# Cargo.toml (workspace y crates), no aquí.
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]
+profile = "minimal"
