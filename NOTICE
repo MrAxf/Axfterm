@@ -24,6 +24,8 @@ Assets
 ------
 
 - Tabler Icons (MIT) — https://github.com/tabler/tabler-icons
+  Vendorizados en `crates/ui/assets/icons/tabler/` (terminal-2, layout-sidebar,
+  settings, plus; commit `85e870db`).
 - simple-icons (CC0 1.0) — https://github.com/simple-icons/simple-icons
 - Nerd Fonts, glifos parcheados (SIL OFL 1.1 u otras licencias de la fuente
   original, según cada familia) — https://github.com/ryanoasis/nerd-fonts

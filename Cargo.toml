@@ -22,6 +22,14 @@ license = "MIT OR Apache-2.0"
 authors = ["Juan Andrés"]
 publish = false
 
+[workspace.dependencies]
+# GPUI se encapsula en `axf_ui`; el pin exacto lo exige AGENTS.md.
+gpui-kit = "=0.10.0"
+anyhow = "1"
+
+# Crates internos.
+axf_ui = { path = "crates/ui" }
+
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "warn"
 unreachable_pub = "warn"

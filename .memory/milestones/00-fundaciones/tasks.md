@@ -11,10 +11,10 @@
 
 ## Shell GPUI
 
-- [ ] `main.rs` con gpui-kit: ventana 1280x800, tema oscuro base, quit limpio
-- [ ] `AssetSource` embebido con iconos Tabler vendorizados
-- [ ] Layout placeholder: sidebar izquierda vacía + área central + status bar
-- [ ] Acción de ejemplo + keybinding mínimo para validar el dispatch
+- [x] `main.rs` con gpui-kit: ventana 1280x800, tema oscuro base, quit limpio
+- [x] `AssetSource` embebido con iconos Tabler vendorizados
+- [x] Layout placeholder: sidebar izquierda vacía + área central + status bar
+- [x] Acción de ejemplo + keybinding mínimo para validar el dispatch
 
 ## Spikes
 

@@ -1,7 +1,7 @@
 # Axfterm — memoria del proyecto
 
-Estado: M0 Fundaciones en curso. Repo listo (workspace Rust 2024 con 6 crates,
-lints, `scripts/check.ps1`); shell GPUI y spikes pendientes.
+Estado: M0 Fundaciones en curso. Repo y shell GPUI listos (ventana 1280x800,
+tema oscuro, assets Tabler, acciones de ejemplo); spikes y ADR pendientes.
 Stack: Rust 2024 + gpui-kit + alacritty_terminal + portable-pty. Windows primero.
 
 ## Cómo leer
