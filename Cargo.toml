@@ -26,9 +26,48 @@ publish = false
 # GPUI se encapsula en `axf_ui`; el pin exacto lo exige AGENTS.md.
 gpui-kit = "=0.10.0"
 anyhow = "1"
+# Errores tipados en los bordes de los crates (AGENTS.md: convenciones).
+thiserror = "2"
+# Canal acotado parser -> UI del terminal: backpressure sin atarse a un runtime.
+async-channel = "2"
+# IDs y sesión del workspace: formato estable y legible, sin red.
+serde = { version = "1", features = ["derive"] }
+# `session.json` (ADR 0003/0004): JSON tolerante a campos futuros.
+serde_json = "1"
+# `config.toml` y temas de usuario (ADR 0004).
+toml = "1"
+# Migración v1 -> v2 y escritura de perfiles conservando comentarios (ADR 0006).
+toml_edit = "0.25"
+# Hot reload de config y temas: observa archivos, no el perfil completo.
+# `notify` 9 exige Rust 1.91 y rompe la MSRV 1.85 del proyecto; se fija 8.2.1,
+# la misma versión que ya usa gpui-kit. El lock fija `notify-types` 2.1.0
+# (2.3.x exige 1.91) para conservar la MSRV.
+notify = "=8.2.1"
+# Logs de diagnóstico sin bloquear ni usar red.
+tracing = "0.1"
+
+# Motor de terminal (verificado en M0): Apache-2.0, MSRV 1.85.
+alacritty_terminal = "=0.26.0"
+# PTY multiplataforma (ConPTY en Windows): MIT.
+portable-pty = "=0.9.0"
+# Árbol de procesos para la detección de agentes: MIT.
+sysinfo = "=0.40.4"
+# Extracción del icono del ejecutable en Windows (shell/GDI) y PNG con alpha.
+# Ambas ya están en el árbol por gpui/portable-pty; se fijan por MSRV.
+windows-sys = { version = "=0.61.2", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+png = "=0.18.1"
 
 # Crates internos.
 axf_ui = { path = "crates/ui" }
+axf_terminal = { path = "crates/terminal" }
+axf_workspace = { path = "crates/workspace" }
+axf_agents = { path = "crates/agents" }
+axf_config = { path = "crates/config" }
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "warn"

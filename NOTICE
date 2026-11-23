@@ -12,9 +12,17 @@ Crates de Rust
 - gpui-kit (Apache-2.0) — componentes de shell, dock y base.
 - alacritty_terminal (Apache-2.0) — motor VT y estado de pantalla.
 - portable-pty (MIT) — capa PTY multiplataforma (ConPTY en Windows).
+- async-channel (Apache-2.0 OR MIT) — canal acotado parser → UI del terminal.
+- thiserror (MIT OR Apache-2.0) — errores tipados en los bordes de los crates.
+- serde / serde_json (MIT OR Apache-2.0) — IDs y `session.json` del workspace.
+- tracing (MIT) — logs de diagnóstico sin red.
 - sysinfo (MIT) — árbol de procesos.
 - toml (MIT OR Apache-2.0) — parseo de configuración.
+- toml_edit (MIT OR Apache-2.0) — migración y escritura de config conservando
+  comentarios.
 - notify (MIT OR Apache-2.0) — hot reload de configuración.
+- windows-sys (MIT OR Apache-2.0) — icono del ejecutable (shell/GDI) en Windows.
+- png (MIT OR Apache-2.0) — codificación PNG con alpha de los iconos extraídos.
 
 Las versiones exactas se fijan en el `Cargo.lock` versionado. Cada dependencia
 conserva su propio texto de licencia en el paquete de origen; al empaquetar una
@@ -25,10 +33,23 @@ Assets
 
 - Tabler Icons (MIT) — https://github.com/tabler/tabler-icons
   Vendorizados en `crates/ui/assets/icons/tabler/` (terminal-2, layout-sidebar,
-  settings, plus; commit `85e870db`).
+  layout-columns, layout-rows, settings, plus, x, chevron-left/right/down/up,
+  folder, folder-open, pencil, copy, maximize, refresh, search, sun, moon,
+  palette, menu-2, keyboard, device-desktop, external-link, file-import,
+  file-export, check, circle, alert-triangle, info-circle, player-play,
+  player-pause, player-stop, loader-2, bell, bell-off, brand-powershell; rama
+  `main`, descargados con `scripts/update-icons.ps1` el 2026-11-21 y
+  `brand-powershell` añadido el 2026-11-22).
 - simple-icons (CC0 1.0) — https://github.com/simple-icons/simple-icons
+  Vendorizado en `crates/ui/assets/icons/simple/` (`rust.svg`, `opencode.svg`,
+  `githubcopilot.svg`; rama `develop`, descargados el 2026-11-21). Los colores
+  de marca viven en `crates/ui/src/brand.rs`.
+- Temas built-in de Axfterm (`One Dark`, `One Light`, `Monokai`,
+  `Monokai Light`, `Cobalt2`, `Cobalt2 Light`): paletas originales inspiradas en
+  esquemas conocidos, sin código ni assets de terceros.
 - Nerd Fonts, glifos parcheados (SIL OFL 1.1 u otras licencias de la fuente
-  original, según cada familia) — https://github.com/ryanoasis/nerd-fonts
+  original, según cada familia) — https://github.com/ryanoasis/nerd-fonts.
+  Axfterm detecta y usa las familias instaladas; no embebe archivos de fuente.
 
 Los SVG e iconos vendorizados se guardan con la copia de su licencia en el
 directorio de vendor correspondiente.
@@ -36,6 +57,7 @@ directorio de vendor correspondiente.
 Marcas
 ------
 
-Los nombres y logotipos de terceros (por ejemplo OpenCode y GitHub Copilot) son
-marcas de sus respectivos titulares y se usan únicamente para identificar los
-agentes detectados. Axfterm no está afiliado ni respaldado por ellos.
+Los nombres y logotipos de terceros (por ejemplo OpenCode, GitHub Copilot y
+PowerShell) son marcas de sus respectivos titulares y se usan únicamente para
+identificar los agentes o shells detectados. Axfterm no está afiliado ni
+respaldado por ellos.

@@ -20,3 +20,4 @@
 # Estado local de herramientas (no forma parte del producto)
 .opencode/
 .agents/
+skills-lock.json

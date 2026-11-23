@@ -5,7 +5,8 @@
 
 .DESCRIPTION
     fmt + clippy (-D warnings) + test. Falla con código distinto de cero en el
-    primer paso que no pase.
+    primer paso que no pase. Todo pasa por `cargo-low.ps1`: prioridad
+    BelowNormal y `-j 4`, para que la compilación no bloquee el escritorio.
 
 .PARAMETER SkipFmt
     Omite `cargo fmt --all -- --check`.
@@ -16,6 +17,10 @@
 .PARAMETER SkipTests
     Omite `cargo test --workspace`.
 
+.PARAMETER Jobs
+    Jobs de cargo para esta ejecución. 0 (por defecto) respeta
+    `AXF_CARGO_JOBS`, y si no está definido el wrapper usa 4.
+
 .EXAMPLE
     pwsh -File scripts/check.ps1
 #>
@@ -23,11 +28,23 @@
 param(
     [switch]$SkipFmt,
     [switch]$SkipClippy,
-    [switch]$SkipTests
+    [switch]$SkipTests,
+
+    [ValidateRange(0, 64)]
+    [int]$Jobs = 0
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+if ($Jobs -gt 0) {
+    $env:AXF_CARGO_JOBS = "$Jobs"
+}
+
+$cargoLow = Join-Path $PSScriptRoot 'cargo-low.ps1'
+if (-not (Test-Path $cargoLow)) {
+    throw "No se encontró $cargoLow."
+}
 
 function Invoke-Cargo {
     param(
@@ -41,7 +58,7 @@ function Invoke-Cargo {
     )
 
     Write-Host "==> cargo $($Arguments -join ' ')" -ForegroundColor Cyan
-    & cargo @Arguments
+    & $cargoLow @Arguments
     if ($LASTEXITCODE -ne 0) {
         throw "Fallo '$Label' (exit code $LASTEXITCODE)."
     }
