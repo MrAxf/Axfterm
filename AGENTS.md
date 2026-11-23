@@ -3,14 +3,16 @@
 ## Qué es
 
 Axfterm es un terminal workspace nativo, rápido y keyboard-first para Windows
-(macOS/Linux después), construido en Rust 2024 sobre GPUI. Agrupa proyectos,
-paneles y pestañas de terminal, y muestra agentes de IA (opencode y GitHub
-Copilot) con su estado en la barra lateral.
+(macOS/Linux después), construido en Rust 2024 sobre GPUI. Reúne las terminales
+de cada proyecto en una barra lateral, con paneles y pestañas en el área
+central, y muestra agentes de IA (opencode y GitHub Copilot) con su estado en la
+misma barra.
 
 ## Estado
 
 v0.1 en desarrollo. La fuente de verdad del progreso es `.memory/`: leer
-`.memory/README.md` antes de tocar código.
+`.memory/README.md` antes de tocar código. Las decisiones estructurales están en
+`.memory/adr/` (0001–0009) y no se contradicen desde el código.
 
 ## Stack fijado
 
@@ -20,11 +22,18 @@ v0.1 en desarrollo. La fuente de verdad del progreso es `.memory/`: leer
 - `alacritty_terminal` 0.26 para VT y estado de pantalla.
 - `portable-pty` 0.9 para PTY (ConPTY en Windows).
 - `sysinfo` 0.40 para árbol de procesos.
-- `toml` 1.x + `notify` 9 para configuración y hot reload.
+- `toml` 1.x + `notify` 8.2.1 para configuración y hot reload. `notify` 9 exige
+  Rust 1.91 y rompería la MSRV 1.85; se fija la misma versión que ya usa
+  gpui-kit.
+- `toml_edit` para que el panel de ajustes escriba `config.toml` sin perder
+  comentarios ni orden.
+- `windows-sys` (shell/GDI) y `png` para extraer y cachear el icono del
+  ejecutable en Windows; ambos ya están en el árbol por gpui/portable-pty.
 - `serde`, `thiserror`, `anyhow`, `tracing`, `smallvec`, `unicode-width`.
 
 Licencias: GPUI/gpui-kit y alacritty son Apache-2.0; portable-pty es MIT;
-Tabler es MIT; simple-icons es CC0. Mantener `NOTICE` actualizado.
+Tabler es MIT; simple-icons es CC0; `toml_edit`, `windows-sys` y `png` son
+MIT/Apache-2.0. Mantener `NOTICE` actualizado.
 
 ## Restricciones de producto (no negociables)
 
@@ -42,38 +51,71 @@ Tabler es MIT; simple-icons es CC0. Mantener `NOTICE` actualizado.
 7. Sin telemetría ni red por defecto. La detección de agentes es local.
 8. Minimalismo: una acción primaria por superficie; nada que no comunique
    estado o permita actuar.
+9. Los proyectos son una clasificación de la sidebar. No hay selector, pestañas
+   ni breadcrumb de proyecto en el área central.
 
 ## Arquitectura
 
+Decisiones estructurales registradas en `.memory/adr/`: 0001 motor VT/PTY,
+0002 GPUI encapsulado, 0003 workspace y proyectos, 0004 config y versionado,
+0005 límites de v0.1, 0006 perfiles de terminal, 0007 panel de ajustes.
+
 ### Crates
 
-- `crates/app` (`axfterm`) — binario, shell GPUI, acciones, paleta, wiring.
-- `crates/ui` (`axf_ui`) — tokens, tema, iconos y componentes propios.
+- `crates/app` (`axfterm`) — binario, shell GPUI, acciones, paleta, panel de
+  ajustes, wiring.
+- `crates/ui` (`axf_ui`) — tokens, tema, iconos, extracción del icono de
+  ejecutable y componentes propios.
 - `crates/terminal` (`axf_terminal`) — PTY, motor VT, input encoding,
-  `TerminalElement`, selección.
+  `TerminalElement`, selección. Arranca un `SpawnSpec`; no elige shell.
 - `crates/workspace` (`axf_workspace`) — proyectos, `PaneTree`, pestañas, foco,
   persistencia de sesión.
 - `crates/agents` (`axf_agents`) — detección de procesos y máquina de estados.
-- `crates/config` (`axf_config`) — esquema TOML, defaults, migraciones, reload.
+- `crates/config` (`axf_config`) — esquema TOML, perfiles, descubrimiento,
+  defaults, migraciones, escritura y reload.
 
 Dependencias permitidas: `app -> {ui, terminal, workspace, agents, config}`;
-`workspace -> {terminal, agents, config, ui}`; `ui` no conoce terminal ni
-agentes; `agents` no conoce GPUI; `config` no conoce terminal.
+`workspace -> {terminal, agents, config, ui}`; `terminal -> ui` (solo para los
+tipos de GPUI que `axf_ui` reexporta como `axf_ui::gpui`, nunca `gpui-kit`
+directo); `ui` no conoce terminal ni agentes; `agents` no conoce GPUI; `config`
+no conoce terminal. **Solo `crates/ui` declara `gpui-kit`**; el resto, incluido
+`app`, importa GPUI desde `axf_ui::gpui` (ADR 0002).
 
 ### Modelo
 
 ```text
-WindowState { projects: Vec<Project>, active_project, sidebars: SidebarState }
-Project     { root, layout: PaneTree, terminals: HashMap<TerminalId, Terminal> }
-Pane        { tabs: Vec<TabId>, active: TabId, ratio }
-Tab         { terminal_id, title, agent: Option<AgentBinding> }
+WindowState { projects: Vec<Project>, layout: PaneTree,
+              tabs: HashMap<TabId, Tab>, panes: HashMap<PaneId, Pane>,
+              focus: Focus, sidebars: SidebarState }
+Project     { id, root, name }
+SidebarState { visible, width, expanded: Set<ProjectId>, filter }
+PaneTree    = Split { axis, ratio, first, second } | Leaf(PaneId)
+Pane        { tabs: Vec<TabId>, active: Option<TabId> }
+Tab         { project_id, terminal_id, profile_id, title,
+              agents: Vec<AgentSession> }
+Profile     { id, name, command, icon }
+Focus       { pane: PaneId, tab: Option<TabId> }
 ```
 
-- `TerminalId` y `TabId` son estables y serializables para restaurar sesión.
-- Una pestaña pertenece a un panel, pero puede moverse a otro sin recrear el
-  PTY.
-- Cerrar un panel con procesos vivos pide confirmación; cerrar el último panel
-  cierra el proyecto.
+- `TerminalId`, `PaneId`, `TabId` y `ProfileId` son estables y serializables
+  para restaurar sesión; el contador de IDs también se persiste.
+- Los perfiles viven en `config.toml`, no en la sesión: la pestaña guarda solo
+  `profile_id`. `default_profile` debe existir; el estado "cero perfiles" no es
+  válido.
+- El orden de `projects` es el orden de la sidebar.
+- `Project` es solo una clasificación de la sidebar: carpeta raíz registrada,
+  sin layout ni terminales propios.
+- Un panel puede mezclar pestañas de proyectos distintos. Una pestaña pertenece
+  a un panel y a un proyecto, y puede moverse a otro panel sin recrear el PTY ni
+  cambiar de proyecto.
+- El proyecto actual se deriva de la pestaña enfocada (`focus`); no existe
+  `active_project`.
+- El foco apunta a un panel y a su pestaña activa. Un panel sin pestañas y el
+  workspace vacío son estados válidos; solo el último panel puede quedar vacío,
+  los demás se colapsan al cerrar su última pestaña.
+- Cerrar un panel con procesos vivos pide confirmación. Cerrar la última
+  pestaña deja el proyecto vacío en la sidebar; quitarlo es una acción explícita
+  que cierra sus pestañas, con confirmación si hay procesos vivos.
 
 ### Hilos y datos
 
@@ -95,9 +137,9 @@ Tab         { terminal_id, title, agent: Option<AgentBinding> }
 
 ### Teclado
 
-- Contextos GPUI: `Workspace`, `Terminal`, `Palette`, `Sidebar`.
-- Orden de dispatch: overlay/paleta -> keybinding del contexto -> terminal ->
-  IME.
+- Contextos GPUI: `Workspace`, `Terminal`, `Palette`, `Sidebar` y `Settings`.
+- Orden de dispatch: overlay/paleta/panel de ajustes -> keybinding del contexto
+  -> terminal -> IME.
 - Los atajos de app exigen modificador. `Ctrl+C/D/Z`, Tab, Esc y flechas quedan
   libres para la terminal.
 - La config valida conflictos y teclas reservadas; `unbind` explícito. Nunca
@@ -115,24 +157,63 @@ Tab         { terminal_id, title, agent: Option<AgentBinding> }
   color.
 - Cambiar tema, fuente o tamaño base recalcula métricas y repinta sin reiniciar.
 
+### Perfiles
+
+- `config.toml` (schema v2) declara `[[profiles]]` con `id`, `name`, `command`
+  e `icon` opcional, más `[terminal] default_profile`.
+- `command` es una línea que se tokeniza a ejecutable + argv; sin shell, sin
+  variables de entorno y sin operadores. El terminal recibe `SpawnSpec` y no
+  elige shell por su cuenta.
+- Sin `icon`, en Windows se extrae el icono del ejecutable y se cachea; si no,
+  se usa el fallback de Tabler. La extracción es un adaptador de plataforma en
+  `axf_ui`.
+- Primer arranque o config sin perfiles: descubrimiento local (PATH, WSL en
+  segundo plano) y escritura atómica una sola vez. Después manda el archivo.
+- Un perfil inexistente o un ejecutable que no arranca es un error visible en
+  la pestaña, nunca un fallback silencioso a otro shell.
+- La pestaña conserva su `profile_id` al moverse, duplicarse y restaurarse; el
+  título inicial es el nombre del perfil.
+
 ### Agentes
 
-- Escaneo cada 1-2 s del árbol de procesos del PTY (PID raíz + `sysinfo`).
-- Match por nombre/argv: `opencode`, `copilot` (evitar falsos positivos).
-- Estados: `Idle`, `Working`, `NeedsAttention`, `Stopped`.
-- Prioridad: `NeedsAttention` > `Working` > `Idle` > `Stopped`.
-- Señales: bell, OSC 9/777/1337, tasa de salida, quiescencia, salida del
-  proceso. La atención se mantiene hasta foco o confirmación.
-- La UI solo lee `AgentBinding`; nunca bloquea esperando al proceso.
+- OSC 7501 es la fuente principal de estado; el árbol de procesos del PTY
+  (PID raíz + `sysinfo`) atribuye el agente a su pestaña y sirve de fallback.
+- Match por nombre/argv: `opencode`/`opencode2`, `copilot`/`copilot-runtime`
+  (evitar falsos positivos y podar procesos ayudantes).
+- Cada proceso de agente es una `AgentSession`; una pestaña puede tener varias.
+  El estado es runtime-only y no se persiste en la sesión.
+- Estados: `Idle`, `Working`, `NeedsAttention`, `Finished`, `Error`, `Stopped`.
+- Prioridad: `NeedsAttention` > `Working` > `Error` > `Finished` > `Idle` >
+  `Stopped`. Atención, terminado y error se limpian al enfocar.
+- Señales: OSC 7501, bell, OSC 9/777/1337, tasa de salida, quiescencia y salida
+  del proceso. El escaneo y el parser viven fuera del hilo de UI.
+- La UI solo lee `AgentSession`; nunca bloquea esperando al proceso.
 - Futuro (no v0.1): eventos del servidor/plugin de OpenCode.
 
 ### Persistencia
 
 - Config: `%APPDATA%\axfterm\config.toml` y `themes/`. En Unix,
-  `~/.config/axfterm/`; en macOS, `~/Library/Application Support/axfterm/`.
+  `~/.config/axfterm/` (o `$XDG_CONFIG_HOME/axfterm/`); en macOS,
+  `~/Library/Application Support/axfterm/`. `AXFTERM_CONFIG_DIR` solo para tests
+  y diagnóstico.
+- Config y sesión llevan versión de esquema (`schema_version` / `version`) con
+  migraciones encadenadas; una versión futura se rechaza con error, no se
+  degrada. Escribir siempre es atómico (temporal + rename).
+- Config v2 incluye los perfiles; sesión v2 incluye el `profile_id` de cada
+  pestaña. Las migraciones v1 → v2 se conservan y se prueban en actualización.
 - Sesión: `session.json` junto a la config, con versión y migraciones.
-- Si config o sesión están corruptas: backup, aviso y arranque con defaults.
-- Hot reload de config con errores accionables, sin panics.
+- Historial de terminal: un archivo ANSI por terminal en `scrollback/`, con
+  `epoch` por ejecución, checksum y tope de 2 MiB (ADR 0008). Se guarda en cierre
+  ordenado y se restaura de forma perezosa al activar cada pestaña; un archivo
+  inválido cae al mismo perfil desde cero con aviso.
+- Panel de ajustes: borrador validado, escritura con `toml_edit` preservando
+  comentarios y `write_atomic`. Ante conflicto con un cambio externo se avisa y
+  se pide decisión; nunca se pisa en silencio. No hay almacén paralelo.
+- Si config o sesión están corruptas: backup fechado, aviso y arranque con
+  defaults. Un error de hot reload conserva la última config válida.
+- Hot reload de config con errores accionables, sin panics. Las escrituras del
+  propio panel no se aplican dos veces.
+- Límites de terminales, perfiles, scrollback, pegado e iconos: ADR 0005.
 
 ## Convenciones de código
 
@@ -151,13 +232,20 @@ Tab         { terminal_id, title, agent: Option<AgentBinding> }
 Comandos obligatorios antes de cerrar una tarea (PowerShell):
 
 ```powershell
-cargo fmt --all -- --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
-cargo build --release
+pwsh -File scripts/check.ps1          # fmt + clippy + test
+pwsh -File scripts/cargo-low.ps1 build --release
 ```
 
+Equivalen a `cargo fmt --all -- --check`,
+`cargo clippy --workspace --all-targets -- -D warnings`,
+`cargo test --workspace` y `cargo build --release`, pero con la máquina a salvo:
+8 núcleos / 16 hilos sin límite bloquean el escritorio. **Nunca lanzar `cargo`
+a pelo en primer plano**; para más paralelismo,
+`AXF_CARGO_JOBS=8 pwsh -File scripts/cargo-low.ps1 …`.
+
 - Tests unitarios de parser, input encoding, config y máquina de estados.
+- Tests de perfiles: tokenizer de `command`, descubrimiento con PATH falso,
+  migraciones v1 → v2 y escritura que conserva comentarios.
 - Tests de PTY con scripts fixture (PowerShell y sh).
 - UI smoke tests con el test-support de gpui-kit.
 - Benchmarks: arranque, throughput de output, resize, fuzzy de paleta.
@@ -176,7 +264,13 @@ cargo build --release
 
 SSH/remoto, plugins de terceros, contenedores y puertos, split dentro de una
 pestaña, ligaduras, kitty graphics/sixel, búsqueda en scrollback, daemon de
-sesiones, worktrees por proyecto, auto-update y empaquetado macOS/Linux.
+sesiones, worktrees por proyecto, auto-update y empaquetado macOS/Linux. También
+quedan fuera: ventana única sin pestañas desacoplables, perfiles por proyecto,
+variables de entorno por perfil, extracción nativa de iconos en macOS/Linux,
+shell integration (OSC 133), ARM64 y sincronización de config/temas. Los números
+y el comportamiento al alcanzar un límite están en ADR 0005. El panel de ajustes
+sí entra en v0.1 (M7): la config sigue siendo el archivo y el panel escribe en
+él.
 
 ## Riesgos conocidos
 
@@ -187,5 +281,15 @@ sesiones, worktrees por proyecto, auto-update y empaquetado macOS/Linux.
 - **ConPTY + IME/AltGr**: validar con teclados ES y CJK desde M0.
 - **Overflow y drag de pestañas**: geometría pura con tests; nada de lógica
   enterrada en el render.
-- **Agentes heurísticos**: falsos positivos inevitables; el estado debe ser
-  explicable y permitir override manual.
+- **Parser de la línea de comandos**: barras invertidas y rutas con espacios;
+  reglas documentadas y tests antes de tocar el spawn.
+- **Iconos de ejecutable**: APIs Win32 y DPI variable; spike previo, caché
+  acotada y fallback Tabler siempre disponible.
+- **Panel de ajustes y hot reload**: dos escritores sobre el mismo archivo;
+  borrador, detección de conflicto y nunca sobrescribir en silencio.
+- **Agentes con OSC 7501 y fallback de procesos**: los CLIs antiguos no reportan
+  estado y pueden aparecer falsos positivos en el matcher; el estado debe ser
+  explicable, medible y permitir override manual.
+- **Historial persistido**: contiene el texto que se mostró en la terminal,
+  incluidos posibles secretos, y solo se guarda en cierre ordenado. Se almacena
+  bajo el perfil del usuario, sin cifrar ni sincronizar (ADR 0008).
