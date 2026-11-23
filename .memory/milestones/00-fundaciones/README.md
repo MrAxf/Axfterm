@@ -6,8 +6,8 @@ features.
 
 ## Criterio de hecho
 
-- [ ] `cargo run -p axfterm` abre una ventana con una terminal real.
-- [ ] Escribir, leer, colores, resize y Ctrl+C funcionan en Windows.
-- [ ] El grid de prueba se pinta con frame estable y medición registrada.
-- [ ] ADRs escritos y decisiones reflejadas en `AGENTS.md`.
-- [ ] `fmt`, `clippy -D warnings` y `test --workspace` en verde.
+- [x] `cargo run -p axfterm` abre una ventana con una terminal real.
+- [x] Escribir, leer, colores, resize y Ctrl+C funcionan en Windows.
+- [x] El grid de prueba se pinta con frame estable y medición registrada.
+- [x] ADRs escritos y decisiones reflejadas en `AGENTS.md`.
+- [x] `fmt`, `clippy -D warnings` y `test --workspace` en verde.
