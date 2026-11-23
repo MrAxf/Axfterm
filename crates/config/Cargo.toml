@@ -1,6 +1,6 @@
 [package]
 name = "axf_config"
-description = "Esquema TOML, defaults, migraciones y hot reload de Axfterm"
+description = "Configuración de Axfterm: rutas, esquema TOML, defaults y hot reload"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,6 +9,17 @@ authors.workspace = true
 publish.workspace = true
 
 [dependencies]
+# Canal acotado watcher -> UI: el hilo de notify nunca bloquea la UI.
+async-channel.workspace = true
+# Watch de `config.toml` y `themes/` con debounce (ADR 0004).
+notify.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+# Esquema TOML con errores de línea/columna.
+toml.workspace = true
+# Migración v1 -> v2 conservando comentarios y orden (ADR 0006).
+toml_edit.workspace = true
+tracing.workspace = true
 
 [lints]
 workspace = true
