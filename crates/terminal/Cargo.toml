@@ -9,6 +9,17 @@ authors.workspace = true
 publish.workspace = true
 
 [dependencies]
+alacritty_terminal.workspace = true
+# Canal acotado para publicar frames del parser al hilo de UI.
+async-channel.workspace = true
+# Solo se usan los tipos de GPUI que `axf_ui` reexporta (ADR 0002).
+axf_ui.workspace = true
+portable-pty.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+# `sysinfo` es de `axf_agents`; aquí solo lo usa el spike S2.
+sysinfo.workspace = true
 
 [lints]
 workspace = true
