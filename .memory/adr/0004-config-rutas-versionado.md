@@ -188,3 +188,21 @@ comportamiento descrito aquí: watch de `config.toml` y `themes/`, debounce de
   reload siguen siendo contratos de primera clase.
 - El panel no hereda el hot reload para escrituras propias: reconoce el cambio
   que él mismo provocó para no aplicar dos veces la misma config.
+
+## Enmienda M7 (2026-11-23) — escritura desde el panel
+
+- `axf_config::write_config(path, base, draft)` edita el documento actual con
+  `toml_edit`: solo toca los campos cuyo valor difiere entre `base` y `draft`,
+  conserva comentarios y orden (incluidos los de `[keymap]` y `[[profiles]]`) y
+  vuelve a parsear el resultado antes de escribir con `write_atomic`.
+- El borrador del panel no modifica la config activa: la apariencia y las
+  fuentes se aplican como previsualización en `ThemeHost` y `Descartar` las
+  revierte. Al guardar se aplica una sola vez y el evento del watcher producido
+  por la escritura se ignora comparando el contenido con la huella guardada.
+- Conflicto externo: con el borrador limpio se recarga; con cambios sin guardar
+  el panel pide recargar o seguir editando, y guardar exige confirmación
+  explícita para sobrescribir. Nunca se pisa en silencio.
+- `[agents]` añade `preferred_profiles` (agente → id de perfil), validado contra
+  `[[profiles]]`; el lanzador de agentes de v0.2 lo consumirá.
+- `theme.info` queda como id legado que abre el panel; los atajos existentes
+  siguen funcionando, pero la ayuda y la paleta muestran `settings.open`.

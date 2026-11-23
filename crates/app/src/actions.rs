@@ -10,9 +10,10 @@ use axf_ui::gpui::Action;
 use crate::{
     AgentNextAttention, ClosePane, CloseTab, DuplicateTab, ExportTheme, FocusNextPane,
     FocusPreviousPane, FocusSidebar, ImportTheme, MoveTabNextPane, NewTab, NextTab, NextTheme,
-    OpenCommandPalette, OpenProject, OpenSearchPalette, OpenThemesFolder, PreviousTab,
-    PreviousTheme, Quit, ReloadThemes, RenameTab, RestartTab, ShowShortcuts, SplitHorizontal,
-    SplitVertical, ToggleSidebar, ToggleSidebarAgents, ToggleThemeVariant, ToggleZoom,
+    OpenCommandPalette, OpenProject, OpenSearchPalette, OpenSettings, OpenThemesFolder,
+    PreviousTab, PreviousTheme, Quit, ReloadThemes, RenameTab, RestartTab, ShowShortcuts,
+    SplitHorizontal, SplitVertical, ToggleSidebar, ToggleSidebarAgents, ToggleThemeVariant,
+    ToggleZoom,
 };
 
 /// Grupos usados por la ayuda y la paleta.
@@ -266,13 +267,23 @@ pub(crate) const ALL_CONTEXT_ACTIONS: &[ActionMeta] = &[
         &["zoom", "panel", "pane"],
     ),
     meta(
+        "settings.open",
+        "Abrir los ajustes",
+        ActionCategory::App,
+        crate::keys::SETTINGS,
+        ALL_CONTEXTS,
+        &["ajustes", "settings", "config", "tema", "fuente", "atajo"],
+    ),
+    // Id legado: se conserva para que un `[keymap]` existente siga funcionando,
+    // pero el panel es ahora la única superficie de tema y fuentes.
+    disabled(hidden(meta(
         "theme.info",
-        "Abrir tema y fuentes",
+        "Abrir los ajustes (id legado)",
         ActionCategory::Theme,
-        crate::keys::SHOW_THEME_INFO,
+        "",
         ALL_CONTEXTS,
         &["tema", "fuente", "ajustes", "theme"],
-    ),
+    ))),
     // El modal «Tema y fuentes» concentra variante, catálogo y botones de
     // gestión; en la paleta de comandos solo queda la entrada al modal.
     hidden(meta(
@@ -396,6 +407,13 @@ const fn hidden(action: ActionMeta) -> ActionMeta {
     action
 }
 
+/// Marca una acción como retirada de la ayuda y de los atajos por defecto.
+const fn disabled(action: ActionMeta) -> ActionMeta {
+    let mut action = action;
+    action.enabled = false;
+    action
+}
+
 /// Todas las acciones registradas.
 pub(crate) fn all() -> impl Iterator<Item = &'static ActionMeta> {
     ALL_CONTEXT_ACTIONS.iter().chain(TERMINAL_ACTIONS)
@@ -438,7 +456,8 @@ pub(crate) fn action_for(id: &str) -> Option<Box<dyn Action>> {
         "pane.focus_next" => Box::new(FocusNextPane),
         "pane.focus_previous" => Box::new(FocusPreviousPane),
         "pane.toggle_zoom" => Box::new(ToggleZoom),
-        "theme.info" => Box::new(crate::ShowThemeInfo),
+        "theme.info" => Box::new(OpenSettings),
+        "settings.open" => Box::new(OpenSettings),
         "theme.toggle_variant" => Box::new(ToggleThemeVariant),
         "theme.next" => Box::new(NextTheme),
         "theme.previous" => Box::new(PreviousTheme),
@@ -573,7 +592,7 @@ mod tests {
             "pane.split_horizontal",
             "pane.close",
             "project.open",
-            "theme.info",
+            "settings.open",
             "help.shortcuts",
         ] {
             assert!(

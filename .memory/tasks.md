@@ -9,7 +9,7 @@
 - [x] M4 Perfiles de terminal, detección e iconos
 - [x] M5 Agentes y sidebar (OSC 7501 + sesiones por terminal; gate manual pendiente)
 - [x] M6 Teclado y command palette
-- [ ] M7 Panel de ajustes
+- [x] M7 Panel de ajustes (gate manual pendiente)
 - [ ] M8 Persistencia, robustez y release v0.1 (historial de terminal: adelanto hecho)
 
 ## Transversal

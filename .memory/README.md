@@ -1,10 +1,12 @@
 # Axfterm — memoria del proyecto
 
-Estado: M6 Teclado y paletas cerrado; siguiente M7 Panel de ajustes. `config.toml` v2 declara
-`[[profiles]]` con id, nombre, comando e icono; el descubrimiento local escribe
-PowerShell, cmd, Git Bash, Nu y WSL en el primer arranque, la sesión v2 conserva
-el perfil y los iconos salen del ejecutable con caché acotada y fallback Tabler.
-Tests, clippy, fmt y release en verde; gate manual con pwsh, cmd y WSL.
+Estado: M7 Panel de ajustes implementado; pendiente el gate manual interactivo.
+M6 Teclado y paletas cerrado. `config.toml` v2 declara `[[profiles]]` con id,
+nombre, comando e icono y `[agents.preferred_profiles]`; el descubrimiento local
+escribe PowerShell, cmd, Git Bash, Nu y WSL en el primer arranque, la sesión v2
+conserva el perfil y los iconos salen del ejecutable con caché acotada y
+fallback Tabler. Tests, clippy, fmt y release en verde; gate manual con pwsh,
+cmd y WSL.
 Spikes S1–S8 hechos y medidos; ADR 0001–0009 aceptados en `adr/`.
 Adelanto de M8: cada terminal guarda su historial en `scrollback/` y lo restaura
 al activar su pestaña; el fallo visible abre el mismo perfil desde cero.
@@ -17,7 +19,11 @@ contextos/unbind y validación de teclas de terminal, paleta única con modos
 Comandos y Búsqueda, filtro por tipo, fuzzy, navegación y recientes, temas y
 fuentes en su modal, y pantalla de atajos generada desde el registro. Tests en
 verde y gate manual sin ratón validado.
-Siguiente: M7 panel de ajustes.
+M7 Panel de ajustes implementado: overlay con siete secciones, borrador con
+validación y preview, escritura con `toml_edit` que conserva comentarios,
+perfiles completos, atajos con captura, agentes y avanzado. Tests en verde;
+queda el gate manual interactivo.
+Siguiente: gate manual de M7 y arranque de M8 persistencia y release.
 Stack: Rust 2024 + gpui-kit + alacritty_terminal + portable-pty. Windows primero.
 
 ## Cómo leer
@@ -39,7 +45,7 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho.
 - [M4 Perfiles de terminal](milestones/04-perfiles/README.md) — cerrado
 - [M5 Agentes y sidebar](milestones/05-agentes-sidebar/README.md)
 - [M6 Teclado y paleta](milestones/06-teclado-paleta/README.md)
-- [M7 Panel de ajustes](milestones/07-panel-ajustes/README.md)
+- [M7 Panel de ajustes](milestones/07-panel-ajustes/README.md) — implementado; gate manual pendiente
 - [M8 Persistencia y release](milestones/08-persistencia-release/README.md)
 - [99 Futuro](milestones/99-futuro/README.md)
 

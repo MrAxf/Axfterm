@@ -137,11 +137,21 @@ scan_interval_ms = 1500
 notify_finished = true
 notify_error = true
 notify_attention = true
+
+# Perfil con el que abrir cada agente (id de [[profiles]]).
+[agents.preferred_profiles]
+opencode = "pwsh"
+copilot = "pwsh"
 ```
 
 Se recarga en caliente como el resto de `config.toml`. Un valor fuera de rango
 es un error de campo accionable; no se corrige en silencio. Al desactivar la
 detección se retiran las sesiones en memoria.
+
+El panel de ajustes (`Ctrl+Alt+T`, sección Agentes) edita estos campos con
+borrador y guardado atómico. `preferred_profiles` se valida contra los perfiles
+existentes y lo consumirá el lanzador de agentes de v0.2; en v0.1 solo se
+persiste. Ver `docs/settings.md`.
 
 ## Diagnóstico y pruebas
 

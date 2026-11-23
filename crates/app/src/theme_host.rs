@@ -46,6 +46,8 @@ pub(crate) struct ThemeHost {
     pub(crate) catalog: ThemeCatalog,
     pub(crate) selected: String,
     pub(crate) preview_variant: Option<ThemeVariant>,
+    /// Borrador visual del panel de ajustes; `None` muestra `settings`.
+    pub(crate) preview: Option<Config>,
     pub(crate) watcher: Option<ConfigWatcher>,
     pub(crate) fonts: FontSet,
     pub(crate) display_scale: f32,
@@ -132,6 +134,7 @@ impl ThemeHost {
             catalog,
             selected,
             preview_variant: None,
+            preview: None,
             watcher,
             fonts,
             display_scale: 1.0,
@@ -154,11 +157,17 @@ impl ThemeHost {
         host
     }
 
+    /// Configuración que pinta la ventana: el borrador visual o la activa.
+    pub(crate) fn visual(&self) -> &Config {
+        self.preview.as_ref().unwrap_or(&self.settings)
+    }
+
     /// Tema activo según apariencia, preview y catálogo.
     pub(crate) fn resolve_theme(&self, system_dark: bool) -> (Theme, Option<String>) {
+        let visual = self.visual();
         let target = self
             .preview_variant
-            .unwrap_or_else(|| target_variant(self.settings.appearance, system_dark));
+            .unwrap_or_else(|| target_variant(visual.appearance, system_dark));
         let selected = self
             .catalog
             .find(&self.selected)
@@ -199,16 +208,16 @@ impl ThemeHost {
             messages.push(warning);
         }
         let metrics = UiMetrics::scaled(
-            self.settings.ui.font_size,
-            self.settings.ui.scale,
+            self.visual().ui.font_size,
+            self.visual().ui.scale,
             self.display_scale,
         );
         let ui_font_size = metrics.font_size;
-        let mono_font_size = px(self.settings.terminal.font_size);
-        let terminal_line_height = if (self.settings.terminal.line_height - 1.0).abs() < 0.001 {
+        let mono_font_size = px(self.visual().terminal.font_size);
+        let terminal_line_height = if (self.visual().terminal.line_height - 1.0).abs() < 0.001 {
             px(0.0)
         } else {
-            px(f32::from(mono_font_size) * self.settings.terminal.line_height)
+            px(f32::from(mono_font_size) * self.visual().terminal.line_height)
         };
         theme::install(
             cx,
@@ -277,6 +286,7 @@ impl ThemeHost {
                     let sources_changed = resolved_font_sources(&config, &self.config_dir)
                         != resolved_font_sources(&self.settings, &self.config_dir);
                     self.settings = config;
+                    self.preview = None;
                     self.profile_icons.clear();
                     report.applied = true;
                     if sources_changed {
@@ -343,15 +353,15 @@ impl ThemeHost {
 
     /// Relee las fuentes configuradas y las registra.
     fn reload_fonts(&mut self, cx: &mut App) -> Vec<String> {
-        let sources = resolved_font_sources(&self.settings, &self.config_dir);
+        let sources = resolved_font_sources(self.visual(), &self.config_dir);
         let prepared = fonts::read_sources(&sources);
         let loaded = prepared.files.len();
         let errors = fonts::install(cx, prepared.files);
         let installed = cx.text_system().all_font_names();
         let mut resolved = fonts::resolve(
             &installed,
-            self.settings.ui.font_family.as_deref(),
-            self.settings.terminal.font_family.as_deref(),
+            self.visual().ui.font_family.as_deref(),
+            self.visual().terminal.font_family.as_deref(),
             loaded,
             prepared.errors,
         );
@@ -367,8 +377,8 @@ impl ThemeHost {
         let installed = cx.text_system().all_font_names();
         let resolved = fonts::resolve(
             &installed,
-            self.settings.ui.font_family.as_deref(),
-            self.settings.terminal.font_family.as_deref(),
+            self.visual().ui.font_family.as_deref(),
+            self.visual().terminal.font_family.as_deref(),
             self.fonts.loaded,
             self.fonts.errors.clone(),
         );
@@ -406,23 +416,59 @@ impl ThemeHost {
         names
     }
 
-    /// Previsualiza una familia de UI en memoria (la fuente sigue siendo
-    /// `config.toml`; el panel de ajustes de M7 será quien la escriba).
-    pub(crate) fn preview_ui_font(&mut self, family: Option<String>, cx: &mut App) -> Vec<String> {
-        self.settings.ui.font_family = family;
-        let mut messages = self.refresh_font_resolution(cx);
+    /// Previsualiza el borrador visual sin escribir ni tocar la config activa.
+    ///
+    /// Solo relee fuentes cuando cambian sus orígenes; el resto de campos se
+    /// aplica con las métricas ya resueltas.
+    pub(crate) fn preview_settings(&mut self, draft: &Config, cx: &mut App) -> Vec<String> {
+        let sources_changed = resolved_font_sources(draft, &self.config_dir)
+            != resolved_font_sources(self.visual(), &self.config_dir);
+        self.preview = Some(draft.clone());
+        self.preview_variant = None;
+        let mut messages = if sources_changed {
+            self.reload_fonts(cx)
+        } else {
+            self.refresh_font_resolution(cx)
+        };
         messages.extend(self.apply_current(cx));
         messages
     }
 
-    /// Previsualiza una familia de terminal en memoria.
-    pub(crate) fn preview_terminal_font(
-        &mut self,
-        family: Option<String>,
-        cx: &mut App,
-    ) -> Vec<String> {
-        self.settings.terminal.font_family = family;
-        let mut messages = self.refresh_font_resolution(cx);
+    /// Descarta la previsualización y vuelve a la configuración activa.
+    pub(crate) fn clear_preview(&mut self, cx: &mut App) -> Vec<String> {
+        let Some(previous) = self.preview.take() else {
+            return Vec::new();
+        };
+        let sources_changed = resolved_font_sources(&previous, &self.config_dir)
+            != resolved_font_sources(&self.settings, &self.config_dir);
+        let mut messages = if sources_changed {
+            self.reload_fonts(cx)
+        } else {
+            self.refresh_font_resolution(cx)
+        };
+        messages.extend(self.apply_current(cx));
+        messages
+    }
+
+    /// Convierte el borrador guardado en la configuración activa.
+    ///
+    /// Se llama una sola vez tras escribir el archivo; el watcher reconocerá
+    /// el contenido y no repetirá el trabajo.
+    pub(crate) fn commit_settings(&mut self, draft: Config, cx: &mut App) -> Vec<String> {
+        let sources_changed = resolved_font_sources(&draft, &self.config_dir)
+            != resolved_font_sources(&self.settings, &self.config_dir);
+        self.preview = None;
+        self.preview_variant = None;
+        self.settings = draft;
+        self.profile_icons.clear();
+        if self.catalog.find(&self.settings.ui.theme).is_some() {
+            self.selected = self.settings.ui.theme.clone();
+        }
+        let mut messages = if sources_changed {
+            self.reload_fonts(cx)
+        } else {
+            self.refresh_font_resolution(cx)
+        };
         messages.extend(self.apply_current(cx));
         messages
     }

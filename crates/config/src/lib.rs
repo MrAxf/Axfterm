@@ -7,6 +7,7 @@ pub mod paths;
 pub mod profiles;
 pub mod schema;
 pub mod watch;
+mod write;
 
 mod timestamp;
 
@@ -19,8 +20,9 @@ pub use profiles::{
     discover_wsl, fallback_profile, resolve_executable, tokenize,
 };
 pub use schema::{
-    AgentsConfig, Appearance, CONFIG_SCHEMA_VERSION, CONFIG_TEMPLATE_HEADER, Config, ConfigError,
-    FontsConfig, LoadedConfig, MAX_CONFIG_BYTES, TerminalConfig, UiConfig, append_profiles,
-    default_template, load, load_or_create, parse_str, write_atomic,
+    AGENT_PROFILE_KEYS, AgentsConfig, Appearance, CONFIG_SCHEMA_VERSION, CONFIG_TEMPLATE_HEADER,
+    Config, ConfigError, FontsConfig, LoadedConfig, MAX_CONFIG_BYTES, TerminalConfig, UiConfig,
+    append_profiles, default_template, load, load_or_create, parse_str, write_atomic,
 };
 pub use watch::{ConfigWatcher, DEBOUNCE, WatchError, WatchEvent, watch};
+pub use write::{read_config_text, write_config};

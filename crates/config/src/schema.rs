@@ -4,6 +4,7 @@
 //! recarga en caliente. Los campos desconocidos son un error para que un typo
 //! no se ignore en silencio. Los rangos se validan sin clamp silencioso.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -71,6 +72,10 @@ scan_interval_ms = 1500
 notify_finished = true
 notify_error = true
 notify_attention = true
+# Perfil de terminal preferido para abrir agentes (vacío = perfil por defecto).
+# [agents.preferred_profiles]
+# opencode = "pwsh"
+# copilot = "pwsh"
 "#;
 
 /// Plantilla del primer arranque con los perfiles detectados.
@@ -224,6 +229,9 @@ pub struct FontsConfig {
     pub sources: Vec<PathBuf>,
 }
 
+/// Claves válidas de `[agents.preferred_profiles]` (nombre estable del agente).
+pub const AGENT_PROFILE_KEYS: &[&str] = &["opencode", "copilot"];
+
 /// Sección `[agents]`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -238,6 +246,10 @@ pub struct AgentsConfig {
     pub notify_error: bool,
     /// Avisar cuando una sesión requiere al usuario.
     pub notify_attention: bool,
+    /// Perfil con el que abrir cada agente. La clave es el nombre estable del
+    /// agente (`opencode`, `copilot`) y el valor un id de `[[profiles]]`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub preferred_profiles: BTreeMap<String, ProfileId>,
 }
 
 impl Default for AgentsConfig {
@@ -248,6 +260,7 @@ impl Default for AgentsConfig {
             notify_finished: true,
             notify_error: true,
             notify_attention: true,
+            preferred_profiles: BTreeMap::new(),
         }
     }
 }
@@ -383,6 +396,29 @@ impl Config {
             });
         }
         self.validate_profiles()?;
+        self.validate_agent_profiles()?;
+        Ok(())
+    }
+
+    fn validate_agent_profiles(&self) -> Result<(), ConfigError> {
+        for (agent, profile) in &self.agents.preferred_profiles {
+            if !AGENT_PROFILE_KEYS.contains(&agent.as_str()) {
+                return Err(ConfigError::Field {
+                    field: format!("agents.preferred_profiles.{agent}"),
+                    message: format!("agente desconocido; usa {}", AGENT_PROFILE_KEYS.join(" o ")),
+                });
+            }
+            if !self
+                .profiles
+                .iter()
+                .any(|candidate| &candidate.id == profile)
+            {
+                return Err(ConfigError::Field {
+                    field: format!("agents.preferred_profiles.{agent}"),
+                    message: format!("`{profile}` no existe en [[profiles]]"),
+                });
+            }
+        }
         Ok(())
     }
 
@@ -478,6 +514,14 @@ impl Config {
         self.profile(&self.terminal.default_profile)
     }
 
+    /// Perfil preferido para un agente (`opencode` o `copilot`).
+    pub fn agent_profile(&self, agent: &str) -> Option<&Profile> {
+        self.agents
+            .preferred_profiles
+            .get(agent)
+            .and_then(|id| self.profile(id))
+    }
+
     /// Resuelve una ruta de fuente relativa contra el directorio de config.
     pub fn resolve_font_source(&self, base: &Path, source: &Path) -> PathBuf {
         if source.is_absolute() {
@@ -520,7 +564,7 @@ struct ParsedDocument {
     profiles_detected: bool,
 }
 
-fn read_source(path: &Path) -> Result<Option<String>, ConfigError> {
+pub(crate) fn read_source(path: &Path) -> Result<Option<String>, ConfigError> {
     let metadata = match std::fs::metadata(path) {
         Ok(metadata) => metadata,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),

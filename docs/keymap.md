@@ -15,6 +15,7 @@ Todos los atajos se pueden cambiar en la sección `[keymap]` de
 | Alternar la barra lateral | `ctrl-b` | `sidebar.toggle` |
 | Enfocar la barra lateral | `ctrl-alt-b` | `sidebar.focus` |
 | Alternar el filtro de agentes | `ctrl-alt-a` | `sidebar.toggle_agents` |
+| Abrir los ajustes | `ctrl-alt-t` | `settings.open` |
 
 ## Proyectos
 
@@ -52,7 +53,6 @@ Todos los atajos se pueden cambiar en la sección `[keymap]` de
 
 | Acción | Atajo | Id |
 | --- | --- | --- |
-| Abrir tema y fuentes | `ctrl-alt-t` | `theme.info` |
 | Previsualizar la variante clara/oscura | `ctrl-alt-v` | `theme.toggle_variant` |
 | Tema siguiente | `ctrl-alt-n` | `theme.next` |
 | Tema anterior | `ctrl-alt-p` | `theme.previous` |

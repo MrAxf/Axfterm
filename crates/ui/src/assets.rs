@@ -46,6 +46,8 @@ own_assets! {
     icons::PALETTE => "../assets/icons/tabler/palette.svg",
     icons::MENU => "../assets/icons/tabler/menu-2.svg",
     icons::KEYBOARD => "../assets/icons/tabler/keyboard.svg",
+    icons::USER => "../assets/icons/tabler/user.svg",
+    icons::TYPOGRAPHY => "../assets/icons/tabler/typography.svg",
     icons::DEVICE_DESKTOP => "../assets/icons/tabler/device-desktop.svg",
     icons::EXTERNAL_LINK => "../assets/icons/tabler/external-link.svg",
     icons::FILE_IMPORT => "../assets/icons/tabler/file-import.svg",

@@ -101,6 +101,27 @@ impl Keymap {
         &self.effective
     }
 
+    /// Valida un chord para una acción con las reglas de `[keymap]`.
+    pub(crate) fn validate_for(action_id: &str, chord: &str) -> Result<(), String> {
+        let Some(meta) = actions::by_id(action_id) else {
+            return Err(format!("la acción `{action_id}` no existe"));
+        };
+        validate_chord(chord, meta, None)
+    }
+
+    /// Acción que ya usa el chord en algún contexto, si la hay.
+    ///
+    /// Sirve al panel para explicar conflictos antes de escribir.
+    pub(crate) fn chord_owner(&self, chord: &str) -> Option<&str> {
+        let normalized = normalize_chord(chord);
+        self.effective.iter().find_map(|(action, chords)| {
+            chords
+                .iter()
+                .any(|existing| normalize_chord(existing) == normalized)
+                .then_some(action.as_str())
+        })
+    }
+
     /// Chords visibles de una acción, ya formateados para la UI.
     pub(crate) fn chords_for(&self, id: &str) -> Option<String> {
         let chords = self.effective.get(id)?;
@@ -117,15 +138,20 @@ impl Keymap {
     }
 
     fn apply_table(&mut self, table: &toml::Table) {
-        let mut entries: Vec<(&String, &toml::Value)> = table.iter().collect();
+        // `unbind` se aplica antes que las entradas explícitas: quita los
+        // atajos por defecto y luego un atajo nuevo del panel vuelve a añadir
+        // el chord elegido, sin que el orden alfabético lo borre.
+        if let Some(value) = table.get("unbind") {
+            self.apply_unbind_list(value, None, false);
+        }
+        let mut entries: Vec<(&String, &toml::Value)> = table
+            .iter()
+            .filter(|(key, _)| key.as_str() != "unbind")
+            .collect();
         entries.sort_by(|left, right| left.0.cmp(right.0));
 
         let mut seen: HashMap<(String, String), String> = HashMap::new();
         for (key, value) in entries {
-            if key == "unbind" {
-                self.apply_unbind_list(value, None, false);
-                continue;
-            }
             if let Some(section) = value.as_table() {
                 let Some((name, context)) = CONTEXTS.iter().find(|(name, _)| *name == key) else {
                     if key == "settings" {
@@ -160,13 +186,15 @@ impl Keymap {
         context_label: &str,
         seen: &mut HashMap<(String, String), String>,
     ) {
-        let mut entries: Vec<(&String, &toml::Value)> = section.iter().collect();
+        if let Some(value) = section.get("unbind") {
+            self.apply_unbind_list(value, Some(context), true);
+        }
+        let mut entries: Vec<(&String, &toml::Value)> = section
+            .iter()
+            .filter(|(key, _)| key.as_str() != "unbind")
+            .collect();
         entries.sort_by(|left, right| left.0.cmp(right.0));
         for (key, value) in entries {
-            if key == "unbind" {
-                self.apply_unbind_list(value, Some(context), true);
-                continue;
-            }
             let Some(action) = value.as_str() else {
                 self.errors.push(format!(
                     "config.toml: [keymap.{context_label}] `{key}` debe ser un id de acción entre comillas."
@@ -447,7 +475,7 @@ mod tests {
     #[test]
     fn defaults_cover_every_registered_action() {
         let keymap = Keymap::defaults();
-        for action in actions::all() {
+        for action in actions::all().filter(|action| action.enabled) {
             assert!(
                 keymap.effective().contains_key(action.id),
                 "falta {}",
@@ -575,6 +603,9 @@ mod tests {
     fn default_shortcuts_doc_matches_generated_markdown() {
         let expected = actions::shortcuts_markdown(Keymap::defaults().effective());
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/keymap.md");
+        if std::env::var_os("AXF_WRITE_KEYMAP_DOC").is_some() {
+            std::fs::write(&path, &expected).expect("regenera docs/keymap.md");
+        }
         let actual = std::fs::read_to_string(&path).unwrap_or_default();
         assert_eq!(
             actual, expected,

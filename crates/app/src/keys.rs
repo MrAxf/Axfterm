@@ -41,8 +41,8 @@ pub(crate) const TOGGLE_ZOOM: &str = "ctrl-shift-z";
 pub(crate) const RESTART_TAB: &str = "ctrl-shift-p";
 /// Enfocar la sidebar.
 pub(crate) const FOCUS_SIDEBAR: &str = "ctrl-alt-b";
-/// Mostrar la información del tema.
-pub(crate) const SHOW_THEME_INFO: &str = "ctrl-alt-t";
+/// Mostrar/ocultar el panel de ajustes.
+pub(crate) const SETTINGS: &str = "ctrl-alt-t";
 /// Alternar variante claro/oscuro.
 pub(crate) const TOGGLE_THEME_VARIANT: &str = "ctrl-alt-v";
 /// Tema siguiente.

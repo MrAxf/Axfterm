@@ -24,6 +24,8 @@ pub struct Modal {
     body: Option<AnyElement>,
     footer: Option<AnyElement>,
     on_close: Option<ClickHandler>,
+    width: Option<crate::gpui::Pixels>,
+    align_top: bool,
 }
 
 impl Modal {
@@ -36,7 +38,24 @@ impl Modal {
             body: None,
             footer: None,
             on_close: None,
+            width: None,
+            align_top: false,
         }
+    }
+
+    /// Ancho de la tarjeta; por defecto se deriva del tamaño de fuente.
+    pub fn width(mut self, width: impl Into<crate::gpui::Pixels>) -> Self {
+        self.width = Some(width.into());
+        self
+    }
+
+    /// Alinea la tarjeta arriba en lugar de centrarla.
+    ///
+    /// Para paneles de trabajo largos que deben dejar visible el chrome de la
+    /// ventana y no empujar el pie fuera de la pantalla.
+    pub fn align_top(mut self) -> Self {
+        self.align_top = true;
+        self
     }
 
     /// Texto secundario.
@@ -91,8 +110,8 @@ impl RenderOnce for Modal {
             .flex()
             .flex_col()
             .gap(metrics.spacing_md())
-            .w(metrics.font_size * 34.0)
-            .max_w(crate::gpui::relative(0.9))
+            .w(self.width.unwrap_or(metrics.font_size * 34.0))
+            .max_w(crate::gpui::relative(0.92))
             .p(metrics.spacing_lg())
             .rounded(metrics.radius_lg())
             .border_1()
@@ -138,7 +157,10 @@ impl RenderOnce for Modal {
             .left_0()
             .size_full()
             .flex()
-            .items_center()
+            .when(self.align_top, |this| {
+                this.items_start().pt(metrics.titlebar_height())
+            })
+            .when(!self.align_top, |this| this.items_center())
             .justify_center()
             .bg(ui.overlay);
         if let Some(handler) = close {

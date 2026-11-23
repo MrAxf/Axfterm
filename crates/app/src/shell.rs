@@ -8,34 +8,42 @@
     clippy::let_unit_value,
     reason = "WeakEntity::update devuelve () en la versión fijada de gpui-pre"
 )]
-
-use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
-use std::rc::Rc;
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant, SystemTime};
-
-use axf_agents::{
-    AgentKind, AgentReport, AgentSession, AgentSessionId, AgentState, AgentTransition,
-    AttentionKind, DetectedAgent, ProcessScanner, ProcessSnapshot,
-};
-use axf_config::ProfileId;
-use axf_terminal::{
-    ProgramState, ProgramStatus, TerminalSignal, TerminalSnapshot, TerminalStyle, TerminalView,
-};
-
+use crate::font_select::{FontList, FontValue, font_list};
 use crate::history::HistoryStore;
 use crate::keymap::Keymap;
 use crate::palette::{
     self, PaletteHistory, PaletteIcon, PaletteItem, PaletteKind, PaletteMode, PaletteState,
     PaletteTarget,
 };
-use axf_ui::components::{
-    Button, ControlSize, EmptyState, Icon, IconButton, IconSize, Kbd, Menu, MenuItem, Modal,
-    ProfileIcon, ProfileIconSource, Tab as TabView, TabStatus, TextField, Toast, Toggle,
-    text_tooltip,
+use crate::settings::{
+    DetectState, ExternalOutcome, PendingDelete, SettingsSection, SettingsState,
 };
+use crate::theme_host::{ApplyReport, ThemeHost};
+use crate::{
+    AgentNextAttention, ClosePane, CloseTab, DuplicateTab, ExportTheme, FocusNextPane,
+    FocusPreviousPane, FocusSidebar, ImportTheme, MoveTabNextPane, NewTab, NextTab, NextTheme,
+    OpenCommandPalette, OpenProject, OpenSearchPalette, OpenSettings, OpenThemesFolder,
+    PALETTE_CONTEXT, PaletteAccept, PaletteCancel, PaletteFilterAgents, PaletteFilterAll,
+    PaletteFilterPanes, PaletteFilterProfiles, PaletteFilterProjects, PaletteFilterTabs,
+    PaletteNext, PalettePrevious, PaletteSwitchMode, PreviousTab, PreviousTheme, Quit,
+    ReloadThemes, RenameTab, RestartTab, SETTINGS_CONTEXT, SHORTCUTS_CONTEXT, SIDEBAR_CONTEXT,
+    SettingsCancel, SettingsNextSection, SettingsPreviousSection, SettingsSave, ShowShortcuts,
+    SplitHorizontal, SplitVertical, ToggleSidebar, ToggleSidebarAgents, ToggleThemeVariant,
+    ToggleZoom, WORKSPACE_CONTEXT, keys,
+};
+use axf_agents::{
+    AgentKind, AgentReport, AgentSession, AgentSessionId, AgentState, AgentTransition,
+    AttentionKind, DetectedAgent, ProcessScanner, ProcessSnapshot,
+};
+use axf_config::{Profile, ProfileId};
+use axf_terminal::{
+    ProgramState, ProgramStatus, TerminalSignal, TerminalSnapshot, TerminalStyle, TerminalView,
+};
+use axf_ui::components::{
+    Button, ControlSize, EmptyState, Icon, IconButton, IconSize, Kbd, Modal, ProfileIcon,
+    ProfileIconSource, Tab as TabView, TabStatus, TextField, Toast, text_tooltip,
+};
+use axf_ui::gpui::base::FocusTrapElement as _;
 use axf_ui::gpui::component::button::{
     Button as KitButton, ButtonVariants as _, Toggle as KitToggle, ToggleGroup,
 };
@@ -45,16 +53,20 @@ use axf_ui::gpui::component::menu::{
 };
 use axf_ui::gpui::component::scroll::ScrollableElement as _;
 use axf_ui::gpui::component::select::{Select, SelectEvent, SelectState};
-use axf_ui::gpui::component::{ActiveTheme, ElementExt as _, Sizable as _, WindowExt as _};
+use axf_ui::gpui::component::switch::Switch;
+use axf_ui::gpui::component::{
+    ActiveTheme, Disableable as _, ElementExt as _, Sizable as _, WindowExt as _,
+};
 use axf_ui::gpui::prelude::FluentBuilder as _;
+
 #[cfg(target_os = "windows")]
 use axf_ui::gpui::svg;
 use axf_ui::gpui::{
-    AnyElement, AppContext, Bounds, ClickEvent, Context, Entity, FocusHandle, Focusable,
-    FontWeight, InteractiveElement, IntoElement, KeyDownEvent, MouseButton, ParentElement, Pixels,
-    Point, Render, ScrollDelta, ScrollEvent, ScrollHandle, SharedString,
-    StatefulInteractiveElement as _, Styled, Subscription, Window, WindowControlArea, div, point,
-    px, relative, transparent_black,
+    AnyElement, AppContext, Bounds, ClickEvent, Context, Div, ElementId, Entity, FocusHandle,
+    Focusable, FontWeight, InteractiveElement, IntoElement, KeyDownEvent, Keystroke, MouseButton,
+    ParentElement, Pixels, Point, Render, ScrollDelta, ScrollEvent, ScrollHandle, SharedString,
+    Stateful, StatefulInteractiveElement as _, Styled, Subscription, Window, WindowControlArea,
+    div, point, px, relative, transparent_black,
 };
 use axf_ui::icons;
 use axf_ui::metrics::UiMetrics;
@@ -63,20 +75,13 @@ use axf_workspace::{
     Branch, PaneId, PaneTree, ProjectId, SessionFile, SidebarSection, SplitAxis, TabId, TerminalId,
     Workspace,
 };
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
+use std::rc::Rc;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant, SystemTime};
 
-use crate::font_select::{FontList, FontValue, font_list};
-use crate::theme_host::ThemeHost;
-use crate::{
-    AgentNextAttention, ClosePane, CloseTab, DuplicateTab, ExportTheme, FocusNextPane,
-    FocusPreviousPane, FocusSidebar, ImportTheme, MoveTabNextPane, NewTab, NextTab, NextTheme,
-    OpenCommandPalette, OpenProject, OpenSearchPalette, OpenThemesFolder, PALETTE_CONTEXT,
-    PaletteAccept, PaletteCancel, PaletteFilterAgents, PaletteFilterAll, PaletteFilterPanes,
-    PaletteFilterProfiles, PaletteFilterProjects, PaletteFilterTabs, PaletteNext, PalettePrevious,
-    PaletteSwitchMode, PreviousTab, PreviousTheme, Quit, ReloadThemes, RenameTab, RestartTab,
-    SHORTCUTS_CONTEXT, SIDEBAR_CONTEXT, ShowShortcuts, ShowThemeInfo, SplitHorizontal,
-    SplitVertical, ToggleSidebar, ToggleSidebarAgents, ToggleThemeVariant, ToggleZoom,
-    WORKSPACE_CONTEXT, keys,
-};
 /// Tope de terminales de v0.1 (ADR 0005).
 const MAX_TABS: usize = 32;
 
@@ -85,8 +90,10 @@ const APP_NAME: &str = "AxfTerm";
 
 /// Avisos simultáneos en pantalla.
 const MAX_NOTICES: usize = 3;
+
 /// Ventana en la que un aviso de agente con la misma clave no se repite.
 const NOTICE_COOLDOWN: Duration = Duration::from_secs(10);
+
 /// Silencio de salida que cierra un `working` sin OSC 7501.
 const OUTPUT_QUIET: Duration = Duration::from_millis(2_500);
 
@@ -407,13 +414,32 @@ struct AgentUiState {
     notice_cooldowns: HashMap<String, Instant>,
 }
 
+/// Editor inline de un perfil dentro del panel de ajustes.
+struct ProfileEditor {
+    id: ProfileId,
+    name: Entity<InputState>,
+    command: Entity<InputState>,
+    icon: Option<PathBuf>,
+    error: Option<String>,
+}
+
+/// Campo numérico ajustable del panel.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum StepField {
+    UiFontSize,
+    UiScale,
+    TerminalFontSize,
+    LineHeight,
+    ScanInterval,
+}
+
 /// Vista raíz de la ventana.
 pub(crate) struct Shell {
     workspace: Workspace,
     session_path: Option<PathBuf>,
     focus: FocusHandle,
     sidebar_focus: FocusHandle,
-    theme_modal_focus: FocusHandle,
+    settings_focus: FocusHandle,
     terminals: HashMap<TerminalId, TerminalEntry>,
     pending_terminals: HashSet<TerminalId>,
     spawn_errors: HashMap<TerminalId, String>,
@@ -443,7 +469,12 @@ pub(crate) struct Shell {
     shortcuts_focus: FocusHandle,
     keymap: Keymap,
     theme_host: ThemeHost,
-    theme_modal: bool,
+    settings: Option<SettingsState>,
+    settings_scroll: ScrollHandle,
+    settings_profile_editor: Option<ProfileEditor>,
+    settings_shortcut_input: Option<Entity<InputState>>,
+    settings_shortcut_subscription: Option<Subscription>,
+    keystroke_interceptor: Option<Subscription>,
     style_revision: u64,
     appearance_subscription: Option<Subscription>,
     window_title: String,
@@ -463,10 +494,9 @@ impl Shell {
     ) -> Self {
         let focus = cx.focus_handle();
         let sidebar_focus = cx.focus_handle();
-        let theme_modal_focus = cx.focus_handle();
+        let settings_focus = cx.focus_handle();
         let shortcuts_focus = cx.focus_handle();
         window.focus(&focus, cx);
-
         let session_path = match axf_config::session_path() {
             Ok(path) => Some(path),
             Err(error) => {
@@ -496,13 +526,12 @@ impl Shell {
         let history = HistoryStore::from_config(fresh_session);
         let theme_notes = theme_host.notes.clone();
         let sidebar_section = workspace.sidebar().section;
-
         let mut shell = Self {
             workspace,
             session_path,
             focus,
             sidebar_focus,
-            theme_modal_focus,
+            settings_focus,
             terminals: HashMap::new(),
             pending_terminals: HashSet::new(),
             spawn_errors: HashMap::new(),
@@ -532,8 +561,12 @@ impl Shell {
             shortcuts_focus,
             keymap,
             theme_host,
-            // Diagnóstico visual: abre el modal de tema al arrancar.
-            theme_modal: std::env::var_os("AXFTERM_SHOW_THEME_MODAL").is_some(),
+            settings: None,
+            settings_scroll: ScrollHandle::new(),
+            settings_profile_editor: None,
+            settings_shortcut_input: None,
+            settings_shortcut_subscription: None,
+            keystroke_interceptor: None,
             style_revision: 0,
             appearance_subscription: None,
             window_title: "Axfterm".into(),
@@ -541,7 +574,6 @@ impl Shell {
             quitting: false,
             close_hook_registered: false,
         };
-
         if let Some(path) = startup {
             shell.open_project_path(path, window, cx);
         }
@@ -553,7 +585,17 @@ impl Shell {
         shell.watch_config(cx);
         shell.spawn_wsl_discovery(cx);
         shell.spawn_agent_scanner(cx);
-
+        let this = cx.entity().downgrade();
+        shell.keystroke_interceptor = Some(cx.intercept_keystrokes(move |event, _window, cx| {
+            let handled = this
+                .update(cx, |shell, cx| {
+                    shell.settings_capture_keystroke(&event.keystroke, cx)
+                })
+                .unwrap_or(false);
+            if handled {
+                cx.stop_propagation();
+            }
+        }));
         let this = cx.entity().downgrade();
         shell.appearance_subscription = Some(window.observe_window_appearance(move |_, cx| {
             if let Some(this) = this.upgrade() {
@@ -568,7 +610,6 @@ impl Shell {
                 });
             }
         }));
-
         let mut warnings = theme_notes;
         warnings.extend(keymap_notes);
         if let Some(warning) = startup_warning {
@@ -577,7 +618,6 @@ impl Shell {
         if !warnings.is_empty() {
             shell.set_notice(warnings.join(" "), true, cx);
         }
-
         shell
     }
 
@@ -621,7 +661,6 @@ impl Shell {
     }
 
     // --- Agentes --------------------------------------------------------
-
     /// Escaneo de procesos en segundo plano; nunca bloquea el hilo de UI.
     fn spawn_agent_scanner(&mut self, cx: &mut Context<'_, Self>) {
         let scanner = Arc::new(Mutex::new(ProcessScanner::new()));
@@ -643,7 +682,6 @@ impl Shell {
                         .await;
                     continue;
                 }
-
                 let roots = this
                     .update(cx, |shell, cx| shell.terminal_roots(cx))
                     .unwrap_or_default();
@@ -665,7 +703,6 @@ impl Shell {
                         break;
                     }
                 }
-
                 cx.background_executor()
                     .timer(Duration::from_millis(settings.scan_interval_ms))
                     .await;
@@ -687,7 +724,6 @@ impl Shell {
         let now = SystemTime::now();
         let mut next_id = self.agents.seq;
         let mut updates: Vec<AgentTabUpdate> = Vec::new();
-
         for (terminal, entry) in &self.terminals {
             let Some(tab) = self.workspace.tab_for_terminal(*terminal) else {
                 continue;
@@ -724,7 +760,6 @@ impl Shell {
             }
         }
         self.agents.seq = next_id;
-
         let mut changed = false;
         let mut persist = false;
         for update in updates {
@@ -761,12 +796,10 @@ impl Shell {
         let Some(tab) = self.workspace.tab_for_terminal(terminal) else {
             return;
         };
-
         let now = SystemTime::now();
         let mut next_id = self.agents.seq;
         let mut transitions: AgentTransitions = Vec::new();
         let mut changed = false;
-
         for signal in signals {
             match signal {
                 TerminalSignal::ProgramStatus(status) => {
@@ -812,7 +845,6 @@ impl Shell {
                 TerminalSignal::Exited(_) => {}
             }
         }
-
         self.agents.seq = next_id;
         let resume = self
             .workspace
@@ -890,7 +922,28 @@ impl Shell {
         cx.spawn(async move |this, cx| {
             while let Ok(event) = events.recv().await {
                 let applied = this.update(cx, |shell, cx| {
-                    let report = shell.theme_host.reload(event, cx);
+                    let panel_config = event.config && shell.settings.is_some();
+                    let report = if panel_config {
+                        let source = shell
+                            .theme_host
+                            .config_path
+                            .as_deref()
+                            .and_then(|path| axf_config::read_config_text(path).ok().flatten());
+                        shell.settings_external_change(source, cx);
+                        if event.themes {
+                            shell.theme_host.reload(
+                                axf_config::WatchEvent {
+                                    config: false,
+                                    themes: true,
+                                },
+                                cx,
+                            )
+                        } else {
+                            ApplyReport::default()
+                        }
+                    } else {
+                        shell.theme_host.reload(event, cx)
+                    };
                     if report.applied {
                         cx.notify();
                     }
@@ -913,7 +966,7 @@ impl Shell {
                     if !keymap_notes.is_empty() {
                         shell.set_notice(keymap_notes.join(" "), true, cx);
                     }
-                    if !had && keymap_notes.is_empty() {
+                    if !had && keymap_notes.is_empty() && !panel_config {
                         let message = match (event.config, event.themes) {
                             (true, true) => "Configuración y temas recargados.",
                             (true, false) => "Configuración recargada.",
@@ -934,7 +987,6 @@ impl Shell {
     }
 
     // --- Sesión ---------------------------------------------------------
-
     fn sync_terminal_meta(&mut self, cx: &mut Context<'_, Self>) {
         let mut updates = Vec::new();
         for (terminal, entry) in &self.terminals {
@@ -962,7 +1014,6 @@ impl Shell {
         let document = SessionFile::current(self.workspace.clone());
         self.save_generation = self.save_generation.wrapping_add(1);
         let generation = self.save_generation;
-
         cx.spawn(async move |this, cx| {
             let timer = cx.background_executor().timer(Duration::from_millis(250));
             timer.await;
@@ -1030,7 +1081,6 @@ impl Shell {
     }
 
     // --- Acciones -------------------------------------------------------
-
     fn quit(&mut self, _: &Quit, _: &mut Window, cx: &mut Context<'_, Self>) {
         self.request_quit(cx);
     }
@@ -1090,6 +1140,7 @@ impl Shell {
         }
         self.workspace.sidebar_mut().section = section;
         self.sidebar_section = section;
+
         // El cursor anterior puede pertenecer a la otra sección.
         self.sidebar_cursor = self.sidebar_rows().first().copied();
         self.persist(cx);
@@ -1125,7 +1176,6 @@ impl Shell {
         }
         self.palette = None;
         self.palette_subscription = None;
-        self.theme_modal = false;
         self.shortcuts_modal = false;
         let items = self.palette_items(mode, cx);
         let input = cx.new(|cx| InputState::new(window, cx).placeholder(mode.placeholder()));
@@ -1176,7 +1226,6 @@ impl Shell {
     /// Navegación: proyectos, paneles, pestañas, agentes y perfiles.
     fn search_items(&mut self, cx: &mut Context<'_, Self>) -> Vec<PaletteItem> {
         let mut items = Vec::new();
-
         let projects: Vec<(ProjectId, String, std::path::PathBuf)> = self
             .workspace
             .projects()
@@ -1200,7 +1249,6 @@ impl Shell {
                 target: PaletteTarget::RevealProject(project),
             });
         }
-
         for pane in self.workspace.layout().leaves() {
             let count = self
                 .workspace
@@ -1221,7 +1269,6 @@ impl Shell {
                 target: PaletteTarget::FocusPane(pane),
             });
         }
-
         let tabs: Vec<(TabId, ProjectId)> = self
             .workspace
             .projects()
@@ -1256,7 +1303,6 @@ impl Shell {
                 target: PaletteTarget::FocusTab(*tab),
             });
         }
-
         for (tab, project_id) in &tabs {
             let Some(sessions) = self.workspace.tab_agents(*tab) else {
                 continue;
@@ -1283,7 +1329,6 @@ impl Shell {
                 });
             }
         }
-
         let profiles: Vec<(ProfileId, String)> = self
             .theme_host
             .profiles()
@@ -1303,7 +1348,6 @@ impl Shell {
                 target: PaletteTarget::NewTabWithProfile(id),
             });
         }
-
         items
     }
 
@@ -1564,7 +1608,7 @@ impl Shell {
             self.close_shortcuts(window, cx);
         } else {
             self.close_palette(window, cx);
-            self.theme_modal = false;
+            self.close_settings(window, cx);
             self.shortcuts_modal = true;
             window.focus(&self.shortcuts_focus, cx);
             cx.notify();
@@ -1594,21 +1638,316 @@ impl Shell {
         self.focus_tab(next, window, cx);
     }
 
-    // --- Tema y fuentes ------------------------------------------------
-
-    fn show_theme_info(&mut self, _: &ShowThemeInfo, _: &mut Window, cx: &mut Context<'_, Self>) {
-        self.theme_modal = !self.theme_modal;
+    // --- Ajustes -------------------------------------------------------
+    /// Abre (o cierra) el panel de ajustes con el foco dentro.
+    fn open_settings(&mut self, window: &mut Window, cx: &mut Context<'_, Self>) {
+        if self.settings.is_some() {
+            self.close_settings(window, cx);
+            return;
+        }
+        self.close_palette(window, cx);
+        self.shortcuts_modal = false;
+        let baseline = self
+            .theme_host
+            .config_path
+            .as_deref()
+            .and_then(|path| axf_config::read_config_text(path).ok().flatten());
+        self.settings = Some(SettingsState::new(
+            self.theme_host.settings.clone(),
+            baseline,
+        ));
+        self.settings_scroll = ScrollHandle::new();
+        self.settings_profile_editor = None;
+        self.ensure_font_selects(window, cx);
+        self.ensure_shortcut_input(window, cx);
+        window.focus(&self.settings_focus, cx);
         cx.notify();
     }
 
-    /// Abre el modal de tema y fuentes con el foco dentro.
-    ///
-    /// Hasta M7 es la superficie de ajustes; cuando exista `OpenSettings`, este
-    /// método será el que abra el panel completo.
-    fn open_theme_modal(&mut self, window: &mut Window, cx: &mut Context<'_, Self>) {
-        self.theme_modal = true;
-        window.focus(&self.theme_modal_focus, cx);
+    fn show_settings(&mut self, _: &OpenSettings, window: &mut Window, cx: &mut Context<'_, Self>) {
+        self.open_settings(window, cx);
+    }
+
+    fn settings_cancel(
+        &mut self,
+        _: &SettingsCancel,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) {
+        if let Some(settings) = &self.settings
+            && settings.capturing.is_some()
+        {
+            if let Some(settings) = &mut self.settings {
+                settings.cancel_capture();
+            }
+            cx.notify();
+            return;
+        }
+        if self.settings_profile_editor.is_some() {
+            self.settings_profile_editor = None;
+            cx.notify();
+            return;
+        }
+        self.close_settings(window, cx);
+    }
+
+    fn settings_save(&mut self, _: &SettingsSave, _: &mut Window, cx: &mut Context<'_, Self>) {
+        self.save_settings(cx);
+    }
+
+    fn settings_next_section(
+        &mut self,
+        _: &SettingsNextSection,
+        _: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) {
+        if let Some(settings) = &mut self.settings {
+            settings.move_section(1);
+            self.settings_scroll = ScrollHandle::new();
+            cx.notify();
+        }
+    }
+
+    fn settings_previous_section(
+        &mut self,
+        _: &SettingsPreviousSection,
+        _: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) {
+        if let Some(settings) = &mut self.settings {
+            settings.move_section(-1);
+            self.settings_scroll = ScrollHandle::new();
+            cx.notify();
+        }
+    }
+
+    /// Cierra el panel descartando el borrador y restaurando la vista activa.
+    fn close_settings(&mut self, window: &mut Window, cx: &mut Context<'_, Self>) {
+        if self.settings.take().is_none() {
+            return;
+        }
+        self.settings_profile_editor = None;
+        self.settings_shortcut_input = None;
+        self.settings_shortcut_subscription = None;
+        self.font_select_subscriptions.clear();
+        self.ui_font_select = None;
+        self.terminal_font_select = None;
+        let messages = self.theme_host.clear_preview(cx);
+        if !messages.is_empty() {
+            tracing::debug!("preview de ajustes descartada: {}", messages.join(" "));
+        }
+        self.restore_workspace_focus(window, cx);
         cx.notify();
+    }
+
+    /// Aplica el borrador al estado visual sin escribir en disco.
+    fn preview_settings(&mut self, cx: &mut Context<'_, Self>) {
+        let Some(settings) = &self.settings else {
+            return;
+        };
+        let messages = self.theme_host.preview_settings(&settings.draft, cx);
+        if !messages.is_empty()
+            && let Some(settings) = &mut self.settings
+        {
+            settings.set_notice(messages.join(" "), false);
+        }
+        cx.notify();
+    }
+
+    /// Guarda el borrador validado y con la política de conflicto de ADR 0007.
+    fn save_settings(&mut self, cx: &mut Context<'_, Self>) {
+        if self.settings_profile_editor.is_some() {
+            if let Some(settings) = &mut self.settings {
+                settings.set_notice(
+                    "Aplica o cancela la edición del perfil antes de guardar.".into(),
+                    true,
+                );
+            }
+            cx.notify();
+            return;
+        }
+        if self
+            .settings
+            .as_ref()
+            .is_some_and(|settings| settings.capturing.is_some())
+        {
+            if let Some(settings) = &mut self.settings {
+                settings.set_notice(
+                    "Termina o cancela la captura del atajo antes de guardar.".into(),
+                    true,
+                );
+            }
+            cx.notify();
+            return;
+        }
+        let Some(path) = self.theme_host.config_path.clone() else {
+            if let Some(settings) = &mut self.settings {
+                settings.set_notice("No se pudo resolver config.toml.".into(), true);
+            }
+            cx.notify();
+            return;
+        };
+        let Some(settings) = self.settings.as_ref() else {
+            return;
+        };
+        let errors = settings.validate();
+        if !errors.is_empty() {
+            if let Some(settings) = &mut self.settings {
+                settings.set_errors(errors.clone());
+                settings.set_notice(errors[0].clone(), true);
+            }
+            cx.notify();
+            return;
+        }
+        let current = axf_config::read_config_text(&path).ok().flatten();
+        if current != settings.baseline && !settings.overwrite {
+            if let Some(settings) = &mut self.settings {
+                settings.conflict = Some(crate::settings::Conflict {
+                    source: current.unwrap_or_default(),
+                    summary:
+                        "config.toml cambió fuera del panel. Guardar sobrescribirá ese cambio; \
+                              recarga para descartar el borrador."
+                            .into(),
+                });
+            }
+            cx.notify();
+            return;
+        }
+        let base = settings.base.clone();
+        let draft = settings.draft.clone();
+        match axf_config::write_config(&path, &base, &draft) {
+            Ok(written) => {
+                let messages = self.theme_host.commit_settings(draft.clone(), cx);
+                if let Some(settings) = &mut self.settings {
+                    settings.commit_saved(written);
+                    if !messages.is_empty() {
+                        settings.set_notice(messages.join(" "), false);
+                    }
+                }
+                let keymap = Keymap::resolve(&draft.keymap);
+                let mut keymap_errors = keymap.errors.clone();
+                keymap_errors.extend(keymap.install(cx));
+                self.keymap = keymap;
+                if !keymap_errors.is_empty() {
+                    self.set_notice(keymap_errors.join(" "), true, cx);
+                }
+                cx.notify();
+            }
+            Err(error) => {
+                if let Some(settings) = &mut self.settings {
+                    settings.set_errors(vec![error.to_string()]);
+                    settings.set_notice(error.to_string(), true);
+                }
+                cx.notify();
+            }
+        }
+    }
+
+    /// Resultado de un cambio externo mientras el panel está abierto.
+    fn settings_external_change(&mut self, source: Option<String>, cx: &mut Context<'_, Self>) {
+        let Some(source) = source else {
+            return;
+        };
+        let parsed = axf_config::parse_str(&source, "config.toml");
+        let Some(outcome) = self
+            .settings
+            .as_mut()
+            .map(|settings| settings.external_change(source, parsed))
+        else {
+            return;
+        };
+        match outcome {
+            ExternalOutcome::Reloaded => {
+                let Some(draft) = self
+                    .settings
+                    .as_ref()
+                    .map(|settings| settings.draft.clone())
+                else {
+                    return;
+                };
+
+                // El archivo ya cambió: la config activa pasa a ser la nueva y
+                // el panel deja de previsualizar. Cancelar no debe revertirla.
+                let messages = self.theme_host.commit_settings(draft.clone(), cx);
+                let keymap = Keymap::resolve(&draft.keymap);
+                let mut notes = keymap.errors.clone();
+                notes.extend(keymap.install(cx));
+                self.keymap = keymap;
+                if let Some(settings) = &mut self.settings {
+                    let mut parts = messages;
+                    parts.extend(notes);
+                    settings.set_notice(
+                        if parts.is_empty() {
+                            "config.toml cambió fuera del panel; borrador recargado.".into()
+                        } else {
+                            parts.join(" ")
+                        },
+                        false,
+                    );
+                }
+            }
+            ExternalOutcome::Conflict => {
+                if let Some(settings) = &mut self.settings {
+                    settings.set_notice(
+                        "Hay cambios externos sin guardar. Recarga o sigue editando; \
+                         guardar pedirá confirmación."
+                            .into(),
+                        true,
+                    );
+                }
+            }
+            ExternalOutcome::Invalid(message) => {
+                tracing::debug!("{message}");
+            }
+            ExternalOutcome::Ignored => {}
+        }
+        cx.notify();
+    }
+
+    /// Recarga el archivo externo descartando el borrador.
+    fn reload_settings_from_disk(&mut self, cx: &mut Context<'_, Self>) {
+        let Some(path) = self.theme_host.config_path.clone() else {
+            return;
+        };
+        let source = axf_config::read_config_text(&path).ok().flatten();
+        let parsed = source
+            .as_deref()
+            .map(|source| axf_config::parse_str(source, "config.toml"));
+        match (source, parsed) {
+            (Some(source), Some(Ok(config))) => {
+                // El usuario descarta el borrador: la config del disco pasa a
+                // ser la activa, no una previsualización.
+                let messages = self.theme_host.commit_settings(config.clone(), cx);
+                let keymap = Keymap::resolve(&config.keymap);
+                let mut notes = keymap.errors.clone();
+                notes.extend(keymap.install(cx));
+                self.keymap = keymap;
+                if let Some(settings) = &mut self.settings {
+                    settings.reload_external(config, source);
+                    let mut parts = messages;
+                    parts.extend(notes);
+                    if !parts.is_empty() {
+                        settings.set_notice(parts.join(" "), false);
+                    }
+                }
+                cx.notify();
+            }
+            (_, Some(Err(error))) => {
+                if let Some(settings) = &mut self.settings {
+                    settings.set_notice(format!("No se pudo recargar: {error}"), true);
+                }
+                cx.notify();
+            }
+            _ => {
+                if let Some(settings) = &mut self.settings {
+                    settings.set_notice(
+                        "config.toml no existe; se conserva el borrador.".into(),
+                        true,
+                    );
+                }
+                cx.notify();
+            }
+        }
     }
 
     fn toggle_theme_variant(
@@ -1665,14 +2004,6 @@ impl Shell {
 
     fn export_theme(&mut self, _: &ExportTheme, _: &mut Window, cx: &mut Context<'_, Self>) {
         self.export_theme_impl(cx);
-    }
-
-    fn close_theme_modal(&mut self, window: &mut Window, cx: &mut Context<'_, Self>) {
-        if self.theme_modal {
-            self.theme_modal = false;
-            self.restore_workspace_focus(window, cx);
-            cx.notify();
-        }
     }
 
     fn restore_workspace_focus(&mut self, window: &mut Window, cx: &mut Context<'_, Self>) {
@@ -2058,6 +2389,7 @@ impl Shell {
         };
         let value = input.read(cx).value();
         let title = value.as_ref().trim();
+
         // Un doble clic seguido de clic fuera no debe congelar el título
         // automático ni marcar la pestaña como renombrada.
         if title != edit.original.trim() {
@@ -2238,7 +2570,6 @@ impl Shell {
     }
 
     // --- Helpers de modelo/terminal -------------------------------------
-
     fn refresh_terminal_styles(&mut self, window: &mut Window, cx: &mut Context<'_, Self>) {
         if self.terminals.is_empty() {
             return;
@@ -2309,12 +2640,12 @@ impl Shell {
         {
             return;
         }
+
         // Un perfil ausente tiene su propia pantalla accionable; no se lanza
         // otro shell por sorpresa.
         if self.theme_host.profile(&profile).is_none() {
             return;
         }
-
         self.pending_terminals.insert(terminal);
         let history = self.history.clone();
         cx.spawn(async move |this, cx| {
@@ -2359,8 +2690,8 @@ impl Shell {
                     window,
                     cx,
                 );
-                // Si el shell tampoco arrancó, manda su error, no el del
-                // historial.
+
+                // Si el shell tampoco arrancó, manda su error, no el del historial.
                 if !shell.terminals.contains_key(&terminal) {
                     return;
                 }
@@ -2566,6 +2897,7 @@ impl Shell {
             self.set_notice(error.to_string(), true, cx);
             return;
         }
+
         // Enfocar limpia atención/terminado/error y retira sesiones sin proceso.
         let _ = self
             .workspace
@@ -2626,7 +2958,6 @@ impl Shell {
             self.notices
                 .retain(|notice| notice.key.as_ref() != Some(key));
         }
-
         self.notice_seq = self.notice_seq.wrapping_add(1);
         let seq = self.notice_seq;
         self.notices.push(Notice {
@@ -2639,7 +2970,6 @@ impl Shell {
         while self.notices.len() > MAX_NOTICES {
             self.notices.remove(0);
         }
-
         let seconds = if error { 8 } else { 4 };
         cx.spawn(async move |this, cx| {
             cx.background_executor()
@@ -2671,7 +3001,6 @@ fn reconcile_agents(
 ) -> (bool, AgentTransitions) {
     let before = sessions.clone();
     let mut transitions = Vec::new();
-
     if !running {
         let success = exit.is_some_and(|info| info.success);
         for session in sessions.iter_mut() {
@@ -2682,7 +3011,6 @@ fn reconcile_agents(
         }
         return (before != *sessions, transitions);
     }
-
     for session in sessions.iter_mut() {
         session.alive = false;
     }
@@ -2715,7 +3043,6 @@ fn reconcile_agents(
             sessions.push(session);
         }
     }
-
     for session in sessions.iter_mut() {
         if session.pid == 0 {
             continue;
@@ -2735,7 +3062,6 @@ fn reconcile_agents(
             transitions.push((session.id, transition));
         }
     }
-
     (before != *sessions, transitions)
 }
 
@@ -2937,7 +3263,6 @@ fn title_bar_title_geometry(
     let center = viewport_width * 0.5;
     let left_room = center - sidebar_width - padding;
     let right_room = viewport_width - controls_width - center - padding;
-
     if left_room > px(0.0) && right_room > px(0.0) {
         let room = left_room.min(right_room);
         let shift = sidebar_width - controls_width;
@@ -2970,6 +3295,7 @@ fn window_controls_width(metrics: UiMetrics) -> Pixels {
     {
         metrics.titlebar_control_width() * 3.0
     }
+
     #[cfg(not(target_os = "windows"))]
     {
         let _ = metrics;
@@ -3032,6 +3358,7 @@ fn window_controls(metrics: UiMetrics, ui: theme::UiTokens, maximized: bool) -> 
             ))
             .into_any_element()
     }
+
     #[cfg(not(target_os = "windows"))]
     {
         let _ = (metrics, ui, maximized);
@@ -3076,7 +3403,6 @@ fn window_control(
         )
         .into_any_element()
 }
-
 // --- Render -------------------------------------------------------------
 
 impl Render for Shell {
@@ -3091,15 +3417,14 @@ impl Render for Shell {
             self.style_revision = self.theme_host.revision;
             self.refresh_terminal_styles(window, cx);
         }
-        if self.theme_modal && !self.theme_modal_focus.is_focused(window) {
-            window.focus(&self.theme_modal_focus, cx);
-        }
+
         // Un drag cancelado o soltado fuera de un destino no debe dejar el
         // resaltado de drop pegado en pantalla.
         if !cx.has_active_drag() && (self.tab_drop.is_some() || self.tab_insert.is_some()) {
             self.tab_drop = None;
             self.tab_insert = None;
         }
+
         // Los paneles cerrados no deben dejar límites fantasma para el drag.
         self.body_bounds
             .borrow_mut()
@@ -3111,24 +3436,22 @@ impl Render for Shell {
                 if let Some(this) = this.upgrade() {
                     let _ = this.update(cx, |shell, cx| shell.request_quit(cx));
                 }
+
                 // La app cierra el proceso después de guardar.
                 false
             });
         }
-
         if let Some(tab) = self.pending_focus.take()
             && let Some(model_tab) = self.workspace.tab(tab)
             && let Some(entry) = self.terminals.get(&model_tab.terminal_id)
         {
             entry.view.update(cx, |view, cx| view.focus(window, cx));
         }
-
         if let Some(pane) = self.zoomed
             && (!self.workspace.layout().contains(pane) || self.workspace.pane(pane).is_none())
         {
             self.zoomed = None;
         }
-
         if let Some(edit) = &mut self.editing
             && !edit.focused
         {
@@ -3156,18 +3479,15 @@ impl Render for Shell {
             window.set_window_title(&title);
             self.window_title = title;
         }
-
         let (background, foreground) = {
             let theme = cx.theme();
             (theme.background, theme.foreground)
         };
-
         let sidebar = self
             .workspace
             .sidebar()
             .visible
             .then(|| self.render_sidebar(window, cx));
-
         let content = if self.workspace.tab_count() == 0 {
             self.render_onboarding(window, cx)
         } else if let Some(pane) = self.zoomed {
@@ -3179,17 +3499,16 @@ impl Render for Shell {
             let layout = self.workspace.layout().clone();
             self.render_layout(&layout, &[], cx)
         };
-
         let toast = self.render_toast(cx);
-        let modal = self
-            .theme_modal
-            .then(|| self.render_theme_modal(window, cx));
+        let settings = self
+            .settings
+            .is_some()
+            .then(|| self.render_settings(window, cx));
         let shortcuts = self.shortcuts_modal.then(|| self.render_shortcuts(cx));
         let palette = self
             .palette
             .is_some()
             .then(|| self.render_palette(window, cx));
-
         div()
             .relative()
             .flex()
@@ -3220,7 +3539,7 @@ impl Render for Shell {
             .on_action(cx.listener(Self::open_command_palette))
             .on_action(cx.listener(Self::open_search_palette))
             .on_action(cx.listener(Self::toggle_sidebar_agents))
-            .on_action(cx.listener(Self::show_theme_info))
+            .on_action(cx.listener(Self::show_settings))
             .on_action(cx.listener(Self::toggle_theme_variant))
             .on_action(cx.listener(Self::next_theme))
             .on_action(cx.listener(Self::previous_theme))
@@ -3265,7 +3584,7 @@ impl Render for Shell {
                     ),
             )
             .children(toast)
-            .children(modal)
+            .children(settings)
             .children(shortcuts)
             .children(palette)
     }
@@ -3330,7 +3649,6 @@ impl Shell {
                     .text_color(ui.text)
                     .child(APP_NAME),
             );
-
         let toggle = IconButton::new("title-sidebar", icons::SIDEBAR)
             .size_px(metrics.titlebar_button())
             .icon_size(IconSize::Custom(metrics.titlebar_button_icon()))
@@ -3350,9 +3668,9 @@ impl Shell {
         let settings = IconButton::new("title-settings", icons::SETTINGS)
             .size_px(metrics.titlebar_button())
             .icon_size(IconSize::Custom(metrics.titlebar_button_icon()))
-            .tooltip("Ajustes de tema (Ctrl+Alt+T)")
+            .tooltip(format!("Ajustes ({})", keys::format_chord(keys::SETTINGS)))
             .on_click(cx.listener(|shell, _, window, cx| {
-                shell.open_theme_modal(window, cx);
+                shell.open_settings(window, cx);
             }));
 
         // La sidebar y el toggle comparten siempre el mismo borde: si la
@@ -3368,7 +3686,6 @@ impl Shell {
             .child(brand)
             .child(settings)
             .child(toggle);
-
         let drag = div()
             .id("title-drag")
             .flex()
@@ -3403,9 +3720,7 @@ impl Shell {
                         .child(label),
                 )
             });
-
         let controls = window_controls(metrics, ui, window.is_maximized());
-
         div()
             .flex()
             .items_center()
@@ -3438,7 +3753,6 @@ impl Shell {
         } else {
             "Abre una terminal en el proyecto actual o registra otra carpeta."
         };
-
         EmptyState::new(icons::FOLDER, message, detail)
             .action(
                 div()
@@ -3492,7 +3806,6 @@ impl Shell {
                 second_path.push(Branch::Second);
                 let first_el = self.render_layout(first, &first_path, cx);
                 let second_el = self.render_layout(second, &second_path, cx);
-
                 let bounds = Rc::clone(&self.split_bounds);
                 let prepaint_key = key.clone();
                 let divider_key = key.clone();
@@ -3506,7 +3819,6 @@ impl Shell {
                     .min_h_0()
                     .child(first_el);
                 let second_wrap = div().flex_1().min_w_0().min_h_0().child(second_el);
-
                 let splitter = UiMetrics::new(cx.theme().font_size).splitter();
                 let divider = div()
                     .id(format!("split-{divider_key}"))
@@ -3572,7 +3884,6 @@ impl Shell {
                         MouseButton::Left,
                         cx.listener(|shell, _, _, cx| shell.persist(cx)),
                     );
-
                 let container = div()
                     .flex()
                     .size_full()
@@ -3607,7 +3918,6 @@ impl Shell {
         let groups = sidebar_view(&self.workspace, self.sidebar_section);
         let no_projects = self.workspace.projects().is_empty();
         let empty = groups.is_empty();
-
         let at_limit = self.workspace.tab_count() >= MAX_TABS;
         let mut new_terminal = Button::new("sidebar-new-terminal", "Nueva terminal")
             .icon(icons::PLUS)
@@ -3623,7 +3933,6 @@ impl Shell {
         if width >= f32::from(metrics.sidebar_actions_compact_width()) {
             new_terminal = new_terminal.shortcut(keys::format_chord(keys::NEW_TAB));
         }
-
         let open_project = IconButton::new("sidebar-open-project", icons::FOLDER_OPEN)
             .size(ControlSize::Md)
             .icon_size(IconSize::Md)
@@ -3635,14 +3944,12 @@ impl Shell {
             .on_click(cx.listener(|shell, _, _, cx| {
                 shell.prompt_open_project(cx);
             }));
-
         let actions = div()
             .flex()
             .items_center()
             .gap(metrics.spacing_sm())
             .child(div().flex_1().min_w_0().child(new_terminal))
             .child(open_project);
-
         let search = div()
             .id("sidebar-search")
             .flex()
@@ -3674,7 +3981,6 @@ impl Shell {
                     .text_size(metrics.font_size * 0.75)
                     .child("Buscar pestañas, paneles y proyectos…"),
             );
-
         let sections = div()
             .flex()
             .items_center()
@@ -3686,7 +3992,6 @@ impl Shell {
             .bg(ui.background)
             .child(self.render_sidebar_section_segment(0, "Todas", SidebarSection::All, cx))
             .child(self.render_sidebar_section_segment(1, "Agentes", SidebarSection::Agents, cx));
-
         let top = div()
             .flex()
             .flex_col()
@@ -3695,13 +4000,11 @@ impl Shell {
             .child(actions)
             .child(search)
             .child(sections);
-
         let mut blocks = Vec::with_capacity(groups.len());
         for group in &groups {
             blocks.push(self.render_sidebar_project(group, cursor, sidebar_focused, cx));
         }
         let sidebar_empty = empty.then(|| self.render_sidebar_empty(no_projects, cx));
-
         let list = div()
             .flex()
             .flex_col()
@@ -3714,7 +4017,6 @@ impl Shell {
             .gap(metrics.spacing_sm())
             .children(blocks)
             .when_some(sidebar_empty, |this, empty| this.child(empty));
-
         let list_section = div()
             .flex()
             .flex_col()
@@ -3725,7 +4027,6 @@ impl Shell {
             .border_b_1()
             .border_color(ui.border)
             .child(list);
-
         div()
             .flex()
             .flex_col()
@@ -3762,7 +4063,6 @@ impl Shell {
                 keys::format_chord(keys::TOGGLE_SIDEBAR_AGENTS)
             )
         });
-
         let mut segment = div()
             .id(("sidebar-section", index))
             .flex()
@@ -3782,7 +4082,6 @@ impl Shell {
                 shell.set_sidebar_section(section, cx);
             }))
             .child(label);
-
         if index == 0 {
             segment = segment.rounded_tl(radius).rounded_bl(radius);
         } else {
@@ -3808,7 +4107,6 @@ impl Shell {
                 "Las terminales con opencode o Copilot aparecerán aquí.",
             )
         };
-
         let mut empty = div()
             .flex()
             .flex_col()
@@ -3826,7 +4124,6 @@ impl Shell {
                     .child(title),
             )
             .child(div().text_center().child(detail));
-
         if no_projects {
             empty = empty.child(
                 Button::new("sidebar-empty-open", "Abrir proyecto…")
@@ -3867,6 +4164,7 @@ impl Shell {
         });
         let menu_this = cx.entity().downgrade();
         let indent = metrics.spacing_xs() + metrics.sidebar_icon_lane() + metrics.spacing_sm();
+
         // Con el proyecto plegado sus terminales no se ven: el encabezado
         // muestra el estado más urgente de sus agentes para que una petición
         // de atención no pase desapercibida.
@@ -3887,7 +4185,6 @@ impl Shell {
                 .color(status.tone().color(ui))
                 .spin(status.is_spinning())
         });
-
         let mut header = div()
             .id(("project", project_id.get()))
             .flex()
@@ -3944,13 +4241,11 @@ impl Shell {
                         shell.new_tab_for(Some(project_id), None, window, cx);
                     })),
             );
-
         if selected && sidebar_focused {
             header = header.bg(ui.surface_raised).border_color(ui.focus);
         } else {
             header = header.hover(move |this| this.bg(ui.surface_raised.opacity(0.55)));
         }
-
         let header = header
             .on_click(cx.listener(move |shell, _, window, cx| {
                 shell.activate_project_row(project_id, window, cx);
@@ -3996,7 +4291,6 @@ impl Shell {
                         }
                     }))
             });
-
         let mut block = div()
             .flex()
             .flex_col()
@@ -4171,7 +4465,6 @@ impl Shell {
         });
         let menu_this = cx.entity().downgrade();
         let hover_group = format!("sidebar-tab-{}", tab.get());
-
         let mut row = div()
             .id(("sidebar-tab", tab.get()))
             .group(hover_group.clone())
@@ -4234,7 +4527,6 @@ impl Shell {
                             .child(meta),
                     ),
             );
-
         let mut slot = div()
             .w(metrics.control_height_sm())
             .h(metrics.control_height_sm())
@@ -4242,7 +4534,6 @@ impl Shell {
             .items_center()
             .justify_center()
             .flex_shrink_0();
-
         if let Some(agent) = agent_status {
             slot = slot.child(
                 div()
@@ -4270,7 +4561,6 @@ impl Shell {
                     ),
             );
         }
-
         slot = slot.child(
             div()
                 .opacity(0.0)
@@ -4305,7 +4595,6 @@ impl Shell {
         if !focused && !(selected && sidebar_focused) {
             row = row.hover(move |this| this.bg(ui.surface_raised.opacity(0.55)));
         }
-
         let has_agent = aggregate.is_some();
         let row = row
             .on_click(cx.listener(move |shell, _, window, cx| {
@@ -4384,7 +4673,6 @@ impl Shell {
                         }
                     }))
             });
-
         row.into_any_element()
     }
 
@@ -4541,7 +4829,6 @@ impl Shell {
             .into_any_element()
         });
         let body_bounds = Rc::clone(&self.body_bounds);
-
         div()
             .id(("pane", pane_id.get()))
             .flex()
@@ -4688,12 +4975,10 @@ impl Shell {
         let scroll_step = metrics.tab_scroll_step();
         let shell_entity = cx.entity().entity_id();
         let this = cx.entity().downgrade();
-
         let mut tab_elements = Vec::with_capacity(tabs.len());
         for (index, tab) in tabs.iter().copied().enumerate() {
             tab_elements.push(self.render_tab(pane_id, tab, index, focused, cx));
         }
-
         let left_scroll = scroll.clone();
         let right_scroll = scroll.clone();
         let pane_menu_this = this.clone();
@@ -4712,7 +4997,6 @@ impl Shell {
                 Some((id.clone(), name, id == default_profile, icon))
             })
             .collect();
-
         div()
             .flex()
             .items_center()
@@ -4936,6 +5220,16 @@ impl Shell {
                                     }
                                 }))
                                 .separator()
+                                .item(PopupMenuItem::new("Ajustes…").on_click({
+                                    let this = this.clone();
+                                    move |_, window, cx| {
+                                        if let Some(this) = this.upgrade() {
+                                            let _ = this.update(cx, |shell, cx| {
+                                                shell.open_settings(window, cx);
+                                            });
+                                        }
+                                    }
+                                }))
                                 .item(
                                     PopupMenuItem::new("Cerrar panel").on_click({
                                         let this = this.clone();
@@ -4995,12 +5289,12 @@ impl Shell {
             .workspace
             .pane(pane_id)
             .map_or(0, |pane| pane.tabs.len());
+
         // El indicador vive dentro del chip: en su borde izquierdo o, para el
         // final de la lista, en el derecho del último. Así no aporta tamaño al
         // contenido scrollable y no inventa overflow.
         let marker_left = insert == Some(index);
         let marker_right = insert == Some(tab_count) && index + 1 == tab_count;
-
         let inner: AnyElement = if editing {
             if let Some(edit) = &self.editing
                 && edit.tab == tab
@@ -5048,7 +5342,6 @@ impl Shell {
                 })
                 .into_any_element()
         };
-
         div()
             .id(("tab", tab.get()))
             .relative()
@@ -5178,6 +5471,7 @@ impl Shell {
     ) {
         let position = event.event.position;
         let metrics = theme::metrics(cx);
+
         // Primero se desplaza la strip y después se calcula el índice: si se
         // hiciera al revés, el destino quedaría un paso por detrás del offset.
         let scrolled = self.auto_scroll_tab_drag(position, metrics);
@@ -5222,6 +5516,7 @@ impl Shell {
             metrics.tab_min_width(),
             metrics.tab_width(),
         );
+
         // `scroll.bounds()` es el viewport estable; el offset lo desplaza el
         // contenido, no el contenedor.
         let local_x = f32::from(position.x - bounds.left() - offset.x);
@@ -5278,6 +5573,7 @@ impl Shell {
             .filter(|(pane, _)| *pane == target)
             .map(|(_, index)| index)
             .unwrap_or(index);
+
         // `move_tab` quita la pestaña antes de insertarla. Si se mueve dentro
         // del mismo panel y hacia la derecha, el índice visible (el hueco de
         // la barra) pierde una posición al quitar.
@@ -5312,6 +5608,7 @@ impl Shell {
             self.drop_tab(drag, target.pane, usize::MAX, window, cx);
             return;
         };
+
         // Un panel nuevo debe verse: el zoom temporal dejaría oculto el split.
         self.zoomed = None;
         match self
@@ -5573,13 +5870,13 @@ impl Shell {
                 .child(entry.view.clone())
                 .into_any_element();
         }
-
         if self.theme_host.profile(&model_tab.profile_id).is_none() {
             return EmptyState::new(
                 icons::ALERT_TRIANGLE,
                 title,
                 format!(
-                    "El perfil `{}` ya no existe en config.toml. Elige el perfil predeterminado o cierra la pestaña; no se arranca otro shell por sorpresa.",
+                    "El perfil `{}` ya no existe en config.toml. Elige el perfil predeterminado o \
+                     cierra la pestaña; no se arranca otro shell por sorpresa.",
                     model_tab.profile_id
                 ),
             )
@@ -5595,9 +5892,11 @@ impl Shell {
                         .small()
                         .primary()
                         .icon(icons::RESTART)
-                        .on_click(cx.listener(move |shell, _, window, cx| {
-                            shell.use_default_profile(tab, window, cx);
-                        })),
+                        .on_click(cx.listener(
+                            move |shell, _, window, cx| {
+                                shell.use_default_profile(tab, window, cx);
+                            },
+                        )),
                     )
                     .child(
                         Button::new(
@@ -5613,7 +5912,6 @@ impl Shell {
             )
             .into_any_element();
         }
-
         if self.pending_terminals.contains(&model_tab.terminal_id) {
             return EmptyState::new(
                 icons::RESTART,
@@ -5622,7 +5920,6 @@ impl Shell {
             )
             .into_any_element();
         }
-
         let missing = self
             .workspace
             .project(model_tab.project_id)
@@ -5657,7 +5954,6 @@ impl Shell {
             )
             .into_any_element();
         }
-
         EmptyState::new(
             icons::ALERT_TRIANGLE,
             title,
@@ -5835,7 +6131,6 @@ impl Shell {
         let empty = rows.is_empty();
         let list_max_h = metrics
             .palette_list_max_height(window.viewport_size().height, mode == PaletteMode::Search);
-
         let body = if empty {
             let hint = if mode == PaletteMode::Search && filter.is_some() {
                 "Pulsa Ctrl+1 para ver todo o prueba con otra palabra."
@@ -5958,7 +6253,6 @@ impl Shell {
             }
             list.vertical_scrollbar(&scroll).into_any_element()
         };
-
         let mode_control = ToggleGroup::new("palette-mode")
             .small()
             .segmented()
@@ -5983,7 +6277,6 @@ impl Shell {
                 };
                 shell.palette_set_mode(mode, window, cx);
             }));
-
         let mut filter_control = ToggleGroup::new("palette-filter")
             .small()
             .segmented()
@@ -6011,7 +6304,6 @@ impl Shell {
                     .and_then(|index| PaletteKind::SEARCH_FILTERS.get(index).copied());
                 shell.palette_set_filter(filter, window, cx);
             }));
-
         let header = div()
             .p(metrics.spacing_sm())
             .border_b_1()
@@ -6040,7 +6332,6 @@ impl Shell {
                         this.child(filter_control)
                     }),
             );
-
         let panel = div()
             .w_full()
             .max_w(metrics.palette_width())
@@ -6094,7 +6385,6 @@ impl Shell {
                             .child("cerrar"),
                     ),
             );
-
         div()
             .absolute()
             .top_0()
@@ -6175,9 +6465,8 @@ impl Shell {
                 .child(
                     "Comandos (Ctrl+Shift+K) ejecuta acciones; búsqueda (Ctrl+P) salta a \
                      pestañas, paneles, proyectos, perfiles y agentes en atención. Dentro de \
-                     la paleta, Ctrl+Tab cambia de modo y Ctrl+1–6 filtra por tipo. Temas y \
-                     fuentes están en Ctrl+Alt+T. Cambia los atajos en la sección [keymap] \
-                     de config.toml.",
+                     la paleta, Ctrl+Tab cambia de modo y Ctrl+1–6 filtra por tipo. Los ajustes \
+                     están en Ctrl+Alt+T. Cambia los atajos en la sección [keymap] de config.toml.",
                 ),
         );
         let footer = div().flex().justify_end().child(
@@ -6201,7 +6490,6 @@ impl Shell {
                 shell.close_shortcuts(window, cx);
             }))
             .into_any_element();
-
         div()
             .absolute()
             .top_0()
@@ -6214,31 +6502,52 @@ impl Shell {
             .into_any_element()
     }
 
-    /// Crea una vez los selectores de fuente que viven mientras dura el modal.
+    // --- Panel de ajustes: estado auxiliar ------------------------------
+    /// Fila enfocable del panel: un único `FocusHandle` persistente por id.
+    fn settings_focusable(
+        window: &mut Window,
+        cx: &mut axf_ui::gpui::App,
+        id: impl Into<ElementId>,
+    ) -> Stateful<Div> {
+        let key: ElementId = id.into();
+        let handle = window
+            .use_keyed_state(key.clone(), cx, |_, cx| cx.focus_handle())
+            .read(cx)
+            .clone();
+        div().id(key).min_w_0().track_focus(&handle).tab_stop(true)
+    }
+
+    /// Crea una vez los selectores de fuente que viven mientras dura el panel.
     fn ensure_font_selects(&mut self, window: &mut Window, cx: &mut Context<'_, Self>) {
         if self.ui_font_select.is_some() && self.terminal_font_select.is_some() {
             return;
         }
+        let Some(settings) = self.settings.as_ref() else {
+            return;
+        };
         self.font_select_subscriptions.clear();
         let fonts = self.theme_host.installed_fonts(cx);
-
-        let (ui_items, ui_selected) =
-            font_list(&fonts, self.theme_host.settings.ui.font_family.as_deref());
+        let (ui_items, ui_selected) = font_list(&fonts, settings.draft.ui.font_family.as_deref());
         let ui_state = cx.new(|cx| SelectState::new(ui_items, ui_selected, window, cx));
         let subscription =
             cx.subscribe(&ui_state, |shell, _, event: &SelectEvent<FontList>, cx| {
                 let SelectEvent::Confirm(value) = event;
                 if let Some(value) = value {
-                    shell.preview_font(false, value.clone(), cx);
+                    if let Some(settings) = &mut shell.settings {
+                        match value {
+                            FontValue::System => settings.set_ui_font(None),
+                            FontValue::Family(name) => {
+                                settings.set_ui_font(Some(name.to_string()));
+                            }
+                        }
+                    }
+                    shell.preview_settings(cx);
                 }
             });
         self.font_select_subscriptions.push(subscription);
         self.ui_font_select = Some(ui_state);
-
-        let (terminal_items, terminal_selected) = font_list(
-            &fonts,
-            self.theme_host.settings.terminal.font_family.as_deref(),
-        );
+        let (terminal_items, terminal_selected) =
+            font_list(&fonts, settings.draft.terminal.font_family.as_deref());
         let terminal_state =
             cx.new(|cx| SelectState::new(terminal_items, terminal_selected, window, cx));
         let subscription = cx.subscribe(
@@ -6246,7 +6555,15 @@ impl Shell {
             |shell, _, event: &SelectEvent<FontList>, cx| {
                 let SelectEvent::Confirm(value) = event;
                 if let Some(value) = value {
-                    shell.preview_font(true, value.clone(), cx);
+                    if let Some(settings) = &mut shell.settings {
+                        match value {
+                            FontValue::System => settings.set_terminal_font(None),
+                            FontValue::Family(name) => {
+                                settings.set_terminal_font(Some(name.to_string()));
+                            }
+                        }
+                    }
+                    shell.preview_settings(cx);
                 }
             },
         );
@@ -6254,244 +6571,2343 @@ impl Shell {
         self.terminal_font_select = Some(terminal_state);
     }
 
-    fn preview_font(&mut self, terminal: bool, value: FontValue, cx: &mut Context<'_, Self>) {
-        let label = value.label();
-        let messages = match (&value, terminal) {
-            (FontValue::System, false) => self.theme_host.preview_ui_font(None, cx),
-            (FontValue::Family(name), false) => {
-                self.theme_host.preview_ui_font(Some(name.to_string()), cx)
+    /// Campo de búsqueda de atajos.
+    fn ensure_shortcut_input(&mut self, window: &mut Window, cx: &mut Context<'_, Self>) {
+        if self.settings_shortcut_input.is_some() {
+            return;
+        }
+        let input =
+            cx.new(|cx| InputState::new(window, cx).placeholder("Filtrar acciones y atajos…"));
+        let subscription = cx.subscribe(&input, |shell, input, event: &InputEvent, cx| {
+            if !matches!(event, InputEvent::Change) {
+                return;
             }
-            (FontValue::System, true) => self.theme_host.preview_terminal_font(None, cx),
-            (FontValue::Family(name), true) => self
-                .theme_host
-                .preview_terminal_font(Some(name.to_string()), cx),
+            let query = input.read(cx).value().to_string();
+            if let Some(settings) = &mut shell.settings {
+                settings.shortcut_query = query;
+                settings.shortcut_cursor = 0;
+            }
+            cx.notify();
+        });
+        self.settings_shortcut_input = Some(input);
+        self.settings_shortcut_subscription = Some(subscription);
+    }
+
+    /// Abre el editor inline de un perfil ya existente en el borrador.
+    fn open_profile_editor(
+        &mut self,
+        id: ProfileId,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) {
+        let Some(profile) = self
+            .settings
+            .as_ref()
+            .and_then(|settings| settings.profiles().iter().find(|p| p.id == id))
+            .cloned()
+        else {
+            return;
         };
-        let kind = if terminal {
-            "Fuente terminal"
-        } else {
-            "Fuente UI"
+        let name_value = profile.name.clone();
+        let command_value = profile.command.clone();
+        let name = cx.new(|cx| InputState::new(window, cx).default_value(name_value));
+        let command = cx.new(|cx| InputState::new(window, cx).default_value(command_value));
+        let handle = name.read(cx).focus_handle(cx);
+        self.settings_profile_editor = Some(ProfileEditor {
+            id,
+            name,
+            command,
+            icon: profile.icon,
+            error: None,
+        });
+        window.focus(&handle, cx);
+        cx.notify();
+    }
+
+    /// Añade un perfil vacío y abre su editor.
+    fn add_profile(&mut self, window: &mut Window, cx: &mut Context<'_, Self>) {
+        let Some(id) = self
+            .settings
+            .as_mut()
+            .map(|settings| settings.add_profile())
+        else {
+            return;
         };
-        if messages.is_empty() {
-            self.set_notice(format!("{kind}: {label}"), false, cx);
-        } else {
-            self.set_notice(messages.join(" "), true, cx);
+        self.open_profile_editor(id, window, cx);
+    }
+
+    /// Valida y aplica los campos del editor inline.
+    fn apply_profile_editor(&mut self, cx: &mut Context<'_, Self>) {
+        let Some(editor) = self.settings_profile_editor.as_ref() else {
+            return;
+        };
+        let name = editor.name.read(cx).value().trim().to_owned();
+        let command = editor.command.read(cx).value().trim().to_owned();
+        if name.is_empty() {
+            if let Some(editor) = &mut self.settings_profile_editor {
+                editor.error = Some("El nombre no puede estar vacío.".into());
+            }
+            cx.notify();
+            return;
+        }
+        if command.is_empty() {
+            if let Some(editor) = &mut self.settings_profile_editor {
+                editor.error = Some("El comando no puede estar vacío.".into());
+            }
+            cx.notify();
+            return;
+        }
+        if let Err(error) =
+            Profile::new(editor.id.clone(), name.clone(), command.clone()).command_line()
+        {
+            if let Some(editor) = &mut self.settings_profile_editor {
+                editor.error = Some(format!("Comando inválido: {error}"));
+            }
+            cx.notify();
+            return;
+        }
+        let id = editor.id.clone();
+        let icon = editor.icon.clone();
+        if let Some(settings) = &mut self.settings
+            && let Err(error) = settings.update_profile(&id, name, command, icon)
+        {
+            settings.set_notice(error, true);
+            cx.notify();
+            return;
+        }
+        self.settings_profile_editor = None;
+        cx.notify();
+    }
+
+    /// Número de pestañas abiertas que usan un perfil.
+    fn profile_in_use(&self, id: &ProfileId) -> usize {
+        let mut count = 0;
+        for project in self.workspace.projects() {
+            for tab in self.workspace.project_tabs(project.id) {
+                if self
+                    .workspace
+                    .tab(tab)
+                    .is_some_and(|tab| &tab.profile_id == id)
+                {
+                    count += 1;
+                }
+            }
+        }
+        count
+    }
+
+    /// Pide borrar el perfil seleccionado, con protección y aviso de uso.
+    fn request_delete_profile(&mut self, cx: &mut Context<'_, Self>) {
+        let Some(settings) = self.settings.as_ref() else {
+            return;
+        };
+        let Some(profile) = settings.selected_profile().cloned() else {
+            return;
+        };
+        if settings.profiles().len() <= 1 {
+            self.set_notice("Debe quedar al menos un perfil.", true, cx);
+            return;
+        }
+        if settings.draft.terminal.default_profile == profile.id {
+            self.set_notice(
+                "Elige otro perfil predeterminado antes de borrar este.",
+                true,
+                cx,
+            );
+            return;
+        }
+        let in_use = self.profile_in_use(&profile.id);
+        if in_use > 0 {
+            if let Some(settings) = &mut self.settings {
+                settings.pending_delete = Some(PendingDelete {
+                    id: profile.id,
+                    name: profile.name,
+                    in_use,
+                });
+            }
+            cx.notify();
+            return;
+        }
+        self.delete_profile_now(&profile.id, cx);
+    }
+
+    fn delete_profile_now(&mut self, id: &ProfileId, cx: &mut Context<'_, Self>) {
+        let result = self
+            .settings
+            .as_mut()
+            .map(|settings| settings.delete_profile(id));
+        match result {
+            Some(Ok(())) => {
+                if self
+                    .settings_profile_editor
+                    .as_ref()
+                    .is_some_and(|editor| &editor.id == id)
+                {
+                    self.settings_profile_editor = None;
+                }
+                self.set_notice("Perfil eliminado del borrador.", false, cx);
+            }
+            Some(Err(error)) => {
+                if let Some(settings) = &mut self.settings {
+                    settings.pending_delete = None;
+                    settings.set_notice(error.clone(), true);
+                }
+                self.set_notice(error, true, cx);
+            }
+            None => {}
         }
         cx.notify();
     }
 
-    fn render_theme_modal(
+    /// Confirma el borrado de un perfil en uso.
+    fn confirm_delete_profile(&mut self, cx: &mut Context<'_, Self>) {
+        let Some(pending) = self
+            .settings
+            .as_mut()
+            .and_then(|settings| settings.pending_delete.take())
+        else {
+            return;
+        };
+        self.delete_profile_now(&pending.id, cx);
+    }
+
+    /// Lanza el descubrimiento local en segundo plano.
+    fn start_detect(&mut self, cx: &mut Context<'_, Self>) {
+        let Some(settings) = self.settings.as_mut() else {
+            return;
+        };
+        if matches!(settings.detect, DetectState::Running) {
+            return;
+        }
+        settings.detect = DetectState::Running;
+        cx.notify();
+        cx.spawn(async move |this, cx| {
+            let discovery = cx
+                .background_executor()
+                .spawn(async { axf_config::discover() })
+                .await;
+            let profiles = discovery.profiles_only();
+            let result = this.update(cx, |shell, cx| {
+                let Some(settings) = &mut shell.settings else {
+                    return;
+                };
+                let mut candidates = profiles;
+                candidates.retain(|profile| {
+                    !settings.profiles().iter().any(|existing| {
+                        existing.id == profile.id
+                            || existing
+                                .command
+                                .trim()
+                                .eq_ignore_ascii_case(profile.command.trim())
+                    })
+                });
+                let count = candidates.len();
+                settings.detect = DetectState::Ready(candidates);
+                settings.set_notice(
+                    if count == 0 {
+                        "No hay terminales nuevas que añadir.".into()
+                    } else {
+                        format!(
+                            "{count} terminales detectadas. Añádelas al borrador o descártalas."
+                        )
+                    },
+                    false,
+                );
+                cx.notify();
+            });
+            result.ok();
+        })
+        .detach();
+    }
+
+    /// Fusiona los perfiles detectados en el borrador.
+    fn merge_detected(&mut self, cx: &mut Context<'_, Self>) {
+        let Some(settings) = self.settings.as_mut() else {
+            return;
+        };
+        let DetectState::Ready(profiles) = std::mem::take(&mut settings.detect) else {
+            return;
+        };
+        let added = settings.merge_detected(profiles);
+        settings.detect = DetectState::Idle;
+        settings.set_notice(
+            if added == 0 {
+                "Ninguno de los perfiles detectados era nuevo.".into()
+            } else {
+                format!("{added} perfiles añadidos al borrador; guarda para aplicarlos.")
+            },
+            false,
+        );
+        cx.notify();
+    }
+
+    /// Ajusta un valor numérico y refresca la preview visual.
+    fn settings_step(&mut self, field: StepField, delta: f32, cx: &mut Context<'_, Self>) {
+        let Some(settings) = self.settings.as_mut() else {
+            return;
+        };
+        match field {
+            StepField::UiFontSize => settings.step_ui_font_size(delta),
+            StepField::UiScale => settings.step_ui_scale(delta),
+            StepField::TerminalFontSize => settings.step_terminal_font_size(delta),
+            StepField::LineHeight => settings.step_line_height(delta),
+            StepField::ScanInterval => settings.step_scan_interval(delta),
+        }
+        if !matches!(field, StepField::ScanInterval) {
+            self.preview_settings(cx);
+        } else {
+            cx.notify();
+        }
+    }
+
+    /// Captura la tecla pulsada durante un rebind. Devuelve `true` si la consumió.
+    fn settings_capture_keystroke(
+        &mut self,
+        keystroke: &Keystroke,
+        cx: &mut Context<'_, Self>,
+    ) -> bool {
+        let Some(action) = self
+            .settings
+            .as_ref()
+            .and_then(|settings| settings.capturing.clone())
+        else {
+            return false;
+        };
+        let key = keystroke.key.to_ascii_lowercase();
+        if matches!(
+            key.as_str(),
+            "control"
+                | "ctrl"
+                | "shift"
+                | "alt"
+                | "meta"
+                | "super"
+                | "win"
+                | "cmd"
+                | "fn"
+                | "function"
+        ) {
+            return false;
+        }
+        let result = if key == "escape" {
+            if let Some(settings) = &mut self.settings {
+                settings.cancel_capture();
+            }
+            Ok(())
+        } else if key == "backspace" || key == "delete" {
+            self.settings
+                .as_mut()
+                .map(|settings| settings.unbind_action(&action))
+                .unwrap_or(Ok(()))
+        } else {
+            let chord = Self::chord_from_keystroke(keystroke);
+            if chord.is_empty() {
+                return false;
+            }
+            self.settings
+                .as_mut()
+                .map(|settings| settings.set_binding(&action, &chord))
+                .unwrap_or(Ok(()))
+        };
+        match result {
+            Ok(()) => {
+                if let Some(settings) = &mut self.settings
+                    && settings.capturing.is_none()
+                    && settings.notice.is_none()
+                {
+                    settings.set_notice("Atajo actualizado en el borrador.".into(), false);
+                }
+            }
+            Err(error) => {
+                if let Some(settings) = &mut self.settings {
+                    settings.set_notice(error, true);
+                }
+            }
+        }
+        cx.notify();
+        true
+    }
+
+    /// Pide archivos o carpetas de fuentes y los añade al borrador.
+    fn settings_add_font_sources(&mut self, files: bool, cx: &mut Context<'_, Self>) {
+        let receiver = cx.prompt_for_paths(axf_ui::gpui::PathPromptOptions {
+            files,
+            directories: !files,
+            multiple: true,
+            prompt: Some(if files {
+                "Añadir archivos de fuente".into()
+            } else {
+                "Añadir carpeta de fuentes".into()
+            }),
+        });
+        let config_dir = self.theme_host.config_dir.clone();
+        cx.spawn(async move |this, cx| {
+            if let Ok(Ok(Some(paths))) = receiver.await {
+                let result = this.update(cx, |shell, cx| {
+                    let mut added = 0;
+                    let mut duplicate = false;
+                    if let Some(settings) = &mut shell.settings {
+                        for path in paths {
+                            if settings.add_font_source(&path, &config_dir) {
+                                added += 1;
+                            } else {
+                                duplicate = true;
+                            }
+                        }
+                        if added > 0 {
+                            settings.set_notice(
+                                format!("{added} orígenes de fuentes añadidos al borrador."),
+                                false,
+                            );
+                        } else if duplicate {
+                            settings.set_notice(
+                                "Esos orígenes ya estaban en la lista o se alcanzó el límite de 16."
+                                    .into(),
+                                true,
+                            );
+                        }
+                    }
+                    if added > 0 {
+                        shell.preview_settings(cx);
+                    }
+                    cx.notify();
+                });
+                result.ok();
+            }
+        })
+        .detach();
+    }
+
+    /// Abre la ruta indicada con la aplicación del sistema.
+    fn settings_open_path(&mut self, path: Option<PathBuf>, cx: &mut Context<'_, Self>) {
+        match path {
+            Some(path) => cx.open_with_system(&path),
+            None => self.set_notice("La ruta no está disponible.", true, cx),
+        }
+    }
+
+    /// Elige el icono del perfil en edición.
+    fn settings_choose_icon(&mut self, window: &mut Window, cx: &mut Context<'_, Self>) {
+        let _ = window;
+        let receiver = cx.prompt_for_paths(axf_ui::gpui::PathPromptOptions {
+            files: true,
+            directories: false,
+            multiple: false,
+            prompt: Some("Elegir icono del perfil".into()),
+        });
+        cx.spawn(async move |this, cx| {
+            if let Ok(Ok(Some(paths))) = receiver.await
+                && let Some(path) = paths.first().cloned()
+            {
+                let result = this.update(cx, |shell, cx| {
+                    if let Some(editor) = &mut shell.settings_profile_editor {
+                        editor.icon = Some(path);
+                        editor.error = None;
+                    }
+                    cx.notify();
+                });
+                result.ok();
+            }
+        })
+        .detach();
+    }
+
+    // --- Panel de ajustes: render --------------------------------------
+    /// Barra lateral de secciones del panel.
+    fn render_settings_rail(
         &mut self,
         window: &mut Window,
         cx: &mut Context<'_, Self>,
     ) -> AnyElement {
-        self.ensure_font_selects(window, cx);
         let state = theme::state(cx);
-        let theme = state.theme.meta.clone();
         let ui = state.theme.ui;
         let metrics = state.metrics;
-        let fonts = state.fonts.clone();
-        let names = self.theme_host.theme_names();
-        let selected = self.theme_host.selected.clone();
-        let preview = self.theme_host.preview_variant.is_some();
-        let themes_dir = self
-            .theme_host
-            .themes_dir
+        let section = self
+            .settings
             .as_ref()
-            .map(|dir| dir.display().to_string())
-            .unwrap_or_else(|| "—".into());
+            .map(|settings| settings.section)
+            .unwrap_or(SettingsSection::Appearance);
+        let mut rows = div().flex().flex_col().gap(metrics.spacing_xxs()).min_w_0();
+        for candidate in SettingsSection::ALL {
+            let candidate = *candidate;
+            let selected = candidate == section;
+            let row = Self::settings_focusable(
+                window,
+                cx,
+                format!("settings-section-{}", candidate.label()),
+            )
+            .flex()
+            .items_center()
+            .gap(metrics.spacing_sm())
+            .min_w_0()
+            .h(metrics.control_height_md())
+            .px(metrics.spacing_sm())
+            .rounded(metrics.radius_sm())
+            .cursor_pointer()
+            .when(selected, |this| this.bg(ui.selection))
+            .when(!selected, |this| {
+                this.hover(move |this| this.bg(ui.surface_raised.opacity(0.6)))
+            })
+            .on_click(cx.listener(move |shell, _, _, cx| {
+                if let Some(settings) = &mut shell.settings {
+                    settings.set_section(candidate);
+                }
+                shell.settings_scroll = ScrollHandle::new();
+                cx.notify();
+            }))
+            .on_key_down(cx.listener(move |shell, event: &KeyDownEvent, _, cx| {
+                if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                    if let Some(settings) = &mut shell.settings {
+                        settings.set_section(candidate);
+                    }
+                    shell.settings_scroll = ScrollHandle::new();
+                    cx.stop_propagation();
+                    cx.notify();
+                }
+            }))
+            .child(
+                Icon::new(candidate.icon())
+                    .size(IconSize::Sm)
+                    .color(if selected { ui.accent } else { ui.muted }),
+            )
+            .child(
+                div()
+                    .min_w_0()
+                    .overflow_hidden()
+                    .whitespace_nowrap()
+                    .text_ellipsis()
+                    .text_size(metrics.font_size * 0.8125)
+                    .text_color(if selected { ui.accent } else { ui.text })
+                    .child(candidate.label()),
+            );
+            rows = rows.child(row);
+        }
+        let rail_width = metrics.font_size * 11.5 + metrics.spacing_sm() * 2.0;
+        // Misma compensación de DPI que en `render_settings`: las anchuras de
+        // los hijos se escalan y el ancho de la tarjeta no.
+        div()
+            .w(rail_width / window.scale_factor())
+            .max_w(rail_width / window.scale_factor())
+            .min_w_0()
+            .flex_shrink_0()
+            .overflow_hidden()
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .min_w_0()
+                    .p(metrics.spacing_sm())
+                    .border_r_1()
+                    .border_color(ui.border)
+                    .child(rows),
+            )
+            .into_any_element()
+    }
+
+    /// Cabecera con el título de la sección, la ayuda y los avisos.
+    fn render_settings_header(
+        &mut self,
+        cx: &mut Context<'_, Self>,
+        section: SettingsSection,
+        notice: Option<(String, bool)>,
+        conflict: Option<String>,
+    ) -> AnyElement {
+        let state = theme::state(cx);
+        let ui = state.theme.ui;
+        let metrics = state.metrics;
+        let mut header = div()
+            .flex()
+            .flex_col()
+            .w_full()
+            .gap(metrics.spacing_xxs())
+            .px(metrics.spacing_lg())
+            .pt(metrics.spacing_lg())
+            .pb(metrics.spacing_sm())
+            .child(
+                div()
+                    .text_size(metrics.font_size * 0.95)
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .child(section.label()),
+            )
+            .child(
+                div()
+                    .text_size(metrics.font_size * 0.75)
+                    .text_color(ui.muted)
+                    .child(section.description()),
+            )
+            .when_some(notice, |this, (text, error)| {
+                this.child(
+                    div()
+                        .pt(metrics.spacing_xs())
+                        .text_size(metrics.font_size * 0.75)
+                        .text_color(if error { ui.danger } else { ui.muted })
+                        .child(text),
+                )
+            });
+        if let Some(message) = conflict {
+            header = header.child(self.render_settings_conflict(message, cx));
+        }
+        header.into_any_element()
+    }
+
+    /// Pie con el estado del borrador y las acciones de descartar/guardar.
+    fn render_settings_footer(
+        &mut self,
+        cx: &mut Context<'_, Self>,
+        dirty: bool,
+        errors: &[String],
+    ) -> AnyElement {
+        let state = theme::state(cx);
+        let ui = state.theme.ui;
+        let metrics = state.metrics;
+        let status = if let Some(first) = errors.first() {
+            div()
+                .min_w_0()
+                .text_size(metrics.font_size * 0.75)
+                .text_color(ui.danger)
+                .child(if errors.len() > 1 {
+                    format!("{first} (+{} errores)", errors.len() - 1)
+                } else {
+                    first.clone()
+                })
+        } else if dirty {
+            div()
+                .text_size(metrics.font_size * 0.75)
+                .text_color(ui.muted)
+                .child("Borrador sin guardar")
+        } else {
+            div()
+                .text_size(metrics.font_size * 0.75)
+                .text_color(ui.muted)
+                .child("Sin cambios")
+        };
+        div()
+            .flex()
+            .w_full()
+            .flex_wrap()
+            .flex_shrink_0()
+            .items_center()
+            .gap(metrics.spacing_sm())
+            .px(metrics.spacing_lg())
+            .py(metrics.spacing_sm())
+            .border_t_1()
+            .border_color(ui.border)
+            .child(status)
+            .child(
+                div()
+                    .flex()
+                    .flex_shrink_0()
+                    .items_center()
+                    .gap(metrics.spacing_sm())
+                    .child(
+                        KitButton::new("settings-discard")
+                            .small()
+                            .ghost()
+                            .label("Descartar")
+                            .on_click(cx.listener(|shell, _, window, cx| {
+                                shell.close_settings(window, cx);
+                            })),
+                    )
+                    .child(
+                        KitButton::new("settings-save")
+                            .small()
+                            .primary()
+                            .label("Guardar")
+                            .disabled(!dirty)
+                            .on_click(cx.listener(|shell, _, _, cx| {
+                                shell.save_settings(cx);
+                            })),
+                    ),
+            )
+            .into_any_element()
+    }
+
+    /// Contenido de la sección activa.
+    fn render_settings_body(
+        &mut self,
+        section: SettingsSection,
+        body_width: Pixels,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) -> AnyElement {
+        match section {
+            SettingsSection::Appearance => self.render_settings_appearance(window, cx),
+            SettingsSection::Terminal => self.render_settings_terminal(window, cx),
+            SettingsSection::Profiles => self.render_settings_profiles(body_width, window, cx),
+            SettingsSection::Fonts => self.render_settings_fonts(cx),
+            SettingsSection::Shortcuts => self.render_settings_shortcuts(window, cx),
+            SettingsSection::Agents => self.render_settings_agents(window, cx),
+            SettingsSection::Advanced => self.render_settings_advanced(cx),
+        }
+    }
+
+    fn render_settings(&mut self, window: &mut Window, cx: &mut Context<'_, Self>) -> AnyElement {
+        let metrics = theme::state(cx).metrics;
+        let Some(settings) = self.settings.as_ref() else {
+            return div().into_any_element();
+        };
+        let section = settings.section;
+        let dirty = settings.is_dirty();
+        let notice = settings.notice.clone();
+        let conflict = settings.conflict_message().map(str::to_owned);
+        let errors = settings.errors.clone();
+        let schema = settings.draft.schema_version;
+        let rail = self.render_settings_rail(window, cx);
+        let header = self.render_settings_header(cx, section, notice, conflict);
+        let footer = self.render_settings_footer(cx, dirty, &errors);
+        let height = (window.viewport_size().height - metrics.font_size * 28.0)
+            .max(metrics.font_size * 16.0);
+        let card_width = metrics.font_size * 62.0;
+        let scale = window.scale_factor().max(1.0);
+        let rail_width = metrics.font_size * 11.5 + metrics.spacing_sm() * 2.0;
+        // `Modal::width` fija la tarjeta en píxeles físicos, mientras que las
+        // anchuras de los hijos se escalan por DPI. Dividir por `scale_factor`
+        // alinea ambos sistemas y evita que las filas desborden la tarjeta.
+        let body_width = (card_width - rail_width - metrics.spacing_lg() * 4.0) / scale;
+        let body = self.render_settings_body(section, body_width, window, cx);
+        let scroll = self.settings_scroll.clone();
+        let content = div()
+            .flex()
+            .flex_col()
+            .flex_1()
+            .min_w_0()
+            .min_h_0()
+            .child(header)
+            .child(
+                div()
+                    .id("settings-content")
+                    .flex_1()
+                    .min_w_0()
+                    .min_h_0()
+                    .overflow_x_hidden()
+                    .overflow_y_scroll()
+                    .track_scroll(&scroll)
+                    .vertical_scrollbar(&scroll)
+                    .px(metrics.spacing_lg())
+                    .pb(metrics.spacing_sm())
+                    .child(div().w(body_width).max_w(body_width).min_w_0().child(body)),
+            )
+            .child(footer);
+        let card_body = div()
+            .flex()
+            .w_full()
+            .min_w_0()
+            .h(height)
+            .min_h_0()
+            .overflow_hidden()
+            .child(rail)
+            .child(content);
+        let modal = Modal::new("settings-modal", "Ajustes")
+            .description(format!(
+                "config.toml · esquema v{schema} · {}",
+                if dirty {
+                    "cambios sin guardar"
+                } else {
+                    "sin cambios"
+                }
+            ))
+            .width(card_width)
+            .align_top()
+            .body(card_body)
+            .on_close(cx.listener(|shell, _, window, cx| {
+                shell.close_settings(window, cx);
+            }))
+            .into_any_element();
+        div()
+            .absolute()
+            .top_0()
+            .left_0()
+            .size_full()
+            .key_context(SETTINGS_CONTEXT)
+            .track_focus(&self.settings_focus)
+            .tab_group()
+            .on_action(cx.listener(Self::settings_cancel))
+            .on_action(cx.listener(Self::settings_save))
+            .on_action(cx.listener(Self::settings_next_section))
+            .on_action(cx.listener(Self::settings_previous_section))
+            .child(modal)
+            .focus_trap("settings-trap", &self.settings_focus)
+            .into_any_element()
+    }
+
+    fn render_settings_conflict(
+        &mut self,
+        message: String,
+        cx: &mut Context<'_, Self>,
+    ) -> AnyElement {
+        let state = theme::state(cx);
+        let ui = state.theme.ui;
+        let metrics = state.metrics;
+        div()
+            .mt(metrics.spacing_sm())
+            .flex()
+            .flex_wrap()
+            .items_center()
+            .gap(metrics.spacing_sm())
+            .p(metrics.spacing_sm())
+            .rounded(metrics.radius_sm())
+            .border_1()
+            .border_color(ui.warning)
+            .bg(ui.surface_raised)
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .text_size(metrics.font_size * 0.75)
+                    .text_color(ui.text)
+                    .child(message),
+            )
+            .child(
+                KitButton::new("settings-conflict-reload")
+                    .small()
+                    .label("Recargar")
+                    .on_click(cx.listener(|shell, _, _, cx| {
+                        shell.reload_settings_from_disk(cx);
+                    })),
+            )
+            .child(
+                KitButton::new("settings-conflict-keep")
+                    .small()
+                    .ghost()
+                    .label("Seguir editando")
+                    .on_click(cx.listener(|shell, _, _, cx| {
+                        if let Some(settings) = &mut shell.settings {
+                            settings.keep_editing();
+                        }
+                        cx.notify();
+                    })),
+            )
+            .child(
+                KitButton::new("settings-conflict-overwrite")
+                    .small()
+                    .danger()
+                    .label("Sobrescribir y guardar")
+                    .on_click(cx.listener(|shell, _, _, cx| {
+                        if let Some(settings) = &mut shell.settings {
+                            settings.allow_overwrite();
+                        }
+                        shell.save_settings(cx);
+                    })),
+            )
+            .into_any_element()
+    }
+
+    fn render_settings_appearance(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) -> AnyElement {
+        let state = theme::state(cx);
+        let ui = state.theme.ui;
+        let metrics = state.metrics;
+        let Some(settings) = self.settings.as_ref() else {
+            return div().into_any_element();
+        };
+        let appearance = settings.draft.appearance;
+        let selected_theme = settings.draft.ui.theme.clone();
+        let ui_size = settings.draft.ui.font_size;
+        let ui_scale = settings.draft.ui.scale;
+        let themes = self.theme_host.theme_names();
+        let ui_font_select = self.ui_font_select.clone();
+        let mut choices = div().flex().flex_col().gap(metrics.spacing_xxs());
+        for (label, value, hint) in [
+            (
+                "Sistema",
+                axf_config::Appearance::System,
+                "Sigue el tema del sistema.",
+            ),
+            (
+                "Claro",
+                axf_config::Appearance::Light,
+                "Fuerza la variante clara.",
+            ),
+            (
+                "Oscuro",
+                axf_config::Appearance::Dark,
+                "Fuerza la variante oscura.",
+            ),
+        ] {
+            let selected = appearance == value;
+            let row = Self::settings_focusable(window, cx, format!("settings-appearance-{label}"))
+                .flex()
+                .items_center()
+                .gap(metrics.spacing_sm())
+                .px(metrics.spacing_sm())
+                .py(metrics.spacing_xs())
+                .rounded(metrics.radius_sm())
+                .cursor_pointer()
+                .hover(move |this| this.bg(ui.surface_raised.opacity(0.6)))
+                .on_click(cx.listener(move |shell, _, _, cx| {
+                    if let Some(settings) = &mut shell.settings {
+                        settings.set_appearance(value);
+                    }
+                    shell.preview_settings(cx);
+                }))
+                .child(
+                    Icon::new(if selected {
+                        icons::CHECK
+                    } else {
+                        icons::CIRCLE
+                    })
+                    .size(IconSize::Xs)
+                    .color(if selected { ui.accent } else { ui.muted }),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap(metrics.hairline())
+                        .child(div().text_size(metrics.font_size * 0.8125).child(label))
+                        .child(
+                            div()
+                                .text_size(metrics.font_size * 0.6875)
+                                .text_color(ui.muted)
+                                .child(hint),
+                        ),
+                );
+            choices = choices.child(row);
+        }
+        let mut theme_list = div().flex().flex_col().gap(metrics.hairline());
+        for (name, variant) in themes {
+            let selected = name == selected_theme;
+            let dark = variant.is_dark();
+            let label = name.clone();
+            let row = Self::settings_focusable(window, cx, format!("settings-theme-{name}"))
+                .flex()
+                .items_center()
+                .gap(metrics.spacing_sm())
+                .px(metrics.spacing_sm())
+                .py(metrics.spacing_xs())
+                .rounded(metrics.radius_sm())
+                .cursor_pointer()
+                .hover(move |this| this.bg(ui.surface_raised.opacity(0.6)))
+                .on_click(cx.listener(move |shell, _, _, cx| {
+                    if let Some(settings) = &mut shell.settings {
+                        settings.set_theme(&label, dark);
+                    }
+                    shell.preview_settings(cx);
+                }))
+                .child(
+                    Icon::new(if selected {
+                        icons::CHECK
+                    } else if dark {
+                        icons::MOON
+                    } else {
+                        icons::SUN
+                    })
+                    .size(IconSize::Xs)
+                    .color(if selected { ui.accent } else { ui.muted }),
+                )
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .text_size(metrics.font_size * 0.75)
+                        .child(name),
+                )
+                .child(
+                    div()
+                        .text_size(metrics.font_size * 0.6875)
+                        .text_color(ui.muted)
+                        .child(variant.label()),
+                );
+            theme_list = theme_list.child(row);
+        }
+        let font_field = ui_font_select.map(|select| {
+            div()
+                .flex()
+                .flex_col()
+                .gap(metrics.spacing_xxs())
+                .child(
+                    div()
+                        .text_size(metrics.font_size * 0.75)
+                        .text_color(ui.muted)
+                        .child("Fuente de la interfaz"),
+                )
+                .child(Select::new(&select).small().w_full().placeholder("Sistema"))
+                .into_any_element()
+        });
+        let body = div()
+            .flex()
+            .flex_col()
+            .gap(metrics.spacing_lg())
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(metrics.spacing_xxs())
+                    .child(
+                        div()
+                            .text_size(metrics.font_size * 0.75)
+                            .text_color(ui.muted)
+                            .child("Modo de color"),
+                    )
+                    .child(choices),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(metrics.spacing_xxs())
+                    .child(
+                        div()
+                            .text_size(metrics.font_size * 0.75)
+                            .text_color(ui.muted)
+                            .child("Catálogo de temas"),
+                    )
+                    .child(
+                        div()
+                            .id("settings-theme-list")
+                            .max_h(metrics.font_size * 12.0)
+                            .overflow_y_scroll()
+                            .child(theme_list),
+                    ),
+            )
+            .when_some(font_field, |this, field| this.child(field))
+            .child(self.render_settings_stepper(
+                window,
+                cx,
+                "settings-ui-size",
+                "Tamaño base de la UI",
+                format!("{:.0} px", ui_size),
+                StepField::UiFontSize,
+            ))
+            .child(self.render_settings_stepper(
+                window,
+                cx,
+                "settings-ui-scale",
+                "Escala global",
+                format!("{:.2}×", ui_scale),
+                StepField::UiScale,
+            ));
+        body.into_any_element()
+    }
+
+    fn render_settings_terminal(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) -> AnyElement {
+        let state = theme::state(cx);
+        let ui = state.theme.ui;
+        let metrics = state.metrics;
+        let Some(settings) = self.settings.as_ref() else {
+            return div().into_any_element();
+        };
+        let font_select = self.terminal_font_select.clone();
+        let font_size = format!("{:.0} px", settings.draft.terminal.font_size);
+        let line_height = format!("{:.2}×", settings.draft.terminal.line_height);
+        let mono = state.fonts.mono.clone();
+        let mono_size = state.mono_font_size;
+        let font_field = font_select.map(|select| {
+            div()
+                .flex()
+                .flex_col()
+                .gap(metrics.spacing_xxs())
+                .child(
+                    div()
+                        .text_size(metrics.font_size * 0.75)
+                        .text_color(ui.muted)
+                        .child("Fuente monoespaciada"),
+                )
+                .child(Select::new(&select).small().w_full().placeholder("Sistema"))
+                .into_any_element()
+        });
+        let preview = div()
+            .flex()
+            .flex_col()
+            .gap(metrics.hairline())
+            .p(metrics.spacing_sm())
+            .rounded(metrics.radius_sm())
+            .border_1()
+            .border_color(ui.border)
+            .bg(ui.surface_raised)
+            .child(
+                div()
+                    .font_family(mono.clone())
+                    .text_size(mono_size)
+                    .text_color(ui.text)
+                    .child("C:\\proyectos\\axfterm ❯ axfterm --help"),
+            )
+            .child(
+                div()
+                    .font_family(mono)
+                    .text_size(mono_size)
+                    .text_color(ui.muted)
+                    .child("0123456789 · []{}()<> · áéíóú · ñ"),
+            );
+        div()
+            .flex()
+            .flex_col()
+            .gap(metrics.spacing_lg())
+            .when_some(font_field, |this, field| this.child(field))
+            .child(self.render_settings_stepper(
+                window,
+                cx,
+                "settings-terminal-size",
+                "Tamaño de celda",
+                font_size,
+                StepField::TerminalFontSize,
+            ))
+            .child(self.render_settings_stepper(
+                window,
+                cx,
+                "settings-line-height",
+                "Altura de línea",
+                line_height,
+                StepField::LineHeight,
+            ))
+            .child(preview)
+            .into_any_element()
+    }
+
+    /// Filas seleccionables de perfiles dentro de los ajustes.
+    fn render_profile_rows(
+        &mut self,
+        width: Pixels,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) -> AnyElement {
+        let state = theme::state(cx);
+        let ui = state.theme.ui;
+        let metrics = state.metrics;
+        let profiles = self
+            .settings
+            .as_ref()
+            .map(|settings| settings.profiles().to_vec())
+            .unwrap_or_default();
+        let cursor = self
+            .settings
+            .as_ref()
+            .map(|settings| settings.profile_cursor)
+            .unwrap_or(0);
+        let default_profile = self
+            .settings
+            .as_ref()
+            .map(|settings| settings.draft.terminal.default_profile.clone());
+        let icons: Vec<ProfileIconSource> = profiles
+            .iter()
+            .map(|profile| self.theme_host.profile_icon(&profile.id))
+            .collect();
+        let mut list = div()
+            .flex()
+            .flex_col()
+            .w(width)
+            .max_w(width)
+            .min_w_0()
+            .gap(metrics.hairline());
+        let profile_count = profiles.len();
+        for (index, profile) in profiles.iter().enumerate() {
+            let selected = index == cursor;
+            let is_default = default_profile.as_ref() == Some(&profile.id);
+            let row =
+                Self::settings_focusable(window, cx, format!("settings-profile-{}", profile.id))
+                    .flex()
+                    .items_center()
+                    .gap(metrics.spacing_sm())
+                    .px(metrics.spacing_sm())
+                    .py(metrics.spacing_xs())
+                    .rounded(metrics.radius_sm())
+                    .cursor_pointer()
+                    .w(width)
+                    .max_w(width)
+                    .min_w_0()
+                    .when(selected, |this| this.bg(ui.selection))
+                    .when(!selected, |this| {
+                        this.hover(move |this| this.bg(ui.surface_raised.opacity(0.6)))
+                    })
+                    .on_click(cx.listener(move |shell, _, _, cx| {
+                        if let Some(settings) = &mut shell.settings {
+                            settings.profile_cursor = index;
+                        }
+                        cx.notify();
+                    }))
+                    .on_key_down(cx.listener(move |shell, event: &KeyDownEvent, _, cx| {
+                        match event.keystroke.key.as_str() {
+                            "up" => {
+                                if let Some(settings) = &mut shell.settings {
+                                    settings.profile_cursor =
+                                        settings.profile_cursor.saturating_sub(1);
+                                }
+                                cx.stop_propagation();
+                                cx.notify();
+                            }
+                            "down" => {
+                                if let Some(settings) = &mut shell.settings {
+                                    settings.profile_cursor = (settings.profile_cursor + 1)
+                                        .min(profile_count.saturating_sub(1));
+                                }
+                                cx.stop_propagation();
+                                cx.notify();
+                            }
+                            "enter" | "space" => {
+                                if let Some(settings) = &mut shell.settings {
+                                    settings.profile_cursor = index;
+                                }
+                                cx.stop_propagation();
+                                cx.notify();
+                            }
+                            _ => {}
+                        }
+                    }))
+                    .child(
+                        ProfileIcon::new(icons[index].clone())
+                            .size(IconSize::Sm)
+                            .color(ui.text),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap(metrics.hairline())
+                            .flex_1()
+                            .min_w_0()
+                            .child(
+                                div()
+                                    .text_size(metrics.font_size * 0.75)
+                                    .child(profile.name.clone()),
+                            )
+                            .child(
+                                div()
+                                    .min_w_0()
+                                    .overflow_hidden()
+                                    .whitespace_nowrap()
+                                    .text_ellipsis()
+                                    .text_size(metrics.font_size * 0.6875)
+                                    .text_color(ui.muted)
+                                    .child(profile.command.clone()),
+                            ),
+                    )
+                    .when(is_default, |this| {
+                        this.child(
+                            div()
+                                .text_size(metrics.font_size * 0.625)
+                                .text_color(ui.accent)
+                                .child("Predeterminado"),
+                        )
+                    });
+            list = list.child(row);
+        }
+        list.into_any_element()
+    }
+
+    /// Botones para añadir, editar, duplicar, mover, marcar o borrar perfiles.
+    fn render_profile_toolbar(&mut self, width: Pixels, cx: &mut Context<'_, Self>) -> AnyElement {
+        let state = theme::state(cx);
+        let metrics = state.metrics;
+        let selected_id = self
+            .settings
+            .as_ref()
+            .and_then(|settings| settings.profiles().get(settings.profile_cursor))
+            .map(|profile| profile.id.clone());
+        let running = matches!(
+            self.settings.as_ref().map(|settings| &settings.detect),
+            Some(DetectState::Running)
+        );
+        let mut toolbar = div()
+            .flex()
+            .flex_wrap()
+            .w(width)
+            .max_w(width)
+            .min_w_0()
+            .gap(metrics.spacing_xs());
+        toolbar = toolbar
+            .child(
+                KitButton::new("settings-profile-add")
+                    .small()
+                    .label("Añadir")
+                    .on_click(cx.listener(|shell, _, window, cx| {
+                        shell.add_profile(window, cx);
+                    })),
+            )
+            .child(
+                KitButton::new("settings-profile-detect")
+                    .small()
+                    .ghost()
+                    .label("Detectar terminales")
+                    .disabled(running)
+                    .on_click(cx.listener(|shell, _, _, cx| {
+                        shell.start_detect(cx);
+                    })),
+            )
+            .when_some(selected_id, |this, id| {
+                let edit_id = id.clone();
+                let duplicate_id = id.clone();
+                let up_id = id.clone();
+                let down_id = id.clone();
+                this.child(
+                    KitButton::new("settings-profile-edit")
+                        .small()
+                        .label("Editar")
+                        .on_click(cx.listener(move |shell, _, window, cx| {
+                            shell.open_profile_editor(edit_id.clone(), window, cx);
+                        })),
+                )
+                .child(
+                    KitButton::new("settings-profile-duplicate")
+                        .small()
+                        .ghost()
+                        .label("Duplicar")
+                        .on_click(cx.listener(move |shell, _, _, cx| {
+                            let result = shell
+                                .settings
+                                .as_mut()
+                                .map(|settings| settings.duplicate_profile(&duplicate_id));
+                            if let Some(Err(error)) = result {
+                                shell.set_notice(error, true, cx);
+                            }
+                            cx.notify();
+                        })),
+                )
+                .child(
+                    KitButton::new("settings-profile-up")
+                        .small()
+                        .ghost()
+                        .label("Subir")
+                        .on_click(cx.listener(move |shell, _, _, cx| {
+                            if let Some(settings) = &mut shell.settings {
+                                settings.move_profile(&up_id, -1);
+                            }
+                            cx.notify();
+                        })),
+                )
+                .child(
+                    KitButton::new("settings-profile-down")
+                        .small()
+                        .ghost()
+                        .label("Bajar")
+                        .on_click(cx.listener(move |shell, _, _, cx| {
+                            if let Some(settings) = &mut shell.settings {
+                                settings.move_profile(&down_id, 1);
+                            }
+                            cx.notify();
+                        })),
+                )
+                .child(
+                    KitButton::new("settings-profile-default")
+                        .small()
+                        .ghost()
+                        .label("Predeterminado")
+                        .on_click(cx.listener(move |shell, _, _, cx| {
+                            if let Some(settings) = &mut shell.settings {
+                                if let Err(error) = settings.set_default_profile(&id) {
+                                    settings.set_notice(error, true);
+                                }
+                            }
+                            cx.notify();
+                        })),
+                )
+                .child(
+                    KitButton::new("settings-profile-delete")
+                        .small()
+                        .danger()
+                        .label("Eliminar")
+                        .on_click(cx.listener(|shell, _, _, cx| {
+                            shell.request_delete_profile(cx);
+                        })),
+                )
+            });
+        toolbar.into_any_element()
+    }
+
+    /// Resultado del descubrimiento local de terminales.
+    fn render_profile_detect(&mut self, cx: &mut Context<'_, Self>) -> AnyElement {
+        let state = theme::state(cx);
+        let ui = state.theme.ui;
+        let metrics = state.metrics;
+        let mut detect = div().flex().flex_col().gap(metrics.spacing_xs());
+        if let Some(settings) = self.settings.as_ref() {
+            match &settings.detect {
+                DetectState::Running => {
+                    detect = detect.child(
+                        div()
+                            .text_size(metrics.font_size * 0.75)
+                            .text_color(ui.muted)
+                            .child("Buscando terminales en PATH…"),
+                    );
+                }
+                DetectState::Ready(found) => {
+                    let mut found_list = div().flex().flex_col().gap(metrics.hairline());
+                    for profile in found {
+                        found_list = found_list.child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap(metrics.spacing_sm())
+                                .text_size(metrics.font_size * 0.75)
+                                .child(
+                                    Icon::new(icons::TERMINAL)
+                                        .size(IconSize::Xs)
+                                        .color(ui.muted),
+                                )
+                                .child(profile.name.clone())
+                                .child(
+                                    div()
+                                        .text_size(metrics.font_size * 0.6875)
+                                        .text_color(ui.muted)
+                                        .child(profile.command.clone()),
+                                ),
+                        );
+                    }
+                    detect = detect.child(found_list).child(
+                        div()
+                            .flex()
+                            .gap(metrics.spacing_xs())
+                            .child(
+                                KitButton::new("settings-profile-detect-add")
+                                    .small()
+                                    .primary()
+                                    .label(format!("Añadir {}", found.len()))
+                                    .on_click(cx.listener(|shell, _, _, cx| {
+                                        shell.merge_detected(cx);
+                                    })),
+                            )
+                            .child(
+                                KitButton::new("settings-profile-detect-discard")
+                                    .small()
+                                    .ghost()
+                                    .label("Descartar")
+                                    .on_click(cx.listener(|shell, _, _, cx| {
+                                        if let Some(settings) = &mut shell.settings {
+                                            settings.detect = DetectState::Idle;
+                                        }
+                                        cx.notify();
+                                    })),
+                            ),
+                    );
+                }
+                DetectState::Idle => {}
+            }
+        }
+        detect.into_any_element()
+    }
+
+    /// Confirmación al borrar un perfil en uso.
+    fn render_profile_delete_warning(&mut self, cx: &mut Context<'_, Self>) -> Option<AnyElement> {
+        let pending = self
+            .settings
+            .as_ref()
+            .and_then(|settings| settings.pending_delete.clone())?;
+        let state = theme::state(cx);
+        let ui = state.theme.ui;
+        let metrics = state.metrics;
+        Some(
+            div()
+                .flex()
+                .flex_wrap()
+                .items_center()
+                .gap(metrics.spacing_sm())
+                .p(metrics.spacing_sm())
+                .rounded(metrics.radius_sm())
+                .border_1()
+                .border_color(ui.warning)
+                .text_size(metrics.font_size * 0.75)
+                .child(format!(
+                    "«{}» se usa en {} pestaña(s) abiertas. Al cerrarlas no podrán arrancar.",
+                    pending.name, pending.in_use
+                ))
+                .child(
+                    KitButton::new("settings-profile-delete-confirm")
+                        .small()
+                        .danger()
+                        .label("Eliminar perfil")
+                        .on_click(cx.listener(|shell, _, _, cx| {
+                            shell.confirm_delete_profile(cx);
+                        })),
+                )
+                .child(
+                    KitButton::new("settings-profile-delete-cancel")
+                        .small()
+                        .ghost()
+                        .label("Cancelar")
+                        .on_click(cx.listener(|shell, _, _, cx| {
+                            if let Some(settings) = &mut shell.settings {
+                                settings.pending_delete = None;
+                            }
+                            cx.notify();
+                        })),
+                )
+                .into_any_element(),
+        )
+    }
+
+    /// Editor inline del perfil seleccionado.
+    fn render_profile_editor_panel(&mut self, cx: &mut Context<'_, Self>) -> Option<AnyElement> {
+        let editor = self.settings_profile_editor.as_ref()?;
+        let state = theme::state(cx);
+        let ui = state.theme.ui;
+        let metrics = state.metrics;
+        let name = editor.name.clone();
+        let command = editor.command.clone();
+        let icon = editor.icon.clone();
+        let error = editor.error.clone();
+        let id = editor.id.clone();
+        Some(
+            div()
+                .flex()
+                .flex_col()
+                .gap(metrics.spacing_sm())
+                .p(metrics.spacing_sm())
+                .rounded(metrics.radius_sm())
+                .border_1()
+                .border_color(ui.border)
+                .child(
+                    div()
+                        .text_size(metrics.font_size * 0.75)
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .child(format!("Editar «{id}»")),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap(metrics.spacing_xxs())
+                        .child(
+                            div()
+                                .text_size(metrics.font_size * 0.6875)
+                                .text_color(ui.muted)
+                                .child("Nombre visible"),
+                        )
+                        .child(
+                            TextField::new(name)
+                                .size(ControlSize::Md)
+                                .aria_label("Nombre"),
+                        ),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap(metrics.spacing_xxs())
+                        .child(
+                            div()
+                                .text_size(metrics.font_size * 0.6875)
+                                .text_color(ui.muted)
+                                .child("Comando (ejecutable y argumentos)"),
+                        )
+                        .child(
+                            TextField::new(command)
+                                .size(ControlSize::Md)
+                                .aria_label("Comando"),
+                        ),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_wrap()
+                        .items_center()
+                        .gap(metrics.spacing_xs())
+                        .child(
+                            div()
+                                .flex_1()
+                                .min_w_0()
+                                .text_size(metrics.font_size * 0.6875)
+                                .text_color(ui.muted)
+                                .child(icon.map(|icon| icon.display().to_string()).unwrap_or_else(
+                                    || "Sin icono propio: se usa el del ejecutable.".into(),
+                                )),
+                        )
+                        .child(
+                            KitButton::new("settings-profile-icon")
+                                .small()
+                                .ghost()
+                                .label("Elegir icono…")
+                                .on_click(cx.listener(|shell, _, window, cx| {
+                                    shell.settings_choose_icon(window, cx);
+                                })),
+                        )
+                        .child(
+                            KitButton::new("settings-profile-icon-clear")
+                                .small()
+                                .ghost()
+                                .label("Quitar icono")
+                                .on_click(cx.listener(|shell, _, _, cx| {
+                                    if let Some(editor) = &mut shell.settings_profile_editor {
+                                        editor.icon = None;
+                                    }
+                                    cx.notify();
+                                })),
+                        ),
+                )
+                .when_some(error, |this, error| {
+                    this.child(
+                        div()
+                            .text_size(metrics.font_size * 0.75)
+                            .text_color(ui.danger)
+                            .child(error),
+                    )
+                })
+                .child(
+                    div()
+                        .flex()
+                        .justify_end()
+                        .gap(metrics.spacing_xs())
+                        .child(
+                            KitButton::new("settings-profile-cancel")
+                                .small()
+                                .ghost()
+                                .label("Cancelar")
+                                .on_click(cx.listener(|shell, _, _, cx| {
+                                    shell.settings_profile_editor = None;
+                                    cx.notify();
+                                })),
+                        )
+                        .child(
+                            KitButton::new("settings-profile-apply")
+                                .small()
+                                .primary()
+                                .label("Aplicar")
+                                .on_click(cx.listener(|shell, _, _, cx| {
+                                    shell.apply_profile_editor(cx);
+                                })),
+                        ),
+                )
+                .into_any_element(),
+        )
+    }
+
+    fn render_settings_profiles(
+        &mut self,
+        width: Pixels,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) -> AnyElement {
+        let state = theme::state(cx);
+        let ui = state.theme.ui;
+        let metrics = state.metrics;
+        let rows = self.render_profile_rows(width, window, cx);
+        let toolbar = self.render_profile_toolbar(width, cx);
+        let detect = self.render_profile_detect(cx);
+        let delete_warning = self.render_profile_delete_warning(cx);
+        let editor = self.render_profile_editor_panel(cx);
+        div()
+            .flex()
+            .flex_col()
+            .w(width)
+            .max_w(width)
+            .min_w_0()
+            .gap(metrics.spacing_md())
+            .child(toolbar)
+            .child(rows)
+            .child(detect)
+            .children(delete_warning)
+            .children(editor)
+            .child(
+                div()
+                    .text_size(metrics.font_size * 0.6875)
+                    .text_color(ui.muted)
+                    .child(
+                        "El id del perfil es estable y no cambia al renombrarlo. Un perfil \
+                         borrado en uso deja sus pestañas sin arranque hasta reiniciarlas.",
+                    ),
+            )
+            .into_any_element()
+    }
+
+    fn render_settings_fonts(&mut self, cx: &mut Context<'_, Self>) -> AnyElement {
+        let state = theme::state(cx);
+        let ui = state.theme.ui;
+        let metrics = state.metrics;
+        let Some(settings) = self.settings.as_ref() else {
+            return div().into_any_element();
+        };
+        let sources = settings.draft.fonts.sources.clone();
+        let config_dir = self.theme_host.config_dir.clone();
+
+        let mut list = div().flex().flex_col().gap(metrics.hairline());
+        if sources.is_empty() {
+            list = list.child(
+                div()
+                    .py(metrics.spacing_sm())
+                    .text_size(metrics.font_size * 0.75)
+                    .text_color(ui.muted)
+                    .child("No hay orígenes adicionales; se usan las fuentes del sistema."),
+            );
+        }
+        for (index, source) in sources.iter().enumerate() {
+            list = list.child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(metrics.spacing_sm())
+                    .px(metrics.spacing_sm())
+                    .py(metrics.spacing_xs())
+                    .rounded(metrics.radius_sm())
+                    .hover(move |this| this.bg(ui.surface_raised.opacity(0.6)))
+                    .child(
+                        Icon::new(icons::TYPOGRAPHY)
+                            .size(IconSize::Xs)
+                            .color(ui.muted),
+                    )
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .overflow_hidden()
+                            .whitespace_nowrap()
+                            .text_ellipsis()
+                            .text_size(metrics.font_size * 0.75)
+                            .child(source.display().to_string()),
+                    )
+                    .child(
+                        KitButton::new(("settings-font-remove", index))
+                            .small()
+                            .ghost()
+                            .label("Quitar")
+                            .on_click(cx.listener(move |shell, _, _, cx| {
+                                if let Some(settings) = &mut shell.settings {
+                                    settings.remove_font_source(index);
+                                }
+                                shell.preview_settings(cx);
+                            })),
+                    ),
+            );
+        }
+
+        div()
+            .flex()
+            .flex_col()
+            .gap(metrics.spacing_md())
+            .child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .gap(metrics.spacing_xs())
+                    .child(
+                        KitButton::new("settings-font-file")
+                            .small()
+                            .label("Añadir archivo…")
+                            .on_click(cx.listener(|shell, _, _, cx| {
+                                shell.settings_add_font_sources(true, cx);
+                            })),
+                    )
+                    .child(
+                        KitButton::new("settings-font-folder")
+                            .small()
+                            .ghost()
+                            .label("Añadir carpeta…")
+                            .on_click(cx.listener(|shell, _, _, cx| {
+                                shell.settings_add_font_sources(false, cx);
+                            })),
+                    ),
+            )
+            .child(list)
+            .child(
+                div()
+                    .text_size(metrics.font_size * 0.6875)
+                    .text_color(ui.muted)
+                    .child(format!(
+                        "Acepta .ttf, .otf y .ttc. Las rutas dentro de {} se guardan relativas. \
+                         Máximo 16 orígenes.",
+                        config_dir.display()
+                    )),
+            )
+            .into_any_element()
+    }
+
+    fn render_settings_shortcuts(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) -> AnyElement {
+        let _ = window;
+        let state = theme::state(cx);
+        let ui = state.theme.ui;
+        let metrics = state.metrics;
+        let Some(settings) = self.settings.as_ref() else {
+            return div().into_any_element();
+        };
+        let actions = settings.shortcut_actions();
+        let keymap = Keymap::resolve(&settings.draft.keymap);
+        let capturing = settings.capturing.clone();
+        let input = self.settings_shortcut_input.clone();
+
+        let capture_label = capturing
+            .as_deref()
+            .and_then(crate::actions::by_id)
+            .map(|action| action.label.to_owned());
+
+        let banner = capturing.as_ref().map(|action| {
+            let action = action.clone();
+            let unbind_action = action.clone();
+            let reset_action = action.clone();
+            div()
+                .flex()
+                .flex_wrap()
+                .items_center()
+                .gap(metrics.spacing_sm())
+                .p(metrics.spacing_sm())
+                .rounded(metrics.radius_sm())
+                .border_1()
+                .border_color(ui.accent)
+                .bg(ui.surface_raised)
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .text_size(metrics.font_size * 0.75)
+                        .child(format!(
+                            "Pulsa la combinación para «{}»; Supr la quita y Esc cancela.",
+                            capture_label.as_deref().unwrap_or(&action)
+                        )),
+                )
+                .child(
+                    KitButton::new("settings-shortcut-unbind")
+                        .small()
+                        .danger()
+                        .label("Quitar atajo")
+                        .on_click(cx.listener(move |shell, _, _, cx| {
+                            if let Some(settings) = &mut shell.settings
+                                && let Err(error) = settings.unbind_action(&unbind_action)
+                            {
+                                settings.set_notice(error, true);
+                            }
+                            cx.notify();
+                        })),
+                )
+                .child(
+                    KitButton::new("settings-shortcut-reset")
+                        .small()
+                        .ghost()
+                        .label("Restaurar")
+                        .on_click(cx.listener(move |shell, _, _, cx| {
+                            if let Some(settings) = &mut shell.settings
+                                && let Err(error) = settings.reset_action(&reset_action)
+                            {
+                                settings.set_notice(error, true);
+                            }
+                            cx.notify();
+                        })),
+                )
+                .child(
+                    KitButton::new("settings-shortcut-cancel")
+                        .small()
+                        .ghost()
+                        .label("Cancelar")
+                        .on_click(cx.listener(|shell, _, _, cx| {
+                            if let Some(settings) = &mut shell.settings {
+                                settings.cancel_capture();
+                            }
+                            cx.notify();
+                        })),
+                )
+                .into_any_element()
+        });
+
+        let mut list = div().flex().flex_col().gap(metrics.hairline());
+        for action in actions {
+            let chords = keymap.chords_for(action.id);
+            let action_id = action.id;
+            let row =
+                Self::settings_focusable(window, cx, format!("settings-shortcut-{action_id}"))
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .gap(metrics.spacing_sm())
+                    .px(metrics.spacing_sm())
+                    .py(metrics.spacing_xs())
+                    .rounded(metrics.radius_sm())
+                    .cursor_pointer()
+                    .hover(move |this| this.bg(ui.surface_raised.opacity(0.6)))
+                    .on_click(cx.listener(move |shell, _, _, cx| {
+                        if let Some(settings) = &mut shell.settings {
+                            settings.begin_capture(action_id);
+                        }
+                        cx.notify();
+                    }))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap(metrics.hairline())
+                            .min_w_0()
+                            .child(
+                                div()
+                                    .text_size(metrics.font_size * 0.75)
+                                    .child(action.label),
+                            )
+                            .child(
+                                div()
+                                    .text_size(metrics.font_size * 0.625)
+                                    .text_color(ui.muted)
+                                    .child(action.id),
+                            ),
+                    )
+                    .child(match chords {
+                        Some(chords) => Kbd::new(chords).into_any_element(),
+                        None => div()
+                            .text_size(metrics.font_size * 0.6875)
+                            .text_color(ui.muted)
+                            .child("Sin atajo")
+                            .into_any_element(),
+                    });
+            list = list.child(row);
+        }
+
+        div()
+            .flex()
+            .flex_col()
+            .gap(metrics.spacing_md())
+            .when_some(input, |this, input| {
+                this.child(
+                    TextField::new(input)
+                        .size(ControlSize::Md)
+                        .prefix_icon(icons::SEARCH)
+                        .cleanable(true)
+                        .aria_label("Filtrar atajos"),
+                )
+            })
+            .children(banner)
+            .child(
+                div()
+                    .id("settings-shortcut-list")
+                    .max_h(metrics.font_size * 26.0)
+                    .overflow_y_scroll()
+                    .child(list),
+            )
+            .child(
+                div()
+                    .text_size(metrics.font_size * 0.6875)
+                    .text_color(ui.muted)
+                    .child(
+                        "Enter sobre una acción captura la combinación. Los atajos de app \
+                         requieren Ctrl, Alt o Win; Ctrl+C/D/Z, Tab, Esc y las flechas quedan \
+                         para la terminal.",
+                    ),
+            )
+            .into_any_element()
+    }
+
+    fn render_settings_agents(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) -> AnyElement {
+        let state = theme::state(cx);
+        let ui = state.theme.ui;
+        let metrics = state.metrics;
+        let Some(settings) = self.settings.as_ref() else {
+            return div().into_any_element();
+        };
+        let enabled = settings.draft.agents.enabled;
+        let scan = settings.draft.agents.scan_interval_ms;
+        let notify_finished = settings.draft.agents.notify_finished;
+        let notify_error = settings.draft.agents.notify_error;
+        let notify_attention = settings.draft.agents.notify_attention;
+        let profiles = settings.profiles().to_vec();
+        let preferences: Vec<(String, String)> = SettingsState::AGENT_KEYS
+            .iter()
+            .map(|agent| {
+                let name = settings
+                    .preferred_profile(agent)
+                    .and_then(|id| profiles.iter().find(|profile| &profile.id == id))
+                    .map(|profile| profile.name.clone())
+                    .unwrap_or_else(|| "Perfil por defecto".into());
+                ((*agent).to_owned(), name)
+            })
+            .collect();
+        let banner = div()
+            .flex()
+            .flex_col()
+            .gap(metrics.spacing_md())
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .flex_wrap()
+                    .gap(metrics.spacing_sm())
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap(metrics.hairline())
+                            .child(
+                                div()
+                                    .text_size(metrics.font_size * 0.8125)
+                                    .child("Detección de agentes"),
+                            )
+                            .child(
+                                div()
+                                    .text_size(metrics.font_size * 0.6875)
+                                    .text_color(ui.muted)
+                                    .child("OSC 7501 y árbol de procesos; sin red ni telemetría."),
+                            ),
+                    )
+                    .child(
+                        Switch::new("settings-agents-enabled")
+                            .checked(enabled)
+                            .on_click(cx.listener(|shell, checked, _, cx| {
+                                if let Some(settings) = &mut shell.settings {
+                                    settings.set_agents_enabled(*checked);
+                                }
+                                cx.notify();
+                            })),
+                    ),
+            )
+            .child(self.render_settings_stepper(
+                window,
+                cx,
+                "settings-agents-scan",
+                "Intervalo de escaneo",
+                format!("{scan} ms"),
+                StepField::ScanInterval,
+            ))
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(metrics.spacing_xs())
+                    .child(
+                        div()
+                            .text_size(metrics.font_size * 0.75)
+                            .text_color(ui.muted)
+                            .child("Avisos"),
+                    )
+                    .child(
+                        Switch::new("settings-agents-notify-finished")
+                            .checked(notify_finished)
+                            .label("Al terminar")
+                            .on_click(cx.listener(|shell, checked, _, cx| {
+                                if let Some(settings) = &mut shell.settings {
+                                    settings.set_notify_finished(*checked);
+                                }
+                                cx.notify();
+                            })),
+                    )
+                    .child(
+                        Switch::new("settings-agents-notify-error")
+                            .checked(notify_error)
+                            .label("Al fallar")
+                            .on_click(cx.listener(|shell, checked, _, cx| {
+                                if let Some(settings) = &mut shell.settings {
+                                    settings.set_notify_error(*checked);
+                                }
+                                cx.notify();
+                            })),
+                    )
+                    .child(
+                        Switch::new("settings-agents-notify-attention")
+                            .checked(notify_attention)
+                            .label("Al requerir atención")
+                            .on_click(cx.listener(|shell, checked, _, cx| {
+                                if let Some(settings) = &mut shell.settings {
+                                    settings.set_notify_attention(*checked);
+                                }
+                                cx.notify();
+                            })),
+                    ),
+            )
+            .child(
+                div().flex().flex_col().gap(metrics.spacing_xs()).child(
+                    div()
+                        .text_size(metrics.font_size * 0.75)
+                        .text_color(ui.muted)
+                        .child("Perfil preferido por agente"),
+                ),
+            );
+        let mut banner = banner;
+        for (agent, current) in preferences {
+            let agent_label = if agent == "opencode" {
+                "opencode"
+            } else {
+                "Copilot"
+            };
+            let click_agent = agent.clone();
+            let row =
+                Self::settings_focusable(window, cx, format!("settings-agent-profile-{agent}"))
+                    .flex()
+                    .items_center()
+                    .flex_wrap()
+                    .gap(metrics.spacing_sm())
+                    .px(metrics.spacing_sm())
+                    .py(metrics.spacing_xs())
+                    .rounded(metrics.radius_sm())
+                    .cursor_pointer()
+                    .hover(move |this| this.bg(ui.surface_raised.opacity(0.6)))
+                    .on_click(cx.listener(move |shell, _, _, cx| {
+                        if let Some(settings) = &mut shell.settings {
+                            settings.cycle_preferred_profile(&click_agent, 1);
+                        }
+                        cx.notify();
+                    }))
+                    .on_key_down(cx.listener(move |shell, event: &KeyDownEvent, _, cx| {
+                        let delta = match event.keystroke.key.as_str() {
+                            "left" => -1,
+                            "right" => 1,
+                            _ => return,
+                        };
+                        if let Some(settings) = &mut shell.settings {
+                            settings.cycle_preferred_profile(&agent, delta);
+                        }
+                        cx.stop_propagation();
+                        cx.notify();
+                    }))
+                    .child(div().text_size(metrics.font_size * 0.75).child(agent_label))
+                    .child(
+                        div()
+                            .text_size(metrics.font_size * 0.75)
+                            .text_color(ui.accent)
+                            .child(current),
+                    );
+            banner = banner.child(row);
+        }
+        banner
+            .child(
+                div()
+                    .text_size(metrics.font_size * 0.6875)
+                    .text_color(ui.muted)
+                    .child(
+                        "El perfil preferido se usará al abrir una terminal de agente desde la \
+                         app; hasta entonces solo se guarda en config.toml.",
+                    ),
+            )
+            .into_any_element()
+    }
+
+    fn render_settings_advanced(&mut self, cx: &mut Context<'_, Self>) -> AnyElement {
+        let state = theme::state(cx);
+        let ui = state.theme.ui;
+        let metrics = state.metrics;
+        let Some(settings) = self.settings.as_ref() else {
+            return div().into_any_element();
+        };
+        let schema = settings.draft.schema_version;
         let config_path = self
             .theme_host
             .config_path
             .as_ref()
             .map(|path| path.display().to_string())
             .unwrap_or_else(|| "—".into());
+        let themes_path = self
+            .theme_host
+            .themes_dir
+            .as_ref()
+            .map(|path| path.display().to_string())
+            .unwrap_or_else(|| "—".into());
+        let pending_defaults = settings.pending_defaults;
+        let config_file = self.theme_host.config_path.clone();
+        let themes_dir = self.theme_host.themes_dir.clone();
+        let mono = state.fonts.mono.clone();
 
-        let mut menu = Menu::new();
-        for (name, variant) in names {
-            let this = cx.entity().downgrade();
-            let label = name.clone();
-            menu = menu.item(
-                MenuItem::new(format!("{name} · {}", variant.label()))
-                    .icon(if variant.is_dark() {
-                        icons::MOON
-                    } else {
-                        icons::SUN
-                    })
-                    .checked(name == selected)
-                    .on_click(move |_, _, cx| {
-                        if let Some(this) = this.upgrade() {
-                            let _ = this.update(cx, |shell, cx| {
-                                if shell.theme_host.select_theme(&label, cx) {
-                                    shell.set_notice(format!("Tema: {label}"), false, cx);
-                                }
-                                cx.notify();
-                            });
-                        }
-                    }),
-            );
-        }
-
-        let toggle = Toggle::new("theme-preview-variant", preview)
-            .label("Previsualizar variante opuesta")
-            .on_click(cx.listener(|shell, checked, _, cx| {
-                if *checked {
-                    shell.theme_host.toggle_preview_variant(cx);
-                } else {
-                    shell.theme_host.set_preview_variant(None, cx);
-                }
-                cx.notify();
-            }));
-
-        let ui_font_select = self.ui_font_select.clone();
-        let terminal_font_select = self.terminal_font_select.clone();
-        let font_fields = div()
-            .flex()
-            .flex_col()
-            .gap(metrics.spacing_sm())
-            .when_some(ui_font_select, |this, select| {
-                this.child(
+        let path_line = |label: &'static str, path: String| {
+            div()
+                .flex()
+                .flex_col()
+                .gap(metrics.hairline())
+                .child(
                     div()
-                        .flex()
-                        .flex_col()
-                        .gap(metrics.spacing_xxs())
-                        .child(
-                            div()
-                                .text_size(metrics.font_size * 0.75)
-                                .text_color(ui.muted)
-                                .child("Fuente de UI"),
-                        )
-                        .child(Select::new(&select).small().w_full().placeholder("Sistema")),
+                        .text_size(metrics.font_size * 0.6875)
+                        .text_color(ui.muted)
+                        .child(label),
                 )
-            })
-            .when_some(terminal_font_select, |this, select| {
-                this.child(
+                .child(
                     div()
-                        .flex()
-                        .flex_col()
-                        .gap(metrics.spacing_xxs())
-                        .child(
-                            div()
-                                .text_size(metrics.font_size * 0.75)
-                                .text_color(ui.muted)
-                                .child("Fuente de la terminal"),
-                        )
-                        .child(Select::new(&select).small().w_full().placeholder("Sistema")),
+                        .font_family(mono.clone())
+                        .text_size(metrics.font_size * 0.75)
+                        .child(path),
                 )
-            });
+        };
 
-        let info = div()
-            .flex()
-            .flex_col()
-            .gap(metrics.spacing_xxs())
-            .text_size(metrics.font_size * 0.75)
-            .text_color(theme::state(cx).theme.ui.muted)
-            .child(format!(
-                "UI: {} · {} px · escala {:.2}",
-                fonts.ui, state.ui_font_size, state.metrics.scale
-            ))
-            .child(format!(
-                "Terminal: {} · {} px",
-                fonts.mono, state.mono_font_size
-            ))
-            .when(!fonts.warnings.is_empty(), |this| {
-                this.child(fonts.warnings.join(" "))
-            })
-            .when(!fonts.errors.is_empty(), |this| {
-                this.child(fonts.errors.join(" "))
-            })
-            .child(format!("Config: {config_path}"))
-            .child(format!("Temas: {themes_dir}"));
-
-        let footer = div()
-            .flex()
-            .flex_wrap()
-            .gap(metrics.spacing_xs())
-            .child(
-                Button::new("theme-open-folder", "Abrir carpeta")
-                    .small()
-                    .icon(icons::FOLDER_OPEN)
-                    .on_click(cx.listener(|shell, _, _, cx| {
-                        shell.open_themes_folder_impl(cx);
-                    })),
-            )
-            .child(
-                Button::new("theme-import", "Importar")
-                    .small()
-                    .icon(icons::FILE_IMPORT)
-                    .on_click(cx.listener(|shell, _, _, cx| {
-                        shell.import_theme_impl(cx);
-                    })),
-            )
-            .child(
-                Button::new("theme-export", "Exportar")
-                    .small()
-                    .icon(icons::FILE_EXPORT)
-                    .on_click(cx.listener(|shell, _, _, cx| {
-                        shell.export_theme_impl(cx);
-                    })),
-            )
-            .child(
-                Button::new("theme-reload", "Recargar")
-                    .small()
-                    .icon(icons::RESTART)
-                    .on_click(cx.listener(|shell, _, _, cx| {
-                        shell.reload_themes_impl(cx);
-                    })),
-            )
-            .child(
-                Button::new("theme-close", "Cerrar")
-                    .small()
-                    .ghost()
-                    .on_click(cx.listener(|shell, _, window, cx| {
-                        shell.close_theme_modal(window, cx);
-                    })),
-            );
-
-        let modal = Modal::new("theme-modal", "Tema y fuentes")
-            .description(format!(
-                "{} · {} · {}",
-                theme.name,
-                theme.variant.label(),
-                theme.author.as_deref().unwrap_or("Axfterm")
-            ))
-            .body(
-                div()
-                    .flex()
-                    .flex_col()
-                    .gap(metrics.spacing_sm())
-                    .child(
-                        div()
-                            .max_h(metrics.font_size * 18.0)
-                            .overflow_y_scrollbar()
-                            .child(menu),
-                    )
-                    .child(toggle)
-                    .child(font_fields)
-                    .child(info),
-            )
-            .footer(footer)
-            .on_close(cx.listener(|shell, _, window, cx| {
-                shell.close_theme_modal(window, cx);
-            }))
-            .into_any_element();
+        let confirm = pending_defaults.then(|| {
+            div()
+                .flex()
+                .flex_wrap()
+                .items_center()
+                .gap(metrics.spacing_sm())
+                .p(metrics.spacing_sm())
+                .rounded(metrics.radius_sm())
+                .border_1()
+                .border_color(ui.warning)
+                .text_size(metrics.font_size * 0.75)
+                .child(
+                    "Restaurar apariencia, terminal, fuentes, atajos y agentes a los valores \
+                     por defecto. Los perfiles se conservan.",
+                )
+                .child(
+                    KitButton::new("settings-defaults-confirm")
+                        .small()
+                        .danger()
+                        .label("Restaurar")
+                        .on_click(cx.listener(|shell, _, _, cx| {
+                            if let Some(settings) = &mut shell.settings {
+                                settings.restore_defaults();
+                            }
+                            shell.preview_settings(cx);
+                        })),
+                )
+                .child(
+                    KitButton::new("settings-defaults-cancel")
+                        .small()
+                        .ghost()
+                        .label("Cancelar")
+                        .on_click(cx.listener(|shell, _, _, cx| {
+                            if let Some(settings) = &mut shell.settings {
+                                settings.pending_defaults = false;
+                            }
+                            cx.notify();
+                        })),
+                )
+                .into_any_element()
+        });
 
         div()
-            .absolute()
-            .top_0()
-            .left_0()
-            .size_full()
-            .key_context("ThemeModal")
-            .track_focus(&self.theme_modal_focus)
-            .on_key_down(cx.listener(|shell, event: &KeyDownEvent, window, cx| {
-                if event.keystroke.key == "escape" {
-                    shell.close_theme_modal(window, cx);
-                    cx.stop_propagation();
-                }
-            }))
-            .child(modal)
+            .flex()
+            .flex_col()
+            .gap(metrics.spacing_lg())
+            .child(path_line("Configuración", config_path))
+            .child(path_line("Temas", themes_path))
+            .child(
+                div()
+                    .text_size(metrics.font_size * 0.75)
+                    .text_color(ui.muted)
+                    .child(format!(
+                        "Esquema de configuración v{schema}. La escritura conserva comentarios y \
+                         orden, y solo aplica el borrador al pulsar Guardar."
+                    )),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .gap(metrics.spacing_xs())
+                    .child(
+                        KitButton::new("settings-open-config")
+                            .small()
+                            .label("Abrir config.toml")
+                            .on_click(cx.listener(move |shell, _, _, cx| {
+                                shell.settings_open_path(config_file.clone(), cx);
+                            })),
+                    )
+                    .child(
+                        KitButton::new("settings-open-themes")
+                            .small()
+                            .ghost()
+                            .label("Abrir temas")
+                            .on_click(cx.listener(move |shell, _, _, cx| {
+                                shell.settings_open_path(themes_dir.clone(), cx);
+                            })),
+                    )
+                    .child(
+                        KitButton::new("settings-restore-defaults")
+                            .small()
+                            .danger()
+                            .label("Restaurar valores por defecto…")
+                            .on_click(cx.listener(|shell, _, _, cx| {
+                                if let Some(settings) = &mut shell.settings {
+                                    settings.pending_defaults = true;
+                                }
+                                cx.notify();
+                            })),
+                    ),
+            )
+            .children(confirm)
             .into_any_element()
     }
+
+    /// Fila numérica ajustable con teclado (←/→) y botones de ratón.
+    fn render_settings_stepper(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+        id: &'static str,
+        label: &'static str,
+        value: String,
+        field: StepField,
+    ) -> AnyElement {
+        let state = theme::state(cx);
+        let ui = state.theme.ui;
+        let metrics = state.metrics;
+        let minus = Self::settings_focusable(window, cx, format!("{id}-minus"))
+            .flex()
+            .items_center()
+            .justify_center()
+            .size(metrics.control_height_xs())
+            .rounded(metrics.radius_sm())
+            .cursor_pointer()
+            .hover(move |this| this.bg(ui.surface_raised))
+            .on_click(cx.listener(move |shell, _, _, cx| {
+                shell.settings_step(field, -1.0, cx);
+            }))
+            .child(
+                div()
+                    .text_size(metrics.font_size * 1.1)
+                    .text_color(ui.muted)
+                    .child("−"),
+            );
+        let plus = Self::settings_focusable(window, cx, format!("{id}-plus"))
+            .flex()
+            .items_center()
+            .justify_center()
+            .size(metrics.control_height_xs())
+            .rounded(metrics.radius_sm())
+            .cursor_pointer()
+            .hover(move |this| this.bg(ui.surface_raised))
+            .on_click(cx.listener(move |shell, _, _, cx| {
+                shell.settings_step(field, 1.0, cx);
+            }))
+            .child(
+                div()
+                    .text_size(metrics.font_size * 1.1)
+                    .text_color(ui.muted)
+                    .child("+"),
+            );
+        div()
+            .flex()
+            .items_center()
+            .flex_wrap()
+            .gap(metrics.spacing_sm())
+            .min_h(metrics.control_height_md())
+            .child(div().text_size(metrics.font_size * 0.8125).child(label))
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(metrics.spacing_xxs())
+                    .child(minus)
+                    .child(
+                        div()
+                            .min_w(metrics.font_size * 4.5)
+                            .text_center()
+                            .text_size(metrics.font_size * 0.75)
+                            .text_color(ui.text)
+                            .child(value),
+                    )
+                    .child(plus),
+            )
+            .into_any_element()
+    }
+
+    /// Convierte una pulsación en el chord canónico de `config.toml`.
+    fn chord_from_keystroke(keystroke: &Keystroke) -> String {
+        let mut parts = Vec::new();
+        if keystroke.modifiers.control {
+            parts.push("ctrl".to_owned());
+        }
+        if keystroke.modifiers.alt {
+            parts.push("alt".to_owned());
+        }
+        if keystroke.modifiers.shift {
+            parts.push("shift".to_owned());
+        }
+        if keystroke.modifiers.platform {
+            parts.push(if cfg!(target_os = "macos") {
+                "cmd".to_owned()
+            } else {
+                "win".to_owned()
+            });
+        }
+        if keystroke.modifiers.function {
+            parts.push("fn".to_owned());
+        }
+        let key = keystroke.key.to_ascii_lowercase();
+        if key.is_empty() {
+            return String::new();
+        }
+        parts.push(key);
+        parts.join("-")
+    }
 }
+
 /// Vista que sigue al cursor durante un drag.
 enum DragGhost {
     /// Etiqueta simple (divisores).
@@ -6563,7 +8979,9 @@ impl Render for DragGhost {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
+
     use axf_ui::gpui::size;
 
     #[test]
@@ -6584,7 +9002,6 @@ mod tests {
         assert_eq!(typical.max_width, px(480.0));
         assert_eq!(typical.padding_left, px(0.0));
         assert_eq!(typical.padding_right, px(102.0));
-
         let narrow = title_bar_title_geometry(px(600.0), px(200.0), px(138.0), px(480.0), px(8.0));
         assert_eq!(narrow.max_width, px(184.0));
         assert_eq!(narrow.padding_right, px(62.0));
@@ -6657,6 +9074,7 @@ mod tests {
             tab_drop_zone(point(px(300.0), px(150.0)), bounds, ratio),
             TabDropZone::Center
         );
+
         // En una esquina gana el borde más cercano.
         assert_eq!(
             tab_drop_zone(point(px(105.0), px(55.0)), bounds, ratio),
@@ -6679,6 +9097,7 @@ mod tests {
     fn tab_widths_compress_uniformly_between_min_and_max() {
         let min = px(90.0);
         let max = px(160.0);
+
         // Cabe el ancho objetivo con holgura: no crece de más.
         assert_eq!(tab_slot_width(px(1000.0), 3, min, max), 160.0);
         // Se reparte el ancho disponible hasta el objetivo.
@@ -6716,6 +9135,7 @@ mod tests {
             tab_autoscroll_offset(px(-100.0), max, px(400.0), left, right, edge, nudge),
             px(-100.0)
         );
+
         // Cada movimiento aplica exactamente un paso, nunca uno por pestaña.
         assert_eq!(
             tab_autoscroll_offset(px(-100.0), max, px(690.0), left, right, edge, nudge),
@@ -6725,6 +9145,7 @@ mod tests {
             tab_autoscroll_offset(px(-100.0), max, px(110.0), left, right, edge, nudge),
             px(-85.0)
         );
+
         // Se acota a los extremos.
         assert_eq!(
             tab_autoscroll_offset(px(-495.0), max, px(690.0), left, right, edge, nudge),
@@ -6734,6 +9155,7 @@ mod tests {
             tab_autoscroll_offset(px(-5.0), max, px(110.0), left, right, edge, nudge),
             px(0.0)
         );
+
         // Sin overflow no hay desplazamiento.
         assert_eq!(
             tab_autoscroll_offset(px(0.0), px(0.0), px(690.0), left, right, edge, nudge),
@@ -6775,14 +9197,12 @@ mod tests {
             ),
             "PowerShell 7"
         );
-
         tab.custom_title = true;
         tab.title = "Mi shell".into();
         assert_eq!(
             resolve_tab_title(&tab, Some("C:\\otro"), Some("pwsh"), Some("adventure2")),
             "Mi shell"
         );
-
         tab.custom_title = false;
         tab.title = "PowerShell 7".into();
         assert_eq!(
@@ -6798,7 +9218,6 @@ mod tests {
             ),
             "PowerShell 7"
         );
-
         tab.auto_title.clear();
         assert_eq!(
             resolve_tab_title(&tab, None, None, Some("adventure2")),
@@ -6822,7 +9241,6 @@ mod tests {
     fn sidebar_profile() -> ProfileId {
         ProfileId::new("shell")
     }
-
     const SIDEBAR_PROFILE_TITLE: &str = "Shell";
 
     fn sidebar_workspace(name: &str) -> (Workspace, ProjectId, TabId) {
@@ -6856,7 +9274,6 @@ mod tests {
         let (project, _) = workspace
             .register_project(&root)
             .expect("registra proyecto vacío");
-
         let groups = sidebar_view(&workspace, SidebarSection::All);
         assert_eq!(groups.len(), 1);
         assert_eq!(groups[0].project, project);
@@ -6895,7 +9312,6 @@ mod tests {
             .new_tab(pane, project, &sidebar_profile(), SIDEBAR_PROFILE_TITLE)
             .expect("tercera pestaña sin agente")
             .tab;
-
         workspace.set_tab_agents(
             tab,
             vec![test_agent(
@@ -6917,12 +9333,10 @@ mod tests {
             )],
         );
         let _ = workspace.set_project_expanded(project, false);
-
         let groups = sidebar_view(&workspace, SidebarSection::Agents);
         assert_eq!(groups.len(), 1);
         assert!(groups[0].show_tabs, "en Agentes siempre se despliegan");
         assert_eq!(groups[0].tabs, vec![second, tab], "atención primero");
-
         let rows = sidebar_rows_from_groups(&groups);
         assert_eq!(
             rows,
@@ -6966,7 +9380,6 @@ mod tests {
                 2,
             )],
         );
-
         let attention = attention_tabs(&workspace);
         assert_eq!(attention, vec![tab, second]);
         assert_eq!(next_attention(&attention, Some(tab)), Some(second));
@@ -7037,7 +9450,6 @@ mod tests {
         assert_eq!(report.state, AgentState::NeedsAttention);
         assert_eq!(report.attention, Some(AttentionKind::Auth));
         assert!(!report.clear);
-
         status.state = ProgramState::Clear;
         let report = agent_report_from_status(&status);
         assert!(report.clear);
@@ -7065,7 +9477,6 @@ mod tests {
         assert!(transitions.is_empty());
         assert_eq!(sessions.len(), 1);
         assert_eq!(sessions[0].state, AgentState::Working);
-
         let (changed, transitions) =
             reconcile_agents(&mut sessions, &[], true, None, false, now, &mut next_id);
         assert!(changed);
@@ -7132,7 +9543,6 @@ mod tests {
         let root = std::path::PathBuf::from("proyecto");
         let inside = root.join("crates").join("app");
         let outside = std::path::PathBuf::from("otro").join("lugar");
-
         assert_eq!(
             context_path(&root, &inside),
             Some(format!("crates{separator}app"))

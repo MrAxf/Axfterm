@@ -39,6 +39,11 @@ Los perfiles conservan el orden del archivo en menús y listas. El estado "cero
 perfiles" no es válido: si el archivo queda sin perfiles, la app vuelve a
 detectar terminales y escribe el resultado una sola vez.
 
+El panel de ajustes (`Ctrl+Alt+T`, sección Perfiles) permite alta, edición,
+duplicado, orden, icono y borrado protegido, además de «Detectar terminales» con
+vista previa y fusión sin duplicados. El `id` no cambia al renombrar y el perfil
+en uso por una pestaña conserva su configuración. Ver `docs/settings.md`.
+
 ## Línea de comandos
 
 `command` se tokeniza sin shell:

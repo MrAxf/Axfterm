@@ -78,6 +78,12 @@ pub const MENU: &str = "icons/tabler/menu-2.svg";
 /// Teclado / atajos.
 pub const KEYBOARD: &str = "icons/tabler/keyboard.svg";
 
+/// Perfil / persona.
+pub const USER: &str = "icons/tabler/user.svg";
+
+/// Tipografía / fuentes.
+pub const TYPOGRAPHY: &str = "icons/tabler/typography.svg";
+
 /// Sistema / apariencia del sistema.
 pub const DEVICE_DESKTOP: &str = "icons/tabler/device-desktop.svg";
 
@@ -159,6 +165,8 @@ pub const ALL: &[&str] = &[
     PALETTE,
     MENU,
     KEYBOARD,
+    USER,
+    TYPOGRAPHY,
     DEVICE_DESKTOP,
     EXTERNAL_LINK,
     FILE_IMPORT,

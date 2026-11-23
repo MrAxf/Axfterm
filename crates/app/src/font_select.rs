@@ -1,8 +1,8 @@
-//! Selector de familias tipográficas del modal «Tema y fuentes».
+//! Selector de familias tipográficas del panel de ajustes.
 //!
 //! Envuelve el `Select` de gpui-kit con la lista de fuentes instaladas y una
-//! opción «Sistema» que representa `None`. Hasta M7 el cambio es una preview en
-//! memoria; el panel de ajustes será quien escriba `config.toml`.
+//! opción «Sistema» que representa `None`. El shell escribe el borrador y el
+//! panel lo aplica a `config.toml` al guardar.
 
 use axf_ui::gpui::SharedString;
 use axf_ui::gpui::component::IndexPath;
@@ -15,15 +15,6 @@ pub(crate) enum FontValue {
     System,
     /// Familia instalada.
     Family(SharedString),
-}
-
-impl FontValue {
-    pub(crate) fn label(&self) -> String {
-        match self {
-            Self::System => "sistema".to_owned(),
-            Self::Family(name) => name.to_string(),
-        }
-    }
 }
 
 /// Una fila del selector.

@@ -11,6 +11,7 @@ mod history;
 mod keymap;
 mod keys;
 mod palette;
+mod settings;
 mod shell;
 mod theme_host;
 
@@ -50,8 +51,8 @@ actions!(
         FocusSidebar,
         OpenCommandPalette,
         OpenSearchPalette,
+        OpenSettings,
         ToggleSidebarAgents,
-        ShowThemeInfo,
         ToggleThemeVariant,
         NextTheme,
         PreviousTheme,
@@ -72,6 +73,10 @@ actions!(
         PaletteFilterProjects,
         PaletteFilterProfiles,
         PaletteFilterAgents,
+        SettingsCancel,
+        SettingsSave,
+        SettingsNextSection,
+        SettingsPreviousSection,
     ]
 );
 
@@ -94,6 +99,12 @@ const PALETTE_INPUT_CONTEXT: &str = "Palette > Input";
 
 /// Contexto de teclado de la pantalla de atajos.
 pub(crate) const SHORTCUTS_CONTEXT: &str = "Shortcuts";
+
+/// Contexto de teclado del panel de ajustes.
+pub(crate) const SETTINGS_CONTEXT: &str = "Settings";
+
+/// El panel con un campo de texto enfocado: Esc y Ctrl+S también deben llegar.
+pub(crate) const SETTINGS_INPUT_CONTEXT: &str = "Settings > Input";
 
 #[expect(
     clippy::print_stderr,
@@ -174,6 +185,16 @@ fn init_internal_keymap(cx: &mut App) {
         KeyBinding::new("tab", SendTab, Some(TERMINAL_CONTEXT)),
         KeyBinding::new("shift-tab", SendBacktab, Some(TERMINAL_CONTEXT)),
         KeyBinding::new("escape", PaletteCancel, Some(SHORTCUTS_CONTEXT)),
+        KeyBinding::new("escape", SettingsCancel, Some(SETTINGS_CONTEXT)),
+        KeyBinding::new("escape", SettingsCancel, Some(SETTINGS_INPUT_CONTEXT)),
+        KeyBinding::new("ctrl-s", SettingsSave, Some(SETTINGS_CONTEXT)),
+        KeyBinding::new("ctrl-s", SettingsSave, Some(SETTINGS_INPUT_CONTEXT)),
+        KeyBinding::new("ctrl-tab", SettingsNextSection, Some(SETTINGS_CONTEXT)),
+        KeyBinding::new(
+            "ctrl-shift-tab",
+            SettingsPreviousSection,
+            Some(SETTINGS_CONTEXT),
+        ),
     ]);
     // Dos niveles: la paleta como contenedor y la paleta con el input enfocado.
     // El segundo gana al binding `up`/`down` de `Input` por orden de registro.
