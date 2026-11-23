@@ -610,6 +610,7 @@ dependencies = [
  "axf_ui",
  "axf_workspace",
  "thiserror 2.0.21",
+ "toml 1.2.2+spec-1.1.0",
  "tracing",
 ]
 

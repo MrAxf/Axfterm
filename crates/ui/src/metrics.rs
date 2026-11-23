@@ -143,6 +143,59 @@ impl UiMetrics {
         px(self.unit() * 28.0)
     }
 
+    /// Ancho de la paleta de comandos y búsqueda.
+    pub fn palette_width(self) -> Pixels {
+        px(self.unit() * 46.0)
+    }
+
+    /// Alto máximo de la lista de la paleta para un viewport dado.
+    ///
+    /// Reserva la barra de título, los márgenes, la cabecera (input y controles)
+    /// y el pie, de modo que a 200 % de escala la paleta siga cabiendo. En
+    /// Búsqueda se reserva además una fila extra por si los filtros envuelven.
+    pub fn palette_list_max_height(self, viewport: Pixels, with_filters: bool) -> Pixels {
+        let toolbar = self.control_height_sm()
+            + if with_filters {
+                self.control_height_sm()
+            } else {
+                px(0.0)
+            };
+        let header =
+            self.spacing_sm() * 2.0 + self.control_height_md() + self.spacing_sm() + toolbar;
+        let list_wrapper = self.spacing_sm() * 2.0;
+        let footer = self.spacing_xs() * 2.0 + self.control_height_xs();
+        let reserved =
+            self.titlebar_height() + self.spacing_xl() * 2.0 + header + list_wrapper + footer;
+        (viewport - reserved)
+            .max(self.font_size * 3.0)
+            .min(self.font_size * 22.0)
+    }
+
+    /// Padding interior de una fila de la paleta.
+    pub fn palette_row_padding(self) -> Pixels {
+        self.spacing_sm()
+    }
+
+    /// Carril fijo del icono de una fila de la paleta.
+    pub fn palette_icon_lane(self) -> Pixels {
+        px(self.unit() * 1.5)
+    }
+
+    /// Tamaño del título de una fila de la paleta.
+    pub fn palette_label_size(self) -> Pixels {
+        px(self.unit())
+    }
+
+    /// Tamaño del subtítulo de una fila de la paleta.
+    pub fn palette_detail_size(self) -> Pixels {
+        px(self.unit() * 0.8125)
+    }
+
+    /// Tamaño de la etiqueta de tipo de una fila de la paleta.
+    pub fn palette_meta_size(self) -> Pixels {
+        px(self.unit() * 0.75)
+    }
+
     /// Altura de una fila de la sidebar.
     pub fn row_height(self) -> Pixels {
         px(self.unit() * 1.75)
@@ -402,6 +455,25 @@ mod tests {
         assert!(large.sidebar_tab_icon() > small.sidebar_tab_icon());
         assert!(large.sidebar_icon_lane() > small.sidebar_icon_lane());
         assert!(large.sidebar_actions_compact_width() > small.sidebar_actions_compact_width());
+    }
+
+    #[test]
+    fn palette_scales_and_fits_the_viewport() {
+        let small = UiMetrics::scaled(12.0, 1.0, 1.0);
+        let large = UiMetrics::scaled(16.0, 2.0, 1.0);
+
+        assert!(large.palette_width() > small.palette_width());
+        assert!(large.palette_icon_lane() > small.palette_icon_lane());
+        assert!(large.palette_label_size() > small.palette_label_size());
+        assert!(large.palette_detail_size() > small.palette_detail_size());
+
+        let list = small.palette_list_max_height(px(560.0), false);
+        assert!(list > px(0.0));
+        assert!(list <= small.font_size * 22.0);
+
+        let zoomed = large.palette_list_max_height(px(560.0), true);
+        assert!(zoomed >= large.font_size * 3.0);
+        assert!(zoomed <= px(560.0));
     }
 
     #[test]

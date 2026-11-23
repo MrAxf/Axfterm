@@ -4,14 +4,19 @@
 //! El modelo de workspace vive en `axf_workspace`; este crate solo conecta ese
 //! modelo con entidades de terminal y vistas.
 
+mod actions;
+mod font_select;
+mod fuzzy;
 mod history;
+mod keymap;
 mod keys;
+mod palette;
 mod shell;
 mod theme_host;
 
 use std::path::PathBuf;
 
-use axf_terminal::{CopySelection, PasteSelection, SendBacktab, SendTab, TERMINAL_CONTEXT};
+use axf_terminal::{SendBacktab, SendTab, TERMINAL_CONTEXT};
 use axf_ui::Assets;
 use axf_ui::gpui;
 use axf_ui::gpui::{
@@ -44,6 +49,7 @@ actions!(
         RestartTab,
         FocusSidebar,
         OpenCommandPalette,
+        OpenSearchPalette,
         ToggleSidebarAgents,
         ShowThemeInfo,
         ToggleThemeVariant,
@@ -53,6 +59,19 @@ actions!(
         OpenThemesFolder,
         ImportTheme,
         ExportTheme,
+        AgentNextAttention,
+        ShowShortcuts,
+        PaletteNext,
+        PalettePrevious,
+        PaletteAccept,
+        PaletteCancel,
+        PaletteSwitchMode,
+        PaletteFilterAll,
+        PaletteFilterTabs,
+        PaletteFilterPanes,
+        PaletteFilterProjects,
+        PaletteFilterProfiles,
+        PaletteFilterAgents,
     ]
 );
 
@@ -61,6 +80,20 @@ pub(crate) const WORKSPACE_CONTEXT: &str = "Workspace";
 
 /// Contexto de teclado de la sidebar.
 pub(crate) const SIDEBAR_CONTEXT: &str = "Sidebar";
+
+/// Contexto de teclado de la paleta.
+pub(crate) const PALETTE_CONTEXT: &str = "Palette";
+
+/// La paleta se navega con las flechas aunque el foco esté en su input.
+///
+/// El `Input` de gpui-kit declara el contexto `Input`, más profundo que
+/// `Palette`, y sus bindings de `up`/`down` mueven el cursor del texto. Estos
+/// bindings se registran después con un predicado de descendiente para que, en
+/// la paleta, las flechas muevan la selección y no el cursor.
+const PALETTE_INPUT_CONTEXT: &str = "Palette > Input";
+
+/// Contexto de teclado de la pantalla de atajos.
+pub(crate) const SHORTCUTS_CONTEXT: &str = "Shortcuts";
 
 #[expect(
     clippy::print_stderr,
@@ -76,8 +109,12 @@ fn main() {
         .with_assets(Assets)
         .run(move |cx| {
             axf_ui::init(cx);
-            init_keymap(cx);
             let theme_host = ThemeHost::bootstrap(cx);
+            let keymap = keymap::Keymap::resolve(&theme_host.settings.keymap);
+            let mut keymap_errors = keymap.errors.clone();
+            keymap_errors.extend(keymap.install(cx));
+            keymap_errors.extend(keymap.warnings.clone());
+            init_internal_keymap(cx);
 
             // 1280x800 es el tamaño objetivo, pero a 150 % de escala física esa
             // medida no cabe en una pantalla de 1920x1080. Se recorta al área
@@ -110,7 +147,16 @@ fn main() {
 
             let startup = startup.clone();
             if let Err(error) = axf_ui::gpui::open_window(window_options, cx, move |window, cx| {
-                cx.new(|cx| Shell::new(window, cx, startup.clone(), theme_host))
+                cx.new(|cx| {
+                    Shell::new(
+                        window,
+                        cx,
+                        startup.clone(),
+                        theme_host,
+                        keymap,
+                        keymap_errors,
+                    )
+                })
             }) {
                 eprintln!("axfterm: no se pudo abrir la ventana: {error}");
                 std::process::exit(1);
@@ -118,64 +164,41 @@ fn main() {
         });
 }
 
-fn init_keymap(cx: &mut App) {
-    // Las acciones de app se resuelven antes que el PTY, también con la
-    // terminal enfocada (AGENTS.md, orden de dispatch). Los atajos llevan
-    // modificador y no roban Ctrl+C/D/Z, Tab, Esc ni flechas sin modificar.
-    macro_rules! bind_all {
+fn init_internal_keymap(cx: &mut App) {
+    // Los atajos de app salen del registro y de `[keymap]`; aquí quedan solo
+    // las teclas internas de las superficies modales y la entrega de Tab a la
+    // terminal. Tab y Shift+Tab también se enlazan en Terminal porque gpui-kit
+    // registra navegación global de foco (`tab` / `shift-tab` sin contexto),
+    // que se resolvería antes de `on_key_down` (AGENTS.md: el foco decide).
+    cx.bind_keys([
+        KeyBinding::new("tab", SendTab, Some(TERMINAL_CONTEXT)),
+        KeyBinding::new("shift-tab", SendBacktab, Some(TERMINAL_CONTEXT)),
+        KeyBinding::new("escape", PaletteCancel, Some(SHORTCUTS_CONTEXT)),
+    ]);
+    // Dos niveles: la paleta como contenedor y la paleta con el input enfocado.
+    // El segundo gana al binding `up`/`down` de `Input` por orden de registro.
+    macro_rules! palette_key {
         ($key:expr, $action:expr) => {
             cx.bind_keys([
-                KeyBinding::new($key, $action, Some(WORKSPACE_CONTEXT)),
-                KeyBinding::new($key, $action, Some(SIDEBAR_CONTEXT)),
-                KeyBinding::new($key, $action, Some(TERMINAL_CONTEXT)),
+                KeyBinding::new($key, $action, Some(PALETTE_CONTEXT)),
+                KeyBinding::new($key, $action, Some(PALETTE_INPUT_CONTEXT)),
             ]);
         };
     }
-    bind_all!(keys::QUIT, Quit);
-    bind_all!(keys::TOGGLE_SIDEBAR, ToggleSidebar);
-    bind_all!(keys::OPEN_PROJECT, OpenProject);
-    bind_all!(keys::NEW_TAB, NewTab);
-    bind_all!(keys::CLOSE_TAB, CloseTab);
-    bind_all!(keys::NEXT_TAB, NextTab);
-    bind_all!(keys::PREVIOUS_TAB, PreviousTab);
-    bind_all!(keys::MOVE_TAB_NEXT_PANE, MoveTabNextPane);
-    bind_all!(keys::SPLIT_HORIZONTAL, SplitHorizontal);
-    bind_all!(keys::SPLIT_VERTICAL, SplitVertical);
-    bind_all!(keys::CLOSE_PANE, ClosePane);
-    bind_all!(keys::FOCUS_NEXT_PANE, FocusNextPane);
-    bind_all!(keys::FOCUS_PREVIOUS_PANE, FocusPreviousPane);
-    bind_all!(keys::RENAME_TAB, RenameTab);
-    bind_all!(keys::DUPLICATE_TAB, DuplicateTab);
-    bind_all!(keys::TOGGLE_ZOOM, ToggleZoom);
-    bind_all!(keys::RESTART_TAB, RestartTab);
-    bind_all!(keys::FOCUS_SIDEBAR, FocusSidebar);
-    bind_all!(keys::COMMAND_PALETTE, OpenCommandPalette);
-    bind_all!(keys::TOGGLE_SIDEBAR_AGENTS, ToggleSidebarAgents);
-
-    // Tema y fuentes (M3). El modal es la superficie de descubrimiento sin
-    // convertirse en una GUI de ajustes: el archivo sigue siendo la fuente.
-    bind_all!(keys::SHOW_THEME_INFO, ShowThemeInfo);
-    bind_all!(keys::TOGGLE_THEME_VARIANT, ToggleThemeVariant);
-    bind_all!(keys::NEXT_THEME, NextTheme);
-    bind_all!(keys::PREVIOUS_THEME, PreviousTheme);
-    bind_all!(keys::RELOAD_THEMES, ReloadThemes);
-    bind_all!(keys::OPEN_THEMES_FOLDER, OpenThemesFolder);
-    bind_all!(keys::IMPORT_THEME, ImportTheme);
-    bind_all!(keys::EXPORT_THEME, ExportTheme);
-
-    // Copiar/pegar viven en el contexto de la terminal para no interceptar los
-    // mismos atajos en un input de renombrado. Tab y Shift+Tab también se
-    // enlazan en Terminal porque gpui-kit registra navegación global de foco
-    // (`tab` / `shift-tab` sin contexto) en `gpui_kit::init`, que se resolvería
-    // antes de `on_key_down` (AGENTS.md: el foco decide).
-    cx.bind_keys([
-        KeyBinding::new(keys::COPY_SELECTION, CopySelection, Some(TERMINAL_CONTEXT)),
-        KeyBinding::new(
-            keys::PASTE_SELECTION,
-            PasteSelection,
-            Some(TERMINAL_CONTEXT),
-        ),
-        KeyBinding::new("tab", SendTab, Some(TERMINAL_CONTEXT)),
-        KeyBinding::new("shift-tab", SendBacktab, Some(TERMINAL_CONTEXT)),
-    ]);
+    palette_key!("down", PaletteNext);
+    palette_key!("up", PalettePrevious);
+    palette_key!("tab", PaletteNext);
+    palette_key!("shift-tab", PalettePrevious);
+    palette_key!("ctrl-n", PaletteNext);
+    palette_key!("ctrl-p", PalettePrevious);
+    palette_key!("enter", PaletteAccept);
+    palette_key!("escape", PaletteCancel);
+    palette_key!("ctrl-tab", PaletteSwitchMode);
+    palette_key!("ctrl-shift-tab", PaletteSwitchMode);
+    palette_key!("ctrl-1", PaletteFilterAll);
+    palette_key!("ctrl-2", PaletteFilterTabs);
+    palette_key!("ctrl-3", PaletteFilterPanes);
+    palette_key!("ctrl-4", PaletteFilterProjects);
+    palette_key!("ctrl-5", PaletteFilterProfiles);
+    palette_key!("ctrl-6", PaletteFilterAgents);
 }

@@ -51,6 +51,17 @@ default_profile = "__default__"
 # Archivos .ttf/.otf/.ttc o directorios con fuentes (Nerd Font, CJK, emoji).
 sources = []
 
+[keymap]
+# Atajos: `chord = "accion"`. Los ids salen de docs/keymap.md y la pantalla
+# de atajos (Ctrl+Alt+K). Los atajos de app requieren Ctrl/Alt/Win; Ctrl+C,
+# Ctrl+D, Ctrl+Z, Tab, Esc y las flechas quedan siempre para la terminal.
+# "ctrl-alt-shift-n" = "tab.new"
+# Quita todos los atajos por defecto de una acción:
+# unbind = ["app.quit"]
+# Contextos: workspace, sidebar y terminal.
+# [keymap.terminal]
+# "ctrl-shift-c" = "terminal.copy"
+
 [agents]
 # Detección local de agentes (opencode y Copilot) por OSC 7501 y procesos.
 enabled = true
@@ -128,6 +139,9 @@ pub struct Config {
     pub fonts: FontsConfig,
     /// Detección de agentes (ADR 0009).
     pub agents: AgentsConfig,
+    /// Atajos de teclado (`[keymap]`), validados por la app contra el registro
+    /// de acciones.
+    pub keymap: toml::Table,
     /// Perfiles de terminal en orden de menú (ADR 0006).
     pub profiles: Vec<Profile>,
 }
@@ -145,6 +159,7 @@ impl Default for Config {
             },
             fonts: FontsConfig::default(),
             agents: AgentsConfig::default(),
+            keymap: toml::Table::new(),
             profiles: vec![fallback],
         }
     }
@@ -1026,6 +1041,36 @@ mod tests {
                 .profiles
                 .iter()
                 .any(|profile| profile.id == config.terminal.default_profile)
+        );
+    }
+
+    #[test]
+    fn keymap_section_is_kept_without_being_interpreted_by_the_schema() {
+        let source = r#"schema_version = 2
+[terminal]
+default_profile = "a"
+[keymap]
+"ctrl-alt-q" = "tab.new"
+[keymap.terminal]
+"ctrl-shift-c" = "terminal.copy"
+[[profiles]]
+id = "a"
+name = "A"
+command = "cmd /Q"
+"#;
+        let config = parse_str(source, "keymap.toml").expect("config válida");
+        let keymap = config.keymap;
+        assert_eq!(
+            keymap.get("ctrl-alt-q").and_then(toml::Value::as_str),
+            Some("tab.new")
+        );
+        assert!(
+            keymap
+                .get("terminal")
+                .and_then(toml::Value::as_table)
+                .and_then(|terminal| terminal.get("ctrl-shift-c"))
+                .and_then(toml::Value::as_str)
+                == Some("terminal.copy")
         );
     }
 

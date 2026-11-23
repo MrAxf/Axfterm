@@ -1,8 +1,9 @@
-//! Chords de la aplicación y su presentación legible.
+//! Chords por defecto de la aplicación y su presentación legible.
 //!
-//! Los keybindings y la UI leen la misma constante para que el atajo mostrado
-//! no se desincronice. Cuando exista el registro de acciones de M6, este módulo
-//! será su fuente de chords por defecto.
+//! El registro de acciones (`actions.rs`) los usa como valor inicial y la UI
+//! formatea el chord efectivo con `format_chord`, de modo que cambiar un atajo
+//! en `config.toml` se refleja en tooltips, menús y la ayuda sin duplicar
+//! etiquetas.
 
 /// Cerrar la aplicación.
 pub(crate) const QUIT: &str = "ctrl-q";
@@ -62,8 +63,14 @@ pub(crate) const COPY_SELECTION: &str = "ctrl-shift-c";
 pub(crate) const PASTE_SELECTION: &str = "ctrl-shift-v";
 /// Abrir la paleta de comandos.
 pub(crate) const COMMAND_PALETTE: &str = "ctrl-shift-k";
+/// Abrir la búsqueda de pestañas, paneles, proyectos y perfiles.
+pub(crate) const SEARCH_PALETTE: &str = "ctrl-p";
 /// Alternar el filtro de pestañas con agentes.
 pub(crate) const TOGGLE_SIDEBAR_AGENTS: &str = "ctrl-alt-a";
+/// Ir al siguiente agente que requiere atención.
+pub(crate) const AGENT_NEXT_ATTENTION: &str = "ctrl-alt-j";
+/// Ver la pantalla de atajos.
+pub(crate) const SHOW_SHORTCUTS: &str = "ctrl-alt-k";
 
 /// Formatea un chord de GPUI para mostrarlo en la UI.
 ///

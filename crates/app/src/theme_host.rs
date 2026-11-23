@@ -398,8 +398,36 @@ impl ThemeHost {
         self.profile(id).map(|profile| profile.name.clone())
     }
 
+    /// Familias instaladas, ordenadas y sin duplicados.
+    pub(crate) fn installed_fonts(&self, cx: &App) -> Vec<String> {
+        let mut names = cx.text_system().all_font_names();
+        names.sort();
+        names.dedup();
+        names
+    }
+
+    /// Previsualiza una familia de UI en memoria (la fuente sigue siendo
+    /// `config.toml`; el panel de ajustes de M7 será quien la escriba).
+    pub(crate) fn preview_ui_font(&mut self, family: Option<String>, cx: &mut App) -> Vec<String> {
+        self.settings.ui.font_family = family;
+        let mut messages = self.refresh_font_resolution(cx);
+        messages.extend(self.apply_current(cx));
+        messages
+    }
+
+    /// Previsualiza una familia de terminal en memoria.
+    pub(crate) fn preview_terminal_font(
+        &mut self,
+        family: Option<String>,
+        cx: &mut App,
+    ) -> Vec<String> {
+        self.settings.terminal.font_family = family;
+        let mut messages = self.refresh_font_resolution(cx);
+        messages.extend(self.apply_current(cx));
+        messages
+    }
+
     /// Resuelve el perfil a un `SpawnSpec` y su icono.
-    ///
     /// Un comando mal formado o un ejecutable ausente es un error accionable;
     /// nunca se cae a otro shell (ADR 0006). Un icono que falla solo produce un
     /// aviso y el fallback Tabler.

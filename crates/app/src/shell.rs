@@ -26,17 +26,25 @@ use axf_terminal::{
 };
 
 use crate::history::HistoryStore;
+use crate::keymap::Keymap;
+use crate::palette::{
+    self, PaletteHistory, PaletteIcon, PaletteItem, PaletteKind, PaletteMode, PaletteState,
+    PaletteTarget,
+};
 use axf_ui::components::{
-    Button, ControlSize, EmptyState, Icon, IconButton, IconSize, Menu, MenuItem, Modal,
+    Button, ControlSize, EmptyState, Icon, IconButton, IconSize, Kbd, Menu, MenuItem, Modal,
     ProfileIcon, ProfileIconSource, Tab as TabView, TabStatus, TextField, Toast, Toggle,
     text_tooltip,
 };
-use axf_ui::gpui::component::button::{Button as KitButton, ButtonVariants as _};
+use axf_ui::gpui::component::button::{
+    Button as KitButton, ButtonVariants as _, Toggle as KitToggle, ToggleGroup,
+};
 use axf_ui::gpui::component::input::{InputEvent, InputState};
 use axf_ui::gpui::component::menu::{
     ContextMenuExt as _, DropdownMenu as _, PopupMenu, PopupMenuItem,
 };
 use axf_ui::gpui::component::scroll::ScrollableElement as _;
+use axf_ui::gpui::component::select::{Select, SelectEvent, SelectState};
 use axf_ui::gpui::component::{ActiveTheme, ElementExt as _, Sizable as _, WindowExt as _};
 use axf_ui::gpui::prelude::FluentBuilder as _;
 #[cfg(target_os = "windows")]
@@ -56,15 +64,19 @@ use axf_workspace::{
     Workspace,
 };
 
+use crate::font_select::{FontList, FontValue, font_list};
 use crate::theme_host::ThemeHost;
 use crate::{
-    ClosePane, CloseTab, DuplicateTab, ExportTheme, FocusNextPane, FocusPreviousPane, FocusSidebar,
-    ImportTheme, MoveTabNextPane, NewTab, NextTab, NextTheme, OpenCommandPalette, OpenProject,
-    OpenThemesFolder, PreviousTab, PreviousTheme, Quit, ReloadThemes, RenameTab, RestartTab,
-    SIDEBAR_CONTEXT, ShowThemeInfo, SplitHorizontal, SplitVertical, ToggleSidebar,
-    ToggleSidebarAgents, ToggleThemeVariant, ToggleZoom, WORKSPACE_CONTEXT, keys,
+    AgentNextAttention, ClosePane, CloseTab, DuplicateTab, ExportTheme, FocusNextPane,
+    FocusPreviousPane, FocusSidebar, ImportTheme, MoveTabNextPane, NewTab, NextTab, NextTheme,
+    OpenCommandPalette, OpenProject, OpenSearchPalette, OpenThemesFolder, PALETTE_CONTEXT,
+    PaletteAccept, PaletteCancel, PaletteFilterAgents, PaletteFilterAll, PaletteFilterPanes,
+    PaletteFilterProfiles, PaletteFilterProjects, PaletteFilterTabs, PaletteNext, PalettePrevious,
+    PaletteSwitchMode, PreviousTab, PreviousTheme, Quit, ReloadThemes, RenameTab, RestartTab,
+    SHORTCUTS_CONTEXT, SIDEBAR_CONTEXT, ShowShortcuts, ShowThemeInfo, SplitHorizontal,
+    SplitVertical, ToggleSidebar, ToggleSidebarAgents, ToggleThemeVariant, ToggleZoom,
+    WORKSPACE_CONTEXT, keys,
 };
-
 /// Tope de terminales de v0.1 (ADR 0005).
 const MAX_TABS: usize = 32;
 
@@ -148,6 +160,33 @@ fn sidebar_rows_from_groups(groups: &[SidebarGroup]) -> Vec<SidebarRow> {
         }
     }
     rows
+}
+
+/// Pestañas con alguna sesión que requiere atención, en orden de proyectos.
+fn attention_tabs(workspace: &Workspace) -> Vec<TabId> {
+    workspace
+        .projects()
+        .iter()
+        .flat_map(|project| workspace.project_tabs(project.id))
+        .filter(|tab| {
+            workspace.tab_agents(*tab).is_some_and(|sessions| {
+                sessions
+                    .iter()
+                    .any(|session| session.state == AgentState::NeedsAttention)
+            })
+        })
+        .collect()
+}
+
+/// Siguiente pestaña en atención, ciclando desde la actual.
+fn next_attention(attention: &[TabId], current: Option<TabId>) -> Option<TabId> {
+    let first = *attention.first()?;
+    Some(
+        current
+            .and_then(|current| attention.iter().position(|tab| *tab == current))
+            .map(|index| attention[(index + 1) % attention.len()])
+            .unwrap_or(first),
+    )
 }
 
 /// Contexto de la terminal relativo al proyecto.
@@ -394,8 +433,15 @@ pub(crate) struct Shell {
     notices: Vec<Notice>,
     notice_seq: u64,
     agents: AgentUiState,
-    palette_hint: bool,
-    palette_hint_seq: u64,
+    palette: Option<PaletteState>,
+    palette_subscription: Option<Subscription>,
+    palette_history: PaletteHistory,
+    ui_font_select: Option<Entity<SelectState<FontList>>>,
+    terminal_font_select: Option<Entity<SelectState<FontList>>>,
+    font_select_subscriptions: Vec<Subscription>,
+    shortcuts_modal: bool,
+    shortcuts_focus: FocusHandle,
+    keymap: Keymap,
     theme_host: ThemeHost,
     theme_modal: bool,
     style_revision: u64,
@@ -412,10 +458,13 @@ impl Shell {
         cx: &mut Context<'_, Self>,
         startup: Option<PathBuf>,
         theme_host: ThemeHost,
+        keymap: Keymap,
+        keymap_notes: Vec<String>,
     ) -> Self {
         let focus = cx.focus_handle();
         let sidebar_focus = cx.focus_handle();
         let theme_modal_focus = cx.focus_handle();
+        let shortcuts_focus = cx.focus_handle();
         window.focus(&focus, cx);
 
         let session_path = match axf_config::session_path() {
@@ -473,8 +522,15 @@ impl Shell {
             notices: Vec::new(),
             notice_seq: 0,
             agents: AgentUiState::default(),
-            palette_hint: false,
-            palette_hint_seq: 0,
+            palette: None,
+            palette_subscription: None,
+            palette_history: PaletteHistory::default(),
+            ui_font_select: None,
+            terminal_font_select: None,
+            font_select_subscriptions: Vec::new(),
+            shortcuts_modal: false,
+            shortcuts_focus,
+            keymap,
             theme_host,
             // Diagnóstico visual: abre el modal de tema al arrancar.
             theme_modal: std::env::var_os("AXFTERM_SHOW_THEME_MODAL").is_some(),
@@ -514,6 +570,7 @@ impl Shell {
         }));
 
         let mut warnings = theme_notes;
+        warnings.extend(keymap_notes);
         if let Some(warning) = startup_warning {
             warnings.push(warning);
         }
@@ -837,6 +894,15 @@ impl Shell {
                     if report.applied {
                         cx.notify();
                     }
+                    let mut keymap_notes = Vec::new();
+                    if report.applied {
+                        let keymap = Keymap::resolve(&shell.theme_host.settings.keymap);
+                        keymap_notes.extend(keymap.errors.iter().cloned());
+                        keymap_notes.extend(keymap.warnings.iter().cloned());
+                        keymap_notes.extend(keymap.install(cx));
+                        shell.keymap = keymap;
+                        cx.notify();
+                    }
                     let had = !report.errors.is_empty() || !report.messages.is_empty();
                     let has_error = !report.errors.is_empty();
                     let mut parts = report.errors;
@@ -844,7 +910,10 @@ impl Shell {
                     if !parts.is_empty() {
                         shell.set_notice(parts.join(" "), has_error, cx);
                     }
-                    if !had {
+                    if !keymap_notes.is_empty() {
+                        shell.set_notice(keymap_notes.join(" "), true, cx);
+                    }
+                    if !had && keymap_notes.is_empty() {
                         let message = match (event.config, event.themes) {
                             (true, true) => "Configuración y temas recargados.",
                             (true, false) => "Configuración recargada.",
@@ -1016,7 +1085,6 @@ impl Shell {
     }
 
     fn set_sidebar_section(&mut self, section: SidebarSection, cx: &mut Context<'_, Self>) {
-        self.palette_hint = false;
         if !self.workspace.sidebar().visible {
             self.workspace.sidebar_mut().visible = true;
         }
@@ -1031,31 +1099,499 @@ impl Shell {
     fn open_command_palette(
         &mut self,
         _: &OpenCommandPalette,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) {
+        self.open_palette(PaletteMode::Commands, window, cx);
+    }
+
+    fn open_search_palette(
+        &mut self,
+        _: &OpenSearchPalette,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) {
+        self.open_palette(PaletteMode::Search, window, cx);
+    }
+
+    /// Abre una de las dos paletas; si la otra estaba abierta, la reemplaza.
+    fn open_palette(&mut self, mode: PaletteMode, window: &mut Window, cx: &mut Context<'_, Self>) {
+        if self
+            .palette
+            .as_ref()
+            .is_some_and(|palette| palette.mode == mode)
+        {
+            return;
+        }
+        self.palette = None;
+        self.palette_subscription = None;
+        self.theme_modal = false;
+        self.shortcuts_modal = false;
+        let items = self.palette_items(mode, cx);
+        let input = cx.new(|cx| InputState::new(window, cx).placeholder(mode.placeholder()));
+        let subscription = cx.subscribe(&input, |shell, input, event: &InputEvent, cx| {
+            if !matches!(event, InputEvent::Change) {
+                return;
+            }
+            let query = input.read(cx).value().to_string();
+            let history = shell.palette_history.clone();
+            if let Some(palette) = shell.palette.as_mut() {
+                palette.refilter(&query, &history);
+            }
+            cx.notify();
+        });
+        let palette = PaletteState::new(mode, input.clone(), items, &self.palette_history);
+        self.palette = Some(palette);
+        self.palette_subscription = Some(subscription);
+        let handle = input.read(cx).focus_handle(cx);
+        window.focus(&handle, cx);
+        cx.notify();
+    }
+
+    /// Recolecta las entradas de cada paleta. El orden de inserción es el
+    /// desempate estable.
+    fn palette_items(&mut self, mode: PaletteMode, cx: &mut Context<'_, Self>) -> Vec<PaletteItem> {
+        match mode {
+            PaletteMode::Commands => self.command_items(),
+            PaletteMode::Search => self.search_items(cx),
+        }
+    }
+
+    /// Acciones del registro, sin las que ya cubren la búsqueda o el modal de tema.
+    fn command_items(&self) -> Vec<PaletteItem> {
+        crate::actions::palette_actions()
+            .map(|action| PaletteItem {
+                id: format!("cmd:{}", action.id),
+                label: action.label.to_owned(),
+                detail: Some(action.category.label().to_owned()),
+                search: format!("{} {}", action.id, action.keywords.join(" ")),
+                kind: PaletteKind::Command,
+                icon: PaletteIcon::Svg(crate::actions::category_icon(action.category)),
+                shortcut: self.keymap.chords_for(action.id),
+                target: PaletteTarget::Command(action.id),
+            })
+            .collect()
+    }
+
+    /// Navegación: proyectos, paneles, pestañas, agentes y perfiles.
+    fn search_items(&mut self, cx: &mut Context<'_, Self>) -> Vec<PaletteItem> {
+        let mut items = Vec::new();
+
+        let projects: Vec<(ProjectId, String, std::path::PathBuf)> = self
+            .workspace
+            .projects()
+            .iter()
+            .map(|project| (project.id, project.name.clone(), project.root.clone()))
+            .collect();
+        for (project, name, root) in projects {
+            let count = self.workspace.project_tabs(project).len();
+            items.push(PaletteItem {
+                id: format!("project:{}", project.get()),
+                label: name,
+                detail: Some(format!(
+                    "{count} terminal{} · {}",
+                    if count == 1 { "" } else { "es" },
+                    root.display()
+                )),
+                search: root.display().to_string(),
+                kind: PaletteKind::Project,
+                icon: PaletteIcon::Svg(axf_ui::icons::FOLDER),
+                shortcut: None,
+                target: PaletteTarget::RevealProject(project),
+            });
+        }
+
+        for pane in self.workspace.layout().leaves() {
+            let count = self
+                .workspace
+                .pane(pane)
+                .map(|pane| pane.tabs.len())
+                .unwrap_or(0);
+            items.push(PaletteItem {
+                id: format!("pane:{}", pane.get()),
+                label: format!("Panel {}", pane.get()),
+                detail: Some(format!(
+                    "{count} pestaña{}",
+                    if count == 1 { "" } else { "s" }
+                )),
+                search: format!("pane panel {}", pane.get()),
+                kind: PaletteKind::Pane,
+                icon: PaletteIcon::Svg(axf_ui::icons::SPLIT_HORIZONTAL),
+                shortcut: None,
+                target: PaletteTarget::FocusPane(pane),
+            });
+        }
+
+        let tabs: Vec<(TabId, ProjectId)> = self
+            .workspace
+            .projects()
+            .iter()
+            .flat_map(|project| {
+                self.workspace
+                    .project_tabs(project.id)
+                    .into_iter()
+                    .map(move |tab| (tab, project.id))
+            })
+            .collect();
+        for (tab, project_id) in &tabs {
+            let title = self.tab_title(*tab, cx);
+            let project = self
+                .workspace
+                .project(*project_id)
+                .map(|project| project.name.clone())
+                .unwrap_or_default();
+            let attention = self.workspace.tab_agents(*tab).is_some_and(|sessions| {
+                sessions
+                    .iter()
+                    .any(|session| session.state == AgentState::NeedsAttention)
+            });
+            items.push(PaletteItem {
+                id: format!("tab:{}", tab.get()),
+                label: format!("{}{title}", if attention { "! " } else { "" }),
+                detail: Some(project),
+                search: format!("terminal tab pestaña {}", tab.get()),
+                kind: PaletteKind::Tab,
+                icon: PaletteIcon::Profile(self.tab_icon(*tab)),
+                shortcut: None,
+                target: PaletteTarget::FocusTab(*tab),
+            });
+        }
+
+        for (tab, project_id) in &tabs {
+            let Some(sessions) = self.workspace.tab_agents(*tab) else {
+                continue;
+            };
+            for session in sessions {
+                if session.state != AgentState::NeedsAttention {
+                    continue;
+                }
+                let title = self.tab_title(*tab, cx);
+                let project = self
+                    .workspace
+                    .project(*project_id)
+                    .map(|project| project.name.clone())
+                    .unwrap_or_default();
+                items.push(PaletteItem {
+                    id: format!("agent:{}:{}", tab.get(), session.id),
+                    label: format!("{} requiere atención · {title}", session.kind.as_str()),
+                    detail: Some(project),
+                    search: format!("agente agent atencion attention {}", session.kind.as_str()),
+                    kind: PaletteKind::Agent,
+                    icon: PaletteIcon::Svg(agent_icon(session.kind)),
+                    shortcut: None,
+                    target: PaletteTarget::JumpToAttention(*tab),
+                });
+            }
+        }
+
+        let profiles: Vec<(ProfileId, String)> = self
+            .theme_host
+            .profiles()
+            .iter()
+            .map(|profile| (profile.id.clone(), profile.name.clone()))
+            .collect();
+        for (id, name) in profiles {
+            let icon = self.theme_host.profile_icon(&id);
+            items.push(PaletteItem {
+                id: format!("profile:{}", id.as_str()),
+                label: format!("Nueva terminal · {name}"),
+                detail: Some(format!("perfil {}", id.as_str())),
+                search: format!("perfil profile terminal nueva {}", id.as_str()),
+                kind: PaletteKind::Profile,
+                icon: PaletteIcon::Profile(icon),
+                shortcut: None,
+                target: PaletteTarget::NewTabWithProfile(id),
+            });
+        }
+
+        items
+    }
+
+    fn close_palette(&mut self, window: &mut Window, cx: &mut Context<'_, Self>) {
+        if self.palette.take().is_none() {
+            return;
+        }
+        self.palette_subscription = None;
+        self.restore_workspace_focus(window, cx);
+        cx.notify();
+    }
+
+    fn palette_next(&mut self, _: &PaletteNext, _: &mut Window, cx: &mut Context<'_, Self>) {
+        if let Some(palette) = self.palette.as_mut() {
+            palette.next();
+            cx.notify();
+        }
+    }
+
+    fn palette_previous(
+        &mut self,
+        _: &PalettePrevious,
         _: &mut Window,
         cx: &mut Context<'_, Self>,
     ) {
-        self.show_palette_placeholder(cx);
+        if let Some(palette) = self.palette.as_mut() {
+            palette.previous();
+            cx.notify();
+        }
     }
 
-    fn show_palette_placeholder(&mut self, cx: &mut Context<'_, Self>) {
-        if !self.workspace.sidebar().visible {
-            self.set_sidebar_visible(true, cx);
+    fn palette_switch_mode(
+        &mut self,
+        _: &PaletteSwitchMode,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) {
+        let Some(next) = self.palette.as_ref().map(|palette| match palette.mode {
+            PaletteMode::Commands => PaletteMode::Search,
+            PaletteMode::Search => PaletteMode::Commands,
+        }) else {
+            return;
+        };
+        self.palette_set_mode(next, window, cx);
+    }
+
+    /// Cambia de paleta sin cerrar el overlay y sin perder consulta ni filtro.
+    fn palette_set_mode(
+        &mut self,
+        mode: PaletteMode,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) {
+        let Some((current, query)) = self
+            .palette
+            .as_ref()
+            .map(|palette| (palette.mode, palette.input.read(cx).value().to_string()))
+        else {
+            return;
+        };
+        if current != mode {
+            let items = self.palette_items(mode, cx);
+            let history = self.palette_history.clone();
+            if let Some(palette) = self.palette.as_mut() {
+                palette.set_mode(mode, items, &query, &history);
+            }
         }
-        self.palette_hint = true;
-        self.palette_hint_seq = self.palette_hint_seq.wrapping_add(1);
-        let seq = self.palette_hint_seq;
-        cx.spawn(async move |this, cx| {
-            cx.background_executor().timer(Duration::from_secs(4)).await;
-            this.update(cx, |shell, cx| {
-                if shell.palette_hint_seq == seq {
-                    shell.palette_hint = false;
-                    cx.notify();
-                }
-            })
-            .ok();
-        })
-        .detach();
+        self.palette_focus_input(window, cx);
         cx.notify();
+    }
+
+    fn palette_set_filter(
+        &mut self,
+        filter: Option<PaletteKind>,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) {
+        if !self
+            .palette
+            .as_ref()
+            .is_some_and(|palette| palette.mode == PaletteMode::Search)
+        {
+            return;
+        }
+        let Some(query) = self
+            .palette
+            .as_ref()
+            .map(|palette| palette.input.read(cx).value().to_string())
+        else {
+            return;
+        };
+        let history = self.palette_history.clone();
+        if let Some(palette) = self.palette.as_mut() {
+            palette.set_filter(filter, &query, &history);
+        }
+        self.palette_focus_input(window, cx);
+        cx.notify();
+    }
+
+    fn palette_filter_all(
+        &mut self,
+        _: &PaletteFilterAll,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) {
+        self.palette_set_filter(None, window, cx);
+    }
+
+    fn palette_filter_tabs(
+        &mut self,
+        _: &PaletteFilterTabs,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) {
+        self.palette_set_filter(Some(PaletteKind::Tab), window, cx);
+    }
+
+    fn palette_filter_panes(
+        &mut self,
+        _: &PaletteFilterPanes,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) {
+        self.palette_set_filter(Some(PaletteKind::Pane), window, cx);
+    }
+
+    fn palette_filter_projects(
+        &mut self,
+        _: &PaletteFilterProjects,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) {
+        self.palette_set_filter(Some(PaletteKind::Project), window, cx);
+    }
+
+    fn palette_filter_profiles(
+        &mut self,
+        _: &PaletteFilterProfiles,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) {
+        self.palette_set_filter(Some(PaletteKind::Profile), window, cx);
+    }
+
+    fn palette_filter_agents(
+        &mut self,
+        _: &PaletteFilterAgents,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) {
+        self.palette_set_filter(Some(PaletteKind::Agent), window, cx);
+    }
+
+    /// Devuelve el foco al input tras pulsar un segmento de modo o de filtro.
+    fn palette_focus_input(&self, window: &mut Window, cx: &mut Context<'_, Self>) {
+        let Some(input) = self.palette.as_ref().map(|palette| palette.input.clone()) else {
+            return;
+        };
+        let handle = input.read(cx).focus_handle(cx);
+        window.focus(&handle, cx);
+    }
+
+    fn palette_accept(
+        &mut self,
+        _: &PaletteAccept,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) {
+        let Some((id, target)) = self.palette.as_ref().and_then(|palette| {
+            let row = palette.current()?;
+            let item = palette.item_at(row);
+            Some((item.id.clone(), item.target.clone()))
+        }) else {
+            return;
+        };
+        self.palette_history.record(&id);
+        self.close_palette(window, cx);
+        self.run_palette_target(target, window, cx);
+    }
+
+    fn palette_cancel(
+        &mut self,
+        _: &PaletteCancel,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) {
+        if self.palette.is_some() {
+            self.close_palette(window, cx);
+            return;
+        }
+        if self.shortcuts_modal {
+            self.close_shortcuts(window, cx);
+        }
+    }
+
+    fn palette_click(&mut self, row: usize, window: &mut Window, cx: &mut Context<'_, Self>) {
+        if let Some(palette) = self.palette.as_mut() {
+            if row >= palette.rows.len() {
+                return;
+            }
+            palette.selected = row;
+        }
+        self.palette_accept(&PaletteAccept, window, cx);
+    }
+
+    fn run_palette_target(
+        &mut self,
+        target: PaletteTarget,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) {
+        match target {
+            PaletteTarget::Command(id) => {
+                if let Some(action) = crate::actions::action_for(id) {
+                    // `App::dispatch_action` reentra en la ventana que ya está
+                    // actualizando este shell y el despacho se pierde. Window
+                    // encola el despacho para después del frame actual.
+                    window.dispatch_action(action, cx);
+                }
+            }
+            PaletteTarget::FocusTab(tab) | PaletteTarget::JumpToAttention(tab) => {
+                self.focus_tab(tab, window, cx);
+            }
+            PaletteTarget::FocusPane(pane) => {
+                if self.workspace.focus_pane(pane).is_ok() {
+                    if let Some(tab) = self.workspace.focus().tab {
+                        self.focus_tab(tab, window, cx);
+                    } else {
+                        window.focus(&self.focus, cx);
+                        cx.notify();
+                    }
+                }
+            }
+            PaletteTarget::RevealProject(project) => {
+                self.workspace.sidebar_mut().visible = true;
+                if self.sidebar_section != SidebarSection::All {
+                    self.sidebar_section = SidebarSection::All;
+                    self.workspace.sidebar_mut().section = SidebarSection::All;
+                }
+                let _ = self.workspace.set_project_expanded(project, true);
+                self.sidebar_cursor = Some(SidebarRow::Project(project));
+                self.persist(cx);
+                cx.notify();
+            }
+            PaletteTarget::NewTabWithProfile(profile) => {
+                self.new_tab_for(None, Some(profile), window, cx);
+            }
+        }
+    }
+
+    fn toggle_shortcuts(
+        &mut self,
+        _: &ShowShortcuts,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) {
+        if self.shortcuts_modal {
+            self.close_shortcuts(window, cx);
+        } else {
+            self.close_palette(window, cx);
+            self.theme_modal = false;
+            self.shortcuts_modal = true;
+            window.focus(&self.shortcuts_focus, cx);
+            cx.notify();
+        }
+    }
+
+    fn close_shortcuts(&mut self, window: &mut Window, cx: &mut Context<'_, Self>) {
+        if self.shortcuts_modal {
+            self.shortcuts_modal = false;
+            self.restore_workspace_focus(window, cx);
+            cx.notify();
+        }
+    }
+
+    fn agent_next_attention(
+        &mut self,
+        _: &AgentNextAttention,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) {
+        let attention = attention_tabs(&self.workspace);
+        let Some(next) = next_attention(&attention, self.workspace.focus().tab) else {
+            self.set_sidebar_section(SidebarSection::Agents, cx);
+            self.set_notice("Ningún agente requiere atención.", false, cx);
+            return;
+        };
+        self.focus_tab(next, window, cx);
     }
 
     // --- Tema y fuentes ------------------------------------------------
@@ -2645,7 +3181,14 @@ impl Render for Shell {
         };
 
         let toast = self.render_toast(cx);
-        let modal = self.theme_modal.then(|| self.render_theme_modal(cx));
+        let modal = self
+            .theme_modal
+            .then(|| self.render_theme_modal(window, cx));
+        let shortcuts = self.shortcuts_modal.then(|| self.render_shortcuts(cx));
+        let palette = self
+            .palette
+            .is_some()
+            .then(|| self.render_palette(window, cx));
 
         div()
             .relative()
@@ -2675,6 +3218,7 @@ impl Render for Shell {
             .on_action(cx.listener(Self::restart_tab))
             .on_action(cx.listener(Self::focus_sidebar))
             .on_action(cx.listener(Self::open_command_palette))
+            .on_action(cx.listener(Self::open_search_palette))
             .on_action(cx.listener(Self::toggle_sidebar_agents))
             .on_action(cx.listener(Self::show_theme_info))
             .on_action(cx.listener(Self::toggle_theme_variant))
@@ -2684,6 +3228,8 @@ impl Render for Shell {
             .on_action(cx.listener(Self::open_themes_folder))
             .on_action(cx.listener(Self::import_theme))
             .on_action(cx.listener(Self::export_theme))
+            .on_action(cx.listener(Self::agent_next_attention))
+            .on_action(cx.listener(Self::toggle_shortcuts))
             .on_drop::<axf_ui::gpui::ExternalPaths>(cx.listener(
                 |shell, paths: &axf_ui::gpui::ExternalPaths, window, cx| {
                     for path in &paths.0 {
@@ -2720,6 +3266,8 @@ impl Render for Shell {
             )
             .children(toast)
             .children(modal)
+            .children(shortcuts)
+            .children(palette)
     }
 }
 
@@ -3109,11 +3657,11 @@ impl Shell {
             .cursor_pointer()
             .hover(move |this| this.bg(ui.surface_raised))
             .tooltip(text_tooltip(format!(
-                "Buscar o ejecutar un comando ({})",
-                keys::format_chord(keys::COMMAND_PALETTE)
+                "Buscar pestañas, paneles y proyectos ({})",
+                keys::format_chord(keys::SEARCH_PALETTE)
             )))
-            .on_click(cx.listener(|shell, _, _, cx| {
-                shell.show_palette_placeholder(cx);
+            .on_click(cx.listener(|shell, _, window, cx| {
+                shell.open_palette(PaletteMode::Search, window, cx);
             }))
             .child(Icon::new(icons::SEARCH).size(IconSize::Sm).color(ui.muted))
             .child(
@@ -3124,24 +3672,8 @@ impl Shell {
                     .whitespace_nowrap()
                     .text_ellipsis()
                     .text_size(metrics.font_size * 0.75)
-                    .child("Buscar o ejecutar un comando…"),
+                    .child("Buscar pestañas, paneles y proyectos…"),
             );
-
-        let palette_hint = self.palette_hint.then(|| {
-            div()
-                .flex()
-                .items_center()
-                .gap(metrics.spacing_xs())
-                .px(metrics.spacing_xs())
-                .text_size(metrics.font_size * 0.75)
-                .text_color(ui.muted)
-                .child(
-                    Icon::new(icons::INFO_CIRCLE)
-                        .size(IconSize::Xs)
-                        .color(ui.info),
-                )
-                .child("Paleta de comandos: próximamente.")
-        });
 
         let sections = div()
             .flex()
@@ -3162,7 +3694,6 @@ impl Shell {
             .p(metrics.spacing_sm())
             .child(actions)
             .child(search)
-            .when_some(palette_hint, |this, hint| this.child(hint))
             .child(sections);
 
         let mut blocks = Vec::with_capacity(groups.len());
@@ -3864,7 +4395,6 @@ impl Shell {
         cx: &mut Context<'_, Self>,
     ) {
         window.focus(&self.sidebar_focus, cx);
-        self.palette_hint = false;
         self.sidebar_cursor = Some(SidebarRow::Project(project));
         if self.sidebar_section == SidebarSection::All {
             let expanded = self.workspace.expanded_projects().contains(&project);
@@ -3881,7 +4411,6 @@ impl Shell {
         cx: &mut Context<'_, Self>,
     ) {
         window.focus(&self.sidebar_focus, cx);
-        self.palette_hint = false;
         self.sidebar_cursor = Some(SidebarRow::Tab(tab));
         self.focus_tab(tab, window, cx);
     }
@@ -5282,9 +5811,483 @@ impl Shell {
         )
     }
 
-    fn render_theme_modal(&mut self, cx: &mut Context<'_, Self>) -> AnyElement {
+    fn render_palette(&mut self, window: &mut Window, cx: &mut Context<'_, Self>) -> AnyElement {
+        let state = theme::state(cx);
+        let ui = state.theme.ui;
+        let metrics = state.metrics;
+        let Some(palette) = self.palette.as_ref() else {
+            return div().into_any_element();
+        };
+        let input = palette.input.clone();
+        let rows: Vec<(usize, PaletteItem, Vec<usize>)> = palette
+            .rows
+            .iter()
+            .enumerate()
+            .map(|(row, entry)| {
+                let item = palette.item_at(entry).clone();
+                (row, item, entry.indices.clone())
+            })
+            .collect();
+        let selected = palette.selected;
+        let scroll = palette.scroll.clone();
+        let mode = palette.mode;
+        let filter = palette.filter;
+        let empty = rows.is_empty();
+        let list_max_h = metrics
+            .palette_list_max_height(window.viewport_size().height, mode == PaletteMode::Search);
+
+        let body = if empty {
+            let hint = if mode == PaletteMode::Search && filter.is_some() {
+                "Pulsa Ctrl+1 para ver todo o prueba con otra palabra."
+            } else {
+                "Prueba con otra palabra."
+            };
+            div()
+                .flex()
+                .items_center()
+                .justify_center()
+                .min_h((metrics.font_size * 10.0).min(list_max_h))
+                .py(metrics.spacing_lg())
+                .child(EmptyState::new(icons::SEARCH, palette.empty_text(), hint).compact())
+                .into_any_element()
+        } else {
+            let mut list = div()
+                .id("palette-list")
+                .flex()
+                .flex_col()
+                .gap(metrics.spacing_xs())
+                .max_h(list_max_h)
+                .track_scroll(&scroll)
+                .overflow_y_scroll();
+            for (row, item, indices) in rows {
+                let active = row == selected;
+                let color = if active { ui.accent } else { ui.text };
+                let icon = match &item.icon {
+                    PaletteIcon::Svg(path) => Icon::new(path)
+                        .size(IconSize::Md)
+                        .color(color)
+                        .into_any_element(),
+                    PaletteIcon::Profile(source) => ProfileIcon::new(source.clone())
+                        .size(IconSize::Md)
+                        .color(color)
+                        .into_any_element(),
+                };
+                let spans: Vec<AnyElement> = palette::highlight(&item.label, &indices)
+                    .into_iter()
+                    .map(|span| {
+                        div()
+                            .when(span.matched, |this| this.text_color(ui.accent))
+                            .child(span.text)
+                            .into_any_element()
+                    })
+                    .collect();
+                let shortcut = item
+                    .shortcut
+                    .clone()
+                    .map(|shortcut| Kbd::new(shortcut).into_any_element());
+                list = list.child(
+                    div()
+                        .id(("palette-row", row))
+                        .flex()
+                        .items_center()
+                        .gap(metrics.spacing_sm())
+                        .flex_shrink_0()
+                        .min_h(metrics.control_height_md())
+                        .px(metrics.palette_row_padding())
+                        .py(metrics.palette_row_padding())
+                        .rounded(metrics.radius_sm())
+                        .when(active, |this| this.bg(ui.selection))
+                        .when(!active, move |this| {
+                            this.hover(move |this| this.bg(ui.surface_raised.opacity(0.6)))
+                        })
+                        .on_click(cx.listener(move |shell, _, window, cx| {
+                            shell.palette_click(row, window, cx);
+                        }))
+                        .child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .w(metrics.palette_icon_lane())
+                                .flex_shrink_0()
+                                .child(icon),
+                        )
+                        .child(
+                            div()
+                                .flex()
+                                .flex_col()
+                                .gap(metrics.hairline())
+                                .flex_1()
+                                .min_w_0()
+                                .child(
+                                    div()
+                                        .flex()
+                                        .items_center()
+                                        .gap(metrics.spacing_xxs())
+                                        .text_size(metrics.palette_label_size())
+                                        .line_height(metrics.font_size * 1.05)
+                                        .children(spans),
+                                )
+                                .when_some(item.detail.clone(), |this, detail| {
+                                    this.child(
+                                        div()
+                                            .min_w_0()
+                                            .overflow_hidden()
+                                            .whitespace_nowrap()
+                                            .text_ellipsis()
+                                            .text_size(metrics.palette_detail_size())
+                                            .line_height(metrics.font_size * 0.9)
+                                            .text_color(ui.muted)
+                                            .child(detail),
+                                    )
+                                }),
+                        )
+                        .when(mode == PaletteMode::Search, |this| {
+                            this.child(
+                                div()
+                                    .w(metrics.font_size * 5.5)
+                                    .flex_shrink_0()
+                                    .text_right()
+                                    .text_size(metrics.palette_meta_size())
+                                    .text_color(ui.muted)
+                                    .child(item.kind.label()),
+                            )
+                        })
+                        .children(shortcut),
+                );
+            }
+            list.vertical_scrollbar(&scroll).into_any_element()
+        };
+
+        let mode_control = ToggleGroup::new("palette-mode")
+            .small()
+            .segmented()
+            .single()
+            .child(
+                KitToggle::new("palette-mode-commands")
+                    .label("Comandos")
+                    .checked(mode == PaletteMode::Commands)
+                    .tooltip("Cambiar a comandos (Ctrl+Tab)"),
+            )
+            .child(
+                KitToggle::new("palette-mode-search")
+                    .label("Búsqueda")
+                    .checked(mode == PaletteMode::Search)
+                    .tooltip("Cambiar a búsqueda (Ctrl+Tab)"),
+            )
+            .on_click(cx.listener(|shell, checks: &Vec<bool>, window, cx| {
+                let mode = if checks.get(1).copied().unwrap_or(false) {
+                    PaletteMode::Search
+                } else {
+                    PaletteMode::Commands
+                };
+                shell.palette_set_mode(mode, window, cx);
+            }));
+
+        let mut filter_control = ToggleGroup::new("palette-filter")
+            .small()
+            .segmented()
+            .single()
+            .child(
+                KitToggle::new("palette-filter-all")
+                    .label("Todo")
+                    .checked(filter.is_none())
+                    .tooltip("Todo (Ctrl+1)"),
+            );
+        for (index, kind) in PaletteKind::SEARCH_FILTERS.into_iter().enumerate() {
+            filter_control = filter_control.child(
+                KitToggle::new(("palette-filter", kind.order()))
+                    .label(kind.filter_label())
+                    .checked(filter == Some(kind))
+                    .tooltip(format!("{} (Ctrl+{})", kind.filter_label(), index + 2)),
+            );
+        }
+        let filter_control =
+            filter_control.on_click(cx.listener(|shell, checks: &Vec<bool>, window, cx| {
+                let filter = checks
+                    .iter()
+                    .position(|checked| *checked)
+                    .and_then(|index| index.checked_sub(1))
+                    .and_then(|index| PaletteKind::SEARCH_FILTERS.get(index).copied());
+                shell.palette_set_filter(filter, window, cx);
+            }));
+
+        let header = div()
+            .p(metrics.spacing_sm())
+            .border_b_1()
+            .border_color(ui.border)
+            .flex()
+            .flex_col()
+            .gap(metrics.spacing_sm())
+            .child(
+                div().w_full().min_w_0().child(
+                    TextField::new(input)
+                        .size(ControlSize::Md)
+                        .prefix_icon(icons::SEARCH)
+                        .cleanable(true)
+                        .aria_label("Buscar en Axfterm"),
+                ),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .items_center()
+                    .justify_between()
+                    .gap(metrics.spacing_sm())
+                    .child(mode_control)
+                    .when(mode == PaletteMode::Search, |this| {
+                        this.child(filter_control)
+                    }),
+            );
+
+        let panel = div()
+            .w_full()
+            .max_w(metrics.palette_width())
+            .mx_auto()
+            .mt(metrics.titlebar_height() + metrics.spacing_xl())
+            .rounded(metrics.radius_lg())
+            .border_1()
+            .border_color(ui.border)
+            .bg(ui.surface)
+            .shadow_lg()
+            .overflow_hidden()
+            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            .child(header)
+            .child(div().p(metrics.spacing_sm()).child(body))
+            .child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .items_center()
+                    .justify_between()
+                    .gap(metrics.spacing_sm())
+                    .px(metrics.spacing_sm())
+                    .py(metrics.spacing_xs())
+                    .border_t_1()
+                    .border_color(ui.border)
+                    .text_size(metrics.font_size * 0.6875)
+                    .text_color(ui.muted)
+                    .child(
+                        div()
+                            .flex()
+                            .flex_wrap()
+                            .items_center()
+                            .gap(metrics.spacing_xs())
+                            .child(Kbd::new("↑↓"))
+                            .child("navegar")
+                            .child(Kbd::new("Enter"))
+                            .child("ejecutar"),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .flex_wrap()
+                            .items_center()
+                            .gap(metrics.spacing_xs())
+                            .child(Kbd::new("Ctrl+Tab"))
+                            .child("modo")
+                            .when(mode == PaletteMode::Search, |this| {
+                                this.child(Kbd::new("Ctrl+1–6")).child("filtrar")
+                            })
+                            .child(Kbd::new("Esc"))
+                            .child("cerrar"),
+                    ),
+            );
+
+        div()
+            .absolute()
+            .top_0()
+            .left_0()
+            .size_full()
+            .key_context(PALETTE_CONTEXT)
+            .track_focus(&self.focus)
+            .on_action(cx.listener(Self::palette_next))
+            .on_action(cx.listener(Self::palette_previous))
+            .on_action(cx.listener(Self::palette_accept))
+            .on_action(cx.listener(Self::palette_cancel))
+            .on_action(cx.listener(Self::palette_switch_mode))
+            .on_action(cx.listener(Self::palette_filter_all))
+            .on_action(cx.listener(Self::palette_filter_tabs))
+            .on_action(cx.listener(Self::palette_filter_panes))
+            .on_action(cx.listener(Self::palette_filter_projects))
+            .on_action(cx.listener(Self::palette_filter_profiles))
+            .on_action(cx.listener(Self::palette_filter_agents))
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|shell, _, window, cx| {
+                    shell.close_palette(window, cx);
+                }),
+            )
+            .bg(ui.overlay)
+            .child(panel)
+            .into_any_element()
+    }
+
+    fn render_shortcuts(&mut self, cx: &mut Context<'_, Self>) -> AnyElement {
+        let state = theme::state(cx);
+        let ui = state.theme.ui;
+        let metrics = state.metrics;
+        let mut body = div().flex().flex_col().gap(metrics.spacing_sm());
+        for category in crate::actions::ActionCategory::ALL {
+            let actions: Vec<&crate::actions::ActionMeta> = crate::actions::all()
+                .filter(|action| action.category == *category && action.enabled)
+                .collect();
+            if actions.is_empty() {
+                continue;
+            }
+            let mut rows = div().flex().flex_col().gap(metrics.hairline()).child(
+                div()
+                    .pt(metrics.spacing_xs())
+                    .text_size(metrics.font_size * 0.6875)
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(ui.muted)
+                    .child(category.label()),
+            );
+            for action in actions {
+                let chord = self
+                    .keymap
+                    .chords_for(action.id)
+                    .unwrap_or_else(|| "—".to_owned());
+                rows = rows.child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_between()
+                        .gap(metrics.spacing_sm())
+                        .py(metrics.spacing_xxs())
+                        .child(
+                            div()
+                                .min_w_0()
+                                .text_size(metrics.font_size * 0.75)
+                                .child(action.label),
+                        )
+                        .child(Kbd::new(chord)),
+                );
+            }
+            body = body.child(rows);
+        }
+        body = body.child(
+            div()
+                .pt(metrics.spacing_sm())
+                .text_size(metrics.font_size * 0.6875)
+                .text_color(ui.muted)
+                .child(
+                    "Comandos (Ctrl+Shift+K) ejecuta acciones; búsqueda (Ctrl+P) salta a \
+                     pestañas, paneles, proyectos, perfiles y agentes en atención. Dentro de \
+                     la paleta, Ctrl+Tab cambia de modo y Ctrl+1–6 filtra por tipo. Temas y \
+                     fuentes están en Ctrl+Alt+T. Cambia los atajos en la sección [keymap] \
+                     de config.toml.",
+                ),
+        );
+        let footer = div().flex().justify_end().child(
+            Button::new("shortcuts-close", "Cerrar")
+                .small()
+                .ghost()
+                .on_click(cx.listener(|shell, _, window, cx| {
+                    shell.close_shortcuts(window, cx);
+                })),
+        );
+        let modal = Modal::new("shortcuts-modal", "Atajos de teclado")
+            .description("Generado desde el registro de acciones")
+            .body(
+                div()
+                    .max_h(metrics.font_size * 24.0)
+                    .overflow_y_scrollbar()
+                    .child(body),
+            )
+            .footer(footer)
+            .on_close(cx.listener(|shell, _, window, cx| {
+                shell.close_shortcuts(window, cx);
+            }))
+            .into_any_element();
+
+        div()
+            .absolute()
+            .top_0()
+            .left_0()
+            .size_full()
+            .key_context(SHORTCUTS_CONTEXT)
+            .track_focus(&self.shortcuts_focus)
+            .on_action(cx.listener(Self::palette_cancel))
+            .child(modal)
+            .into_any_element()
+    }
+
+    /// Crea una vez los selectores de fuente que viven mientras dura el modal.
+    fn ensure_font_selects(&mut self, window: &mut Window, cx: &mut Context<'_, Self>) {
+        if self.ui_font_select.is_some() && self.terminal_font_select.is_some() {
+            return;
+        }
+        self.font_select_subscriptions.clear();
+        let fonts = self.theme_host.installed_fonts(cx);
+
+        let (ui_items, ui_selected) =
+            font_list(&fonts, self.theme_host.settings.ui.font_family.as_deref());
+        let ui_state = cx.new(|cx| SelectState::new(ui_items, ui_selected, window, cx));
+        let subscription =
+            cx.subscribe(&ui_state, |shell, _, event: &SelectEvent<FontList>, cx| {
+                let SelectEvent::Confirm(value) = event;
+                if let Some(value) = value {
+                    shell.preview_font(false, value.clone(), cx);
+                }
+            });
+        self.font_select_subscriptions.push(subscription);
+        self.ui_font_select = Some(ui_state);
+
+        let (terminal_items, terminal_selected) = font_list(
+            &fonts,
+            self.theme_host.settings.terminal.font_family.as_deref(),
+        );
+        let terminal_state =
+            cx.new(|cx| SelectState::new(terminal_items, terminal_selected, window, cx));
+        let subscription = cx.subscribe(
+            &terminal_state,
+            |shell, _, event: &SelectEvent<FontList>, cx| {
+                let SelectEvent::Confirm(value) = event;
+                if let Some(value) = value {
+                    shell.preview_font(true, value.clone(), cx);
+                }
+            },
+        );
+        self.font_select_subscriptions.push(subscription);
+        self.terminal_font_select = Some(terminal_state);
+    }
+
+    fn preview_font(&mut self, terminal: bool, value: FontValue, cx: &mut Context<'_, Self>) {
+        let label = value.label();
+        let messages = match (&value, terminal) {
+            (FontValue::System, false) => self.theme_host.preview_ui_font(None, cx),
+            (FontValue::Family(name), false) => {
+                self.theme_host.preview_ui_font(Some(name.to_string()), cx)
+            }
+            (FontValue::System, true) => self.theme_host.preview_terminal_font(None, cx),
+            (FontValue::Family(name), true) => self
+                .theme_host
+                .preview_terminal_font(Some(name.to_string()), cx),
+        };
+        let kind = if terminal {
+            "Fuente terminal"
+        } else {
+            "Fuente UI"
+        };
+        if messages.is_empty() {
+            self.set_notice(format!("{kind}: {label}"), false, cx);
+        } else {
+            self.set_notice(messages.join(" "), true, cx);
+        }
+        cx.notify();
+    }
+
+    fn render_theme_modal(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) -> AnyElement {
+        self.ensure_font_selects(window, cx);
         let state = theme::state(cx);
         let theme = state.theme.meta.clone();
+        let ui = state.theme.ui;
         let metrics = state.metrics;
         let fonts = state.fonts.clone();
         let names = self.theme_host.theme_names();
@@ -5338,6 +6341,43 @@ impl Shell {
                 }
                 cx.notify();
             }));
+
+        let ui_font_select = self.ui_font_select.clone();
+        let terminal_font_select = self.terminal_font_select.clone();
+        let font_fields = div()
+            .flex()
+            .flex_col()
+            .gap(metrics.spacing_sm())
+            .when_some(ui_font_select, |this, select| {
+                this.child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap(metrics.spacing_xxs())
+                        .child(
+                            div()
+                                .text_size(metrics.font_size * 0.75)
+                                .text_color(ui.muted)
+                                .child("Fuente de UI"),
+                        )
+                        .child(Select::new(&select).small().w_full().placeholder("Sistema")),
+                )
+            })
+            .when_some(terminal_font_select, |this, select| {
+                this.child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap(metrics.spacing_xxs())
+                        .child(
+                            div()
+                                .text_size(metrics.font_size * 0.75)
+                                .text_color(ui.muted)
+                                .child("Fuente de la terminal"),
+                        )
+                        .child(Select::new(&select).small().w_full().placeholder("Sistema")),
+                )
+            });
 
         let info = div()
             .flex()
@@ -5426,6 +6466,7 @@ impl Shell {
                             .child(menu),
                     )
                     .child(toggle)
+                    .child(font_fields)
                     .child(info),
             )
             .footer(footer)
@@ -5891,6 +6932,47 @@ mod tests {
                 SidebarRow::Tab(tab),
             ]
         );
+    }
+
+    #[test]
+    fn palette_attention_jump_cycles_only_tabs_that_need_attention() {
+        let (mut workspace, project, tab) = sidebar_workspace("attention-jump");
+        let pane = workspace.pane_of_tab(tab).expect("panel");
+        let second = workspace
+            .new_tab(pane, project, &sidebar_profile(), SIDEBAR_PROFILE_TITLE)
+            .expect("segunda pestaña")
+            .tab;
+        let _third = workspace
+            .new_tab(pane, project, &sidebar_profile(), SIDEBAR_PROFILE_TITLE)
+            .expect("tercera pestaña")
+            .tab;
+        workspace.set_tab_agents(
+            tab,
+            vec![test_agent(
+                1,
+                AgentKind::OpenCode,
+                10,
+                AgentState::NeedsAttention,
+                1,
+            )],
+        );
+        workspace.set_tab_agents(
+            second,
+            vec![test_agent(
+                2,
+                AgentKind::Copilot,
+                11,
+                AgentState::NeedsAttention,
+                2,
+            )],
+        );
+
+        let attention = attention_tabs(&workspace);
+        assert_eq!(attention, vec![tab, second]);
+        assert_eq!(next_attention(&attention, Some(tab)), Some(second));
+        assert_eq!(next_attention(&attention, Some(second)), Some(tab));
+        assert_eq!(next_attention(&attention, None), Some(tab));
+        assert_eq!(next_attention(&[], None), None);
     }
 
     #[test]

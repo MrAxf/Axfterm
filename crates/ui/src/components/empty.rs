@@ -20,6 +20,7 @@ pub struct EmptyState {
     title: SharedString,
     description: SharedString,
     action: Option<AnyElement>,
+    compact: bool,
 }
 
 impl EmptyState {
@@ -34,7 +35,14 @@ impl EmptyState {
             title: title.into(),
             description: description.into(),
             action: None,
+            compact: false,
         }
+    }
+
+    /// Variante compacta para regiones pequeñas: sin fondo de página ni alto completo.
+    pub fn compact(mut self) -> Self {
+        self.compact = true;
+        self
     }
 
     /// Acción principal.
@@ -49,16 +57,44 @@ impl RenderOnce for EmptyState {
         let state = theme::state(cx);
         let ui = state.theme.ui;
         let metrics = state.metrics;
-        div()
+        let mut root = div()
             .flex()
             .flex_col()
             .items_center()
             .justify_center()
-            .gap(metrics.spacing_md())
-            .size_full()
-            .bg(ui.background)
-            .text_color(ui.muted)
-            .child(
+            .gap(if self.compact {
+                metrics.spacing_sm()
+            } else {
+                metrics.spacing_md()
+            })
+            .text_color(ui.muted);
+        if !self.compact {
+            root = root.size_full().bg(ui.background);
+        }
+
+        let title = div()
+            .text_size(if self.compact {
+                metrics.font_size * 0.9375
+            } else {
+                metrics.font_size * 1.05
+            })
+            .font_weight(FontWeight::SEMIBOLD)
+            .text_color(ui.text)
+            .child(self.title.clone());
+
+        let root = if self.compact {
+            // Fila de una sola línea: el icono no compite con el texto y el
+            // estado vacío cabe incluso a 200 % de escala.
+            root.child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(metrics.spacing_xs())
+                    .child(Icon::new(self.icon).size(IconSize::Sm).color(ui.muted))
+                    .child(title),
+            )
+        } else {
+            root.child(
                 div()
                     .flex()
                     .items_center()
@@ -70,20 +106,16 @@ impl RenderOnce for EmptyState {
                     .bg(ui.surface)
                     .child(Icon::new(self.icon).size(IconSize::Xl).color(ui.accent)),
             )
-            .child(
-                div()
-                    .text_size(metrics.font_size * 1.05)
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(ui.text)
-                    .child(self.title.clone()),
-            )
-            .child(
-                div()
-                    .max_w(metrics.font_size * 26.0)
-                    .text_center()
-                    .text_size(metrics.font_size * 0.8125)
-                    .child(self.description.clone()),
-            )
-            .when_some(self.action, |this, action| this.child(action))
+            .child(title)
+        };
+
+        root.child(
+            div()
+                .max_w(metrics.font_size * 26.0)
+                .text_center()
+                .text_size(metrics.font_size * 0.8125)
+                .child(self.description.clone()),
+        )
+        .when_some(self.action, |this, action| this.child(action))
     }
 }

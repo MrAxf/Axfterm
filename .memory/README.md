@@ -1,6 +1,6 @@
 # Axfterm — memoria del proyecto
 
-Estado: M4 Perfiles de terminal cerrado. `config.toml` v2 declara
+Estado: M6 Teclado y paletas cerrado; siguiente M7 Panel de ajustes. `config.toml` v2 declara
 `[[profiles]]` con id, nombre, comando e icono; el descubrimiento local escribe
 PowerShell, cmd, Git Bash, Nu y WSL en el primer arranque, la sesión v2 conserva
 el perfil y los iconos salen del ejecutable con caché acotada y fallback Tabler.
@@ -12,8 +12,12 @@ M5 Agentes y sidebar implementado: OSC 7501 + árbol de procesos, varias sesione
 por pestaña, chip por terminal, sidebar `Terminales`/`Agentes`, avisos in-app y
 marca en el título. Tests deterministas en verde; queda el gate manual
 interactivo con `opencode2`/`copilot` reales.
-Siguiente: M6 teclado y paleta (el gate manual de M5 puede hacerse con la paleta
-ya disponible).
+M6 Teclado y paletas cerrado: registro de acciones, `[keymap]` con
+contextos/unbind y validación de teclas de terminal, paleta única con modos
+Comandos y Búsqueda, filtro por tipo, fuzzy, navegación y recientes, temas y
+fuentes en su modal, y pantalla de atajos generada desde el registro. Tests en
+verde y gate manual sin ratón validado.
+Siguiente: M7 panel de ajustes.
 Stack: Rust 2024 + gpui-kit + alacritty_terminal + portable-pty. Windows primero.
 
 ## Cómo leer
