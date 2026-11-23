@@ -1,0 +1,35 @@
+# Axfterm built-in — Monokai.
+[meta]
+name = "Monokai"
+family = "Monokai"
+variant = "dark"
+
+[ui]
+background = "#272822"
+surface = "#2d2e27"
+surface_raised = "#34352c"
+border = "#49483e"
+border_strong = "#5c5b4f"
+text = "#f8f8f2"
+muted = "#b3b3a7"
+subtle = "#8a8a7f"
+accent = "#a6e22e"
+danger = "#f92672"
+warning = "#e6db74"
+success = "#a6e22e"
+info = "#66d9ef"
+selection = "#66d9ef40"
+focus = "#a6e22e"
+
+[terminal]
+foreground = "#f8f8f2"
+background = "#272822"
+cursor = "#f8f8f0"
+selection = "#49483e"
+dim_foreground = "#8a8a7f"
+ansi = [
+  "#272822", "#f92672", "#a6e22e", "#f4bf75",
+  "#66d9ef", "#ae81ff", "#a1efe4", "#f8f8f2",
+  "#75715e", "#f92672", "#a6e22e", "#f4bf75",
+  "#66d9ef", "#ae81ff", "#a1efe4", "#f9f8f5",
+]

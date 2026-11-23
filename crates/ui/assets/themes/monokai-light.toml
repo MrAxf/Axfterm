@@ -1,0 +1,35 @@
+# Axfterm built-in — Monokai Light.
+[meta]
+name = "Monokai Light"
+family = "Monokai"
+variant = "light"
+
+[ui]
+background = "#fafaf5"
+surface = "#f1f1e9"
+surface_raised = "#e8e8df"
+border = "#d6d6cc"
+border_strong = "#bcbcb0"
+text = "#2f3028"
+muted = "#62635a"
+subtle = "#85867b"
+accent = "#4d7000"
+danger = "#b0153f"
+warning = "#7a6000"
+success = "#4d7000"
+info = "#0a6c7a"
+selection = "#4d700040"
+focus = "#4d7000"
+
+[terminal]
+foreground = "#2f3028"
+background = "#fafaf5"
+cursor = "#4d7000"
+selection = "#4d700040"
+dim_foreground = "#85867b"
+ansi = [
+  "#2f3028", "#b0153f", "#4d7000", "#7a6000",
+  "#0a63b0", "#7a2ea0", "#0a6c7a", "#c8c8bc",
+  "#62635a", "#b0153f", "#4d7000", "#7a6000",
+  "#0a63b0", "#7a2ea0", "#0a6c7a", "#2f3028",
+]

@@ -1,0 +1,35 @@
+# Axfterm built-in — Cobalt2.
+[meta]
+name = "Cobalt2"
+family = "Cobalt2"
+variant = "dark"
+
+[ui]
+background = "#193549"
+surface = "#1f3b52"
+surface_raised = "#24445e"
+border = "#2f5470"
+border_strong = "#3f6c8c"
+text = "#e1efff"
+muted = "#a9c1d9"
+subtle = "#7e9bb5"
+accent = "#ffc600"
+danger = "#ff628c"
+warning = "#ffc600"
+success = "#3ad900"
+info = "#80ffbb"
+selection = "#ffc6004d"
+focus = "#ffc600"
+
+[terminal]
+foreground = "#e1efff"
+background = "#193549"
+cursor = "#ffc600"
+selection = "#ffc60040"
+dim_foreground = "#7e9bb5"
+ansi = [
+  "#193549", "#ff628c", "#3ad900", "#ffc600",
+  "#0088ff", "#ff9d00", "#80ffbb", "#e1efff",
+  "#7e9bb5", "#ff628c", "#3ad900", "#ffc600",
+  "#0088ff", "#ff9d00", "#80ffbb", "#ffffff",
+]

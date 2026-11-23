@@ -1,0 +1,35 @@
+# Axfterm built-in — One Light.
+[meta]
+name = "One Light"
+family = "One"
+variant = "light"
+
+[ui]
+background = "#fafafa"
+surface = "#f0f0f1"
+surface_raised = "#e7e7e9"
+border = "#d0d0d3"
+border_strong = "#b8b8bd"
+text = "#383a42"
+muted = "#696c77"
+subtle = "#8b8e99"
+accent = "#2f64d6"
+danger = "#c7362b"
+warning = "#8a5d00"
+success = "#2f7a2e"
+info = "#006f8f"
+selection = "#2f64d640"
+focus = "#2f64d6"
+
+[terminal]
+foreground = "#383a42"
+background = "#fafafa"
+cursor = "#2f64d6"
+selection = "#2f64d640"
+dim_foreground = "#8b8e99"
+ansi = [
+  "#383a42", "#c7362b", "#2f7a2e", "#8a5d00",
+  "#2f64d6", "#8b2f92", "#006f8f", "#a0a1a7",
+  "#696c77", "#c7362b", "#2f7a2e", "#8a5d00",
+  "#2f64d6", "#8b2f92", "#006f8f", "#383a42",
+]

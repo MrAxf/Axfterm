@@ -6,8 +6,9 @@ de gpui-kit.
 
 - Licencia: MIT (ver `LICENSE` en esta carpeta y `NOTICE` en la raíz).
 - Origen: `https://github.com/tabler/tabler-icons/tree/85e870dbe8680c2d6deefd062122d30ef1544a41/icons/outline`
-- Fecha de descarga: 2026-11-21.
-- Iconos: `terminal-2`, `layout-sidebar`, `settings` y `plus`.
+- Fecha de descarga: 2026-11-21; `brand-powershell` añadido el 2026-11-22.
+- Iconos: el subset completo vive en `crates/ui/src/icons.rs` y en
+  `scripts/update-icons.ps1`.
 
 El subset crecerá en M3 (`Iconos y assets`), que añadirá el script de
 actualización. Al añadir o actualizar un icono, actualiza también el commit de

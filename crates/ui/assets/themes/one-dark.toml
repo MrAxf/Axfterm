@@ -1,0 +1,35 @@
+# Axfterm built-in — One Dark.
+[meta]
+name = "One Dark"
+family = "One"
+variant = "dark"
+
+[ui]
+background = "#1e2127"
+surface = "#21242b"
+surface_raised = "#282c34"
+border = "#3a3f4b"
+border_strong = "#4b5260"
+text = "#abb2bf"
+muted = "#8d95a3"
+subtle = "#6b7280"
+accent = "#61afef"
+danger = "#e06c75"
+warning = "#e5c07b"
+success = "#98c379"
+info = "#56b6c2"
+selection = "#61afef60"
+focus = "#61afef"
+
+[terminal]
+foreground = "#abb2bf"
+background = "#1e2127"
+cursor = "#61afef"
+selection = "#61afef60"
+dim_foreground = "#6b7280"
+ansi = [
+  "#1e2127", "#e06c75", "#98c379", "#e5c07b",
+  "#61afef", "#c678dd", "#56b6c2", "#abb2bf",
+  "#5c6370", "#e06c75", "#98c379", "#e5c07b",
+  "#61afef", "#c678dd", "#56b6c2", "#ffffff",
+]

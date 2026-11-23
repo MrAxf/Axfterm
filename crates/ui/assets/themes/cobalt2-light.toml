@@ -1,0 +1,35 @@
+# Axfterm built-in — Cobalt2 Light.
+[meta]
+name = "Cobalt2 Light"
+family = "Cobalt2"
+variant = "light"
+
+[ui]
+background = "#f7f9fb"
+surface = "#edf2f7"
+surface_raised = "#e2eaf2"
+border = "#cbd8e4"
+border_strong = "#adc1d3"
+text = "#193549"
+muted = "#566d80"
+subtle = "#7d92a5"
+accent = "#8a5e00"
+danger = "#b01545"
+warning = "#8a5e00"
+success = "#2a7a00"
+info = "#006c8f"
+selection = "#8a5e0040"
+focus = "#8a5e00"
+
+[terminal]
+foreground = "#193549"
+background = "#f7f9fb"
+cursor = "#8a5e00"
+selection = "#8a5e0040"
+dim_foreground = "#7d92a5"
+ansi = [
+  "#193549", "#b01545", "#2a7a00", "#8a5e00",
+  "#0068b3", "#8a3ab9", "#006c8f", "#cbd8e4",
+  "#566d80", "#b01545", "#2a7a00", "#8a5e00",
+  "#0068b3", "#8a3ab9", "#006c8f", "#193549",
+]
