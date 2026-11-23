@@ -9,6 +9,9 @@ authors.workspace = true
 publish.workspace = true
 
 [dependencies]
+# Snapshot del árbol de procesos en segundo plano (MIT, ya en el árbol de
+# portable-pty/GPUI). El matcher sigue siendo puro y testeable.
+sysinfo.workspace = true
 
 [lints]
 workspace = true
