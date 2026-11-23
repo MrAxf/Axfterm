@@ -218,6 +218,8 @@ Focus       { pane: PaneId, tab: Option<TabId> }
 ## Convenciones de código
 
 - `rustfmt` por defecto; `snake_case`, `CamelCase`, crates con prefijo `axf_`.
+- Los archivos Rust de producción bajo `crates/*/src` no deben superar 500
+  líneas; dividir responsabilidades en módulos cohesivos.
 - Errores tipados con `thiserror` en bordes; `anyhow` solo en `app` y tests.
 - Sin `unwrap`/`expect` en rutas de runtime. Sin `unsafe` sin comentario de
   seguridad y justificación.
@@ -234,14 +236,25 @@ Comandos obligatorios antes de cerrar una tarea (PowerShell):
 ```powershell
 pwsh -File scripts/check.ps1          # fmt + clippy + test
 pwsh -File scripts/cargo-low.ps1 build --release
+pwsh -File scripts/test-cargo-low.ps1 # pruebas del wrapper
 ```
+
+`scripts/check.ps1` también verifica que ningún archivo Rust de producción bajo
+`crates/*/src` supere 500 líneas.
 
 Equivalen a `cargo fmt --all -- --check`,
 `cargo clippy --workspace --all-targets -- -D warnings`,
-`cargo test --workspace` y `cargo build --release`, pero con la máquina a salvo:
-8 núcleos / 16 hilos sin límite bloquean el escritorio. **Nunca lanzar `cargo`
-a pelo en primer plano**; para más paralelismo,
-`AXF_CARGO_JOBS=8 pwsh -File scripts/cargo-low.ps1 …`.
+`cargo test --workspace` y `cargo build --release`, con menor carga: Cargo usa
+un job y los tests un hilo por defecto. El wrapper aplica prioridad
+`BelowNormal` y serializa sus ejecuciones por workspace en la sesión de Windows.
+**Usar el wrapper en vez de lanzar `cargo` directamente**; Cargo directo respeta
+la configuración del workspace, pero no la prioridad ni el bloqueo del wrapper.
+Ejecutar el wrapper desde la raíz del workspace; su bloqueo corresponde al
+workspace que contiene el script, incluso si se pasa otro `--manifest-path`.
+Se puede aumentar el paralelismo con `AXF_CARGO_JOBS` o `CARGO_BUILD_JOBS` y los
+hilos de tests con `RUST_TEST_THREADS`, bajo responsabilidad del usuario.
+Los límites no restringen la memoria, el disco ni los hilos internos del linker,
+y un Cargo directo o un proceso huérfano puede coincidir con el wrapper.
 
 - Tests unitarios de parser, input encoding, config y máquina de estados.
 - Tests de perfiles: tokenizer de `command`, descubrimiento con PATH falso,

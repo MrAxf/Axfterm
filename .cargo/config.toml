@@ -1,14 +1,15 @@
 # Configuración de Cargo del workspace.
 #
-# El equipo de desarrollo tiene 8 núcleos / 16 hilos y 15 GB de RAM: sin límite,
-# `cargo test --workspace` o `cargo clippy --workspace --all-targets` levantan
-# 16 `rustc` en paralelo y bloquean el escritorio durante minutos. Cuatro jobs
-# dejan CPU y memoria libres para la app y el resto del sistema.
+# Limitar compilaciones y tests para reducir la presión sobre el escritorio.
+# Los jobs de Cargo no limitan los hilos internos del linker ni la memoria.
 #
 # Para subir el límite sin editar este archivo:
-#   $env:CARGO_BUILD_JOBS = 8
-# o ejecutar a través del wrapper (prioridad BelowNormal + `-j`):
+#   $env:CARGO_BUILD_JOBS = 2
+# o ejecutar a través del wrapper (prioridad BelowNormal y serialización):
 #   pwsh -File scripts/cargo-low.ps1 <subcomando> ...
 
 [build]
-jobs = 4
+jobs = 1
+
+[env]
+RUST_TEST_THREADS = { value = "1", force = false }

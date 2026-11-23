@@ -6,7 +6,7 @@
 .DESCRIPTION
     fmt + clippy (-D warnings) + test. Falla con código distinto de cero en el
     primer paso que no pase. Todo pasa por `cargo-low.ps1`: prioridad
-    BelowNormal y `-j 4`, para que la compilación no bloquee el escritorio.
+    BelowNormal y `-j 1`, para reducir la carga sobre el escritorio.
 
 .PARAMETER SkipFmt
     Omite `cargo fmt --all -- --check`.
@@ -19,7 +19,7 @@
 
 .PARAMETER Jobs
     Jobs de cargo para esta ejecución. 0 (por defecto) respeta
-    `AXF_CARGO_JOBS`, y si no está definido el wrapper usa 4.
+    `AXF_CARGO_JOBS` o `CARGO_BUILD_JOBS`, y si no están definidos usa 1.
 
 .EXAMPLE
     pwsh -File scripts/check.ps1
@@ -71,6 +71,32 @@ if (-not (Test-Path (Join-Path $repoRoot 'Cargo.toml'))) {
 
 Push-Location $repoRoot
 try {
+    $lineLimit = 500
+    $oversizedRustFiles = @(
+        Get-ChildItem -Path (Join-Path $repoRoot 'crates') -Directory |
+            ForEach-Object {
+                $srcPath = Join-Path $_.FullName 'src'
+                if (Test-Path $srcPath) {
+                    Get-ChildItem -Path $srcPath -Recurse -Filter '*.rs' |
+                        ForEach-Object {
+                            $lineCount = [System.IO.File]::ReadAllLines($_.FullName).Count
+                            if ($lineCount -gt $lineLimit) {
+                                [pscustomobject]@{
+                                    Path = $_.FullName.Substring($repoRoot.Length + 1)
+                                    Lines = $lineCount
+                                }
+                            }
+                        }
+                }
+            }
+    )
+    if ($oversizedRustFiles.Count -gt 0) {
+        $details = $oversizedRustFiles |
+            ForEach-Object { "  $($_.Path): $($_.Lines) líneas (máximo $lineLimit)" }
+        throw "Hay archivos Rust de producción que superan $lineLimit líneas:`n$($details -join "`n")"
+    }
+    Write-Host "OK: archivos Rust de producción dentro del límite de $lineLimit líneas." -ForegroundColor Green
+
     if (-not $SkipFmt) {
         Invoke-Cargo -Label 'fmt' -Arguments @('fmt', '--all', '--', '--check')
     }

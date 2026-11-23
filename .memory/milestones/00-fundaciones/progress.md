@@ -8,6 +8,11 @@ se indique `debug`.
 
 ## Spikes
 
+- 2026-11-23: **Cargo con menor carga**. El workspace limita Cargo a un job y
+  los tests a un hilo; `cargo-low.ps1` mantiene prioridad `BelowNormal` y
+  serializa los wrappers del mismo workspace en la sesión de Windows. Los
+  overrides siguen disponibles y `scripts/test-cargo-low.ps1` prueba el wrapper.
+  Los límites no garantizan la ausencia de bloqueos ni serializan Cargo directo.
 - 2026-11-22: **Tooling de build OK**. `scripts/cargo-low.ps1` ejecuta cargo a
   prioridad `BelowNormal` (heredada por rustc y el linker) con `-j 4`, y
   `.cargo/config.toml` fija `build.jobs = 4`; `scripts/check.ps1` usa el wrapper.
