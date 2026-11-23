@@ -43,9 +43,10 @@ use axf_ui::gpui::prelude::FluentBuilder as _;
 use axf_ui::gpui::svg;
 use axf_ui::gpui::{
     AnyElement, AppContext, Bounds, ClickEvent, Context, Entity, FocusHandle, Focusable,
-    InteractiveElement, IntoElement, KeyDownEvent, MouseButton, ParentElement, Pixels, Point,
-    Render, ScrollDelta, ScrollEvent, ScrollHandle, SharedString, StatefulInteractiveElement as _,
-    Styled, Subscription, Window, WindowControlArea, div, point, px, relative, transparent_black,
+    FontWeight, InteractiveElement, IntoElement, KeyDownEvent, MouseButton, ParentElement, Pixels,
+    Point, Render, ScrollDelta, ScrollEvent, ScrollHandle, SharedString,
+    StatefulInteractiveElement as _, Styled, Subscription, Window, WindowControlArea, div, point,
+    px, relative, transparent_black,
 };
 use axf_ui::icons;
 use axf_ui::metrics::UiMetrics;
@@ -2265,6 +2266,11 @@ fn agent_icon(kind: AgentKind) -> &'static str {
     }
 }
 
+/// Estado de agente más urgente de un conjunto, según la prioridad de presentación.
+fn most_urgent_agent_state(states: impl IntoIterator<Item = AgentState>) -> Option<AgentState> {
+    states.into_iter().max_by_key(|state| state.priority())
+}
+
 /// Duración compacta para la sección `Agentes`.
 fn format_duration(duration: Duration) -> String {
     let seconds = duration.as_secs();
@@ -3330,6 +3336,26 @@ impl Shell {
         });
         let menu_this = cx.entity().downgrade();
         let indent = metrics.spacing_xs() + metrics.sidebar_icon_lane() + metrics.spacing_sm();
+        // Con el proyecto plegado sus terminales no se ven: el encabezado
+        // muestra el estado más urgente de sus agentes para que una petición
+        // de atención no pase desapercibida.
+        let collapsed_status = (!group.show_tabs)
+            .then(|| {
+                most_urgent_agent_state(group.tabs.iter().filter_map(|tab| {
+                    self.workspace
+                        .tab(*tab)?
+                        .agent_aggregate()
+                        .map(|aggregate| aggregate.state)
+                }))
+            })
+            .flatten()
+            .map(tab_status_from_state);
+        let collapsed_glyph = collapsed_status.map(|status| {
+            Icon::new(status.icon())
+                .size(IconSize::Sm)
+                .color(status.tone().color(ui))
+                .spin(status.is_spinning())
+        });
 
         let mut header = div()
             .id(("project", project_id.get()))
@@ -3361,10 +3387,18 @@ impl Shell {
                     .whitespace_nowrap()
                     .text_ellipsis()
                     .text_size(metrics.font_size * 0.75)
+                    .font_weight(FontWeight::SEMIBOLD)
                     .child(project.name.clone()),
             )
+            .when_some(collapsed_glyph, |this, glyph| this.child(glyph))
             .child(
                 div()
+                    .flex()
+                    .items_center()
+                    .h(metrics.control_height_xs())
+                    .px(metrics.spacing_xs())
+                    .rounded(metrics.radius_full())
+                    .bg(ui.surface_raised)
                     .text_size(metrics.font_size * 0.6875)
                     .text_color(ui.muted)
                     .child(group.tabs.len().to_string()),
@@ -3432,7 +3466,11 @@ impl Shell {
                     }))
             });
 
-        let mut block = div().flex().flex_col().gap_0p5().child(header);
+        let mut block = div()
+            .flex()
+            .flex_col()
+            .gap(metrics.spacing_xxs())
+            .child(header);
         if group.show_tabs {
             if missing {
                 block = block.child(
@@ -3564,7 +3602,8 @@ impl Shell {
                 "Error de arranque".to_owned(),
             ))
         } else if aggregate.is_some() {
-            // El agente domina el icono y la subtítulo; el estado va superpuesto.
+            // El agente se muestra como glifo en el hueco de estado (a la
+            // derecha), así que el icono de la terminal queda sin superponer.
             None
         } else if pending {
             Some((icons::LOADER, ui.info, "Arrancando".to_owned()))
@@ -3586,15 +3625,6 @@ impl Shell {
         } else {
             ui.muted
         };
-        let ring_color = if focused || (selected && sidebar_focused) {
-            ui.surface_raised
-        } else {
-            ui.surface
-        };
-        let badge_offset = -metrics.agent_badge_offset();
-        let badge_ring = metrics.hairline();
-        let badge_inner = metrics.sidebar_agent_badge();
-        let badge_outer = badge_inner + badge_ring * 2.0;
         let row_tooltip = aggregate.as_ref().map(|aggregate| {
             let session = &aggregate.dominant;
             let status = tab_status_from_state(session.state);
@@ -3614,6 +3644,7 @@ impl Shell {
         let mut row = div()
             .id(("sidebar-tab", tab.get()))
             .group(hover_group.clone())
+            .relative()
             .flex()
             .items_center()
             .gap(metrics.spacing_sm())
@@ -3643,41 +3674,7 @@ impl Shell {
                                 ProfileIcon::new(icon)
                                     .size(IconSize::Custom(metrics.sidebar_tab_icon()))
                                     .color(icon_color),
-                            )
-                            .when_some(agent_status, |this, status| {
-                                this.child(
-                                    div()
-                                        .id(format!("sidebar-agent-badge-{}", tab.get()))
-                                        .absolute()
-                                        .right(badge_offset)
-                                        .bottom(badge_offset)
-                                        .flex()
-                                        .items_center()
-                                        .justify_center()
-                                        .size(badge_outer)
-                                        .p(badge_ring)
-                                        .rounded_full()
-                                        .bg(ring_color)
-                                        .tooltip(text_tooltip(status.label()))
-                                        .child(
-                                            div()
-                                                .flex()
-                                                .items_center()
-                                                .justify_center()
-                                                .size(badge_inner)
-                                                .rounded_full()
-                                                .bg(status.tone().color(ui))
-                                                .child(
-                                                    Icon::new(status.icon())
-                                                        .size(IconSize::Custom(
-                                                            metrics.sidebar_agent_badge_icon(),
-                                                        ))
-                                                        .color(status.tone().text(ui))
-                                                        .spin(status.is_spinning()),
-                                                ),
-                                        ),
-                                )
-                            }),
+                            ),
                     ),
             )
             .child(
@@ -3715,6 +3712,20 @@ impl Shell {
             .justify_center()
             .flex_shrink_0();
 
+        if let Some(agent) = agent_status {
+            slot = slot.child(
+                div()
+                    .id(format!("sidebar-agent-status-{}", tab.get()))
+                    .group_hover(hover_group.clone(), |this| this.opacity(0.0))
+                    .tooltip(text_tooltip(agent.label()))
+                    .child(
+                        Icon::new(agent.icon())
+                            .size(IconSize::Md)
+                            .color(agent.tone().color(ui))
+                            .spin(agent.is_spinning()),
+                    ),
+            );
+        }
         if let Some((status_icon, status_color, status_label)) = status {
             slot = slot.child(
                 div()
@@ -3746,7 +3757,16 @@ impl Shell {
         );
         row = row.child(slot);
         if focused {
-            row = row.bg(ui.surface_raised);
+            row = row.bg(ui.surface_raised).child(
+                div()
+                    .absolute()
+                    .left_0()
+                    .top(metrics.spacing_xs())
+                    .bottom(metrics.spacing_xs())
+                    .w(metrics.tab_indicator())
+                    .rounded(metrics.radius_full())
+                    .bg(ui.accent),
+            );
         }
         if selected && sidebar_focused {
             row = row.bg(ui.surface_raised).border_color(ui.focus);
@@ -5898,6 +5918,19 @@ mod tests {
         );
         assert_eq!(agent_icon(AgentKind::OpenCode), icons::BRAND_OPENCODE);
         assert_eq!(agent_icon(AgentKind::Copilot), icons::BRAND_COPILOT);
+    }
+
+    #[test]
+    fn collapsed_project_shows_its_most_urgent_agent_state() {
+        assert_eq!(most_urgent_agent_state([]), None);
+        assert_eq!(
+            most_urgent_agent_state([AgentState::Idle, AgentState::Working, AgentState::Error]),
+            Some(AgentState::Working)
+        );
+        assert_eq!(
+            most_urgent_agent_state([AgentState::Working, AgentState::NeedsAttention]),
+            Some(AgentState::NeedsAttention)
+        );
     }
 
     #[test]

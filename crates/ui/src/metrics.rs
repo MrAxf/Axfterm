@@ -158,31 +158,6 @@ impl UiMetrics {
         px(self.unit() * 1.5)
     }
 
-    /// Diámetro del círculo de estado superpuesto al icono de una pestaña.
-    pub fn agent_badge(self) -> Pixels {
-        px(self.unit() * 0.875)
-    }
-
-    /// Icono dentro del círculo de estado.
-    pub fn agent_badge_icon(self) -> Pixels {
-        px(self.unit() * 0.5625)
-    }
-
-    /// Desplazamiento exterior del círculo de estado sobre el icono.
-    pub fn agent_badge_offset(self) -> Pixels {
-        px(self.unit() * 0.1875)
-    }
-
-    /// Diámetro del círculo de estado en una tarjeta de la sidebar.
-    pub fn sidebar_agent_badge(self) -> Pixels {
-        px(self.unit() * 0.9375)
-    }
-
-    /// Icono dentro del círculo de estado de la sidebar.
-    pub fn sidebar_agent_badge_icon(self) -> Pixels {
-        px(self.unit() * 0.625)
-    }
-
     /// Carril fijo para el icono o el chevron de una fila de la sidebar.
     pub fn sidebar_icon_lane(self) -> Pixels {
         px(self.unit() * 1.75)
@@ -315,6 +290,11 @@ impl UiMetrics {
     /// Línea de 1 px físico para bordes y hairlines.
     pub fn hairline(self) -> Pixels {
         self.phys(1.0)
+    }
+
+    /// Grosor del indicador de la pestaña activa y de la tarjeta enfocada.
+    pub fn tab_indicator(self) -> Pixels {
+        px(self.unit() * 0.125).max(self.hairline())
     }
 
     /// Grosor del divisor entre paneles.

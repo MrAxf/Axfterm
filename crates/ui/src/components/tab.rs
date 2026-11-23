@@ -124,11 +124,14 @@ impl RenderOnce for Tab {
         let active = self.active;
         let focused = self.focused && active;
         let status = self.status;
+        // La pestaña activa del panel enfocado comparte color con el cuerpo del
+        // terminal: parece abrirse hacia él.
         let active_background = if focused {
-            ui.surface_raised
+            ui.background
         } else {
             ui.surface_raised.opacity(0.55)
         };
+        let hover_group = format!("{}-hover", self.id);
         let hover_background = ui.surface_raised.opacity(0.35);
         let icon_color = if focused { ui.accent } else { ui.muted };
         let text_color = if active && focused { ui.text } else { ui.muted };
@@ -138,18 +141,10 @@ impl RenderOnce for Tab {
             .map(ProfileIconSource::Image)
             .or_else(|| self.icon.map(ProfileIconSource::Svg));
 
-        let ring_color = if active {
-            active_background
-        } else {
-            ui.surface
-        };
-        let offset = -metrics.agent_badge_offset();
-        let ring = metrics.hairline();
-        let badge_inner = metrics.agent_badge();
-        let badge_outer = badge_inner + ring * 2.0;
-
         let mut element = div()
             .id(self.id.clone())
+            .group(hover_group.clone())
+            .relative()
             .when(!self.title.is_empty(), |this| {
                 this.tooltip(super::tooltip::text_tooltip(self.title.clone()))
             })
@@ -158,7 +153,7 @@ impl RenderOnce for Tab {
             .gap(metrics.spacing_xs())
             .h(metrics.tab_height())
             .px(metrics.spacing_sm())
-            .rounded(metrics.radius_sm())
+            .rounded_t(metrics.radius_md())
             .overflow_hidden()
             .text_color(text_color)
             .when(self.full_width, |this| this.w_full())
@@ -179,41 +174,7 @@ impl RenderOnce for Tab {
                             ProfileIcon::new(source)
                                 .size(IconSize::Custom(metrics.tab_icon()))
                                 .color(icon_color),
-                        )
-                        .when_some(status, |this, status| {
-                            this.child(
-                                div()
-                                    .id(format!("{}-status", self.id))
-                                    .absolute()
-                                    .right(offset)
-                                    .bottom(offset)
-                                    .flex()
-                                    .items_center()
-                                    .justify_center()
-                                    .size(badge_outer)
-                                    .p(ring)
-                                    .rounded_full()
-                                    .bg(ring_color)
-                                    .tooltip(super::tooltip::text_tooltip(status.label()))
-                                    .child(
-                                        div()
-                                            .flex()
-                                            .items_center()
-                                            .justify_center()
-                                            .size(badge_inner)
-                                            .rounded_full()
-                                            .bg(status.tone().color(ui))
-                                            .child(
-                                                Icon::new(status.icon())
-                                                    .size(IconSize::Custom(
-                                                        metrics.agent_badge_icon(),
-                                                    ))
-                                                    .color(status.tone().text(ui))
-                                                    .spin(status.is_spinning()),
-                                            ),
-                                    ),
-                            )
-                        }),
+                        ),
                 )
             });
 
@@ -226,6 +187,27 @@ impl RenderOnce for Tab {
                 .text_ellipsis()
                 .child(self.title.clone()),
         );
+
+        // El estado va como glifo propio entre el título y la "x": el icono de
+        // la app queda intacto y la información se lee sin superponerse.
+        if let Some(status) = status {
+            element = element.child(
+                div()
+                    .id(format!("{}-status", self.id))
+                    .flex_shrink_0()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .size(metrics.icon_md())
+                    .tooltip(super::tooltip::text_tooltip(status.label()))
+                    .child(
+                        Icon::new(status.icon())
+                            .size(IconSize::Sm)
+                            .color(status.tone().color(ui))
+                            .spin(status.is_spinning()),
+                    ),
+            );
+        }
 
         if self.closable {
             let on_close = self.on_close.clone();
@@ -242,7 +224,28 @@ impl RenderOnce for Tab {
                     handler(event, window, cx);
                 });
             }
-            element = element.child(close);
+            // Con muchas pestañas el cierre de las inactivas solo aparece al
+            // pasar el ratón; la activa lo muestra siempre.
+            element = element.child(
+                div()
+                    .flex_shrink_0()
+                    .when(!active, |this| {
+                        this.opacity(0.0)
+                            .group_hover(hover_group.clone(), |this| this.opacity(1.0))
+                    })
+                    .child(close),
+            );
+        }
+        if focused {
+            element = element.child(
+                div()
+                    .absolute()
+                    .left_0()
+                    .right_0()
+                    .bottom_0()
+                    .h(metrics.tab_indicator())
+                    .bg(ui.accent),
+            );
         }
         element
     }

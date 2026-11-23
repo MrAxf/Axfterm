@@ -65,10 +65,7 @@ impl RenderOnce for Toast {
             .p(metrics.spacing_md())
             .rounded(metrics.radius_md())
             .border_1()
-            .border_color(ui.border)
-            .bg(ui.surface_raised)
-            .text_color(ui.text)
-            .text_size(metrics.font_size * 0.8125)
+            .border_color(tone.opacity(0.45))
             .child(Icon::new(self.icon).size(IconSize::Md).color(tone))
             .child(
                 div()

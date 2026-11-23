@@ -2,7 +2,8 @@
 
 use crate::gpui::prelude::FluentBuilder as _;
 use crate::gpui::{
-    AnyElement, App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div,
+    AnyElement, App, FontWeight, IntoElement, ParentElement, RenderOnce, SharedString, Styled,
+    Window, div,
 };
 use crate::theme;
 
@@ -72,6 +73,7 @@ impl RenderOnce for EmptyState {
             .child(
                 div()
                     .text_size(metrics.font_size * 1.05)
+                    .font_weight(FontWeight::SEMIBOLD)
                     .text_color(ui.text)
                     .child(self.title.clone()),
             )
