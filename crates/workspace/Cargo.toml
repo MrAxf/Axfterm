@@ -9,6 +9,14 @@ authors.workspace = true
 publish.workspace = true
 
 [dependencies]
+axf_agents.workspace = true
+# `ProfileId` estable de las pestañas y migración de sesión v1 -> v2.
+axf_config.workspace = true
+# Normalización del root que se entrega como CWD al PTY.
+axf_terminal.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
 
 [lints]
 workspace = true
