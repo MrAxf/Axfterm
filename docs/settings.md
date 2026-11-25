@@ -67,6 +67,9 @@ El panel observa `config.toml` mientras está abierto:
   fila.
 - **Nuevo perfil** y **Editar** abren un modal; el alta solo entra en el borrador
   al pulsar **Aplicar**.
+- El modal incluye dos comandos de agente opcionales, **OpenCode** y **Copilot**.
+  Vacío usa el comando global; si se rellena, ese perfil ejecuta y reanuda el
+  agente con el comando indicado (`opencode2 --continue` en WSL, por ejemplo).
 - El `id` es estable y no cambia al renombrar; la sesión guarda solo ese id.
 - No se puede borrar el último perfil ni el predeterminado sin elegir otro.
 - Borrar un perfil que usan pestañas abiertas pide confirmación: esas pestañas
@@ -151,11 +154,12 @@ Automatizado:
 
 - `cargo test -p axf_config` cubre round-trip con comentarios y orden, escritura
   atómica, validación y rechazo sin tocar el archivo.
-- `cargo test -p axfterm` cubre perfiles, rebindeo/`unbind`, conflictos de
-  atajos, perfiles preferidos de agentes, restauración de defaults y política de
-  conflicto externo. También verifica que un borrador combinado de apariencia,
-  fuentes, perfil, atajo y agente se escribe y conserva al recargar `config.toml`,
-  y que restaurar defaults conserva `[fonts].sources`.
+- `cargo test -p axfterm` cubre perfiles, comandos de agente por perfil,
+  rebindeo/`unbind`, conflictos de atajos, perfiles preferidos de agentes,
+  restauración de defaults y política de conflicto externo. También verifica que
+  un borrador combinado de apariencia, fuentes, perfil, atajo y agente se escribe
+  y conserva al recargar `config.toml`, y que restaurar defaults conserva
+  `[fonts].sources`.
 
 Verificado interactivamente en Studio visible:
 

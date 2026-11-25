@@ -94,13 +94,15 @@ mod tests {
         assert_eq!(AgentKind::from_app("make"), None);
         assert_eq!(AgentKind::from_name("opencode"), Some(AgentKind::OpenCode));
         assert_eq!(AgentKind::from_name("copilot"), Some(AgentKind::Copilot));
+        assert_eq!(AgentKind::OpenCode.label(), "OpenCode");
+        assert_eq!(AgentKind::Copilot.label(), "Copilot");
         assert_eq!(AgentKind::OpenCode.resume_command(), "opencode --continue");
         assert_eq!(AgentKind::Copilot.resume_command(), "copilot --continue");
     }
 
     #[test]
     fn a_report_replaces_the_whole_record() {
-        let mut session = session(1, AgentKind::OpenCode, 10, 1);
+        let mut session = session(1, AgentKind::Copilot, 10, 1);
         let mut report = AgentReport::new(AgentState::Working);
         report.app = Some("opencode".into());
         report.message = Some("Compilando".into());
@@ -122,6 +124,70 @@ mod tests {
         assert_eq!(session.app, None);
         assert_eq!(session.message, None);
         assert_eq!(session.progress, None);
+    }
+
+    #[test]
+    fn opencode_idle_after_working_finishes_once() {
+        let mut session = session(1, AgentKind::OpenCode, 10, 1);
+        session.apply_report(&AgentReport::new(AgentState::Working), at(2));
+
+        let transition = session.apply_report(&AgentReport::new(AgentState::Idle), at(3));
+        assert_eq!(transition.from, AgentState::Working);
+        assert_eq!(transition.to, AgentState::Finished);
+        assert!(transition.notify);
+        assert_eq!(session.state, AgentState::Finished);
+
+        // OpenCode repite `idle` en el registro raíz y `clear` en el de la
+        // sesión; ninguno debe borrar el resultado pendiente.
+        let transition = session.apply_report(&AgentReport::new(AgentState::Idle), at(4));
+        assert!(!transition.notify);
+        assert_eq!(session.state, AgentState::Finished);
+
+        let transition = session.apply_report(&AgentReport::clear(), at(5));
+        assert!(!transition.notify);
+        assert_eq!(session.state, AgentState::Finished);
+
+        // Un turno nuevo vuelve a trabajar con normalidad.
+        session.apply_report(&AgentReport::new(AgentState::Working), at(6));
+        assert_eq!(session.state, AgentState::Working);
+    }
+
+    #[test]
+    fn opencode_clear_after_working_finishes() {
+        let mut session = session(1, AgentKind::OpenCode, 10, 1);
+        session.apply_report(&AgentReport::new(AgentState::Working), at(2));
+
+        let transition = session.apply_report(&AgentReport::clear(), at(3));
+        assert_eq!(transition.from, AgentState::Working);
+        assert_eq!(transition.to, AgentState::Finished);
+        assert!(transition.notify);
+        assert_eq!(session.state, AgentState::Finished);
+    }
+
+    #[test]
+    fn opencode_idle_without_a_working_report_does_not_finish() {
+        let mut session = session(1, AgentKind::OpenCode, 10, 1);
+        // La salida inicial de la TUI basta para marcar Working en el escaneo,
+        // pero no es un turno de trabajo reportado por OSC.
+        session.apply_output_activity(at(2));
+        assert_eq!(session.state, AgentState::Working);
+
+        let transition = session.apply_report(&AgentReport::new(AgentState::Idle), at(3));
+        assert_eq!(transition.to, AgentState::Idle);
+        assert!(!transition.notify);
+        assert_eq!(session.state, AgentState::Idle);
+        assert!(session.reported);
+    }
+
+    #[test]
+    fn copilot_idle_after_working_stays_idle() {
+        let mut session = session(1, AgentKind::Copilot, 11, 1);
+        session.apply_report(&AgentReport::new(AgentState::Working), at(2));
+
+        let transition = session.apply_report(&AgentReport::new(AgentState::Idle), at(3));
+        assert_eq!(transition.to, AgentState::Idle);
+        assert!(!transition.notify);
+        assert_eq!(session.state, AgentState::Idle);
     }
 
     #[test]

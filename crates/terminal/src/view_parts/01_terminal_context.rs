@@ -13,7 +13,8 @@ use axf_ui::gpui;
 use axf_ui::gpui::component::menu::ContextMenuExt as _;
 use axf_ui::gpui::{
     App, Bounds, ClipboardItem, Context, CursorStyle, Element, ElementId, ElementInputHandler,
-    Entity, EntityInputHandler, FocusHandle, Font, FontFallbacks, FontId, GlobalElementId, Hsla,
+    Entity, EntityInputHandler, ExternalPaths, FocusHandle, Font, FontFallbacks, FontId,
+    GlobalElementId, Hsla,
     InspectorElementId, InteractiveElement, IntoElement, KeyDownEvent, Keystroke, LayoutId,
     Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement, Pixels,
     Point, Render, ScrollDelta, ScrollEvent, ShapedLine, SharedString, Size, StrikethroughStyle,
@@ -301,6 +302,8 @@ pub struct TerminalView {
     selection_anchor: Option<SelectionPoint>,
     selection_dragging: bool,
     selection_moved: bool,
+    /// Un arrastre (archivos o pestaña) está sobre la terminal.
+    drag_hover: bool,
     _focus_in: Option<Subscription>,
     _focus_out: Option<Subscription>,
     _pump: Option<Task<()>>,

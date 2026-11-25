@@ -114,6 +114,7 @@ impl Shell {
         let sidebar_empty = (empty
             && (!no_projects || self.sidebar_section == SidebarSection::Agents))
             .then(|| self.render_sidebar_empty(cx));
+        let sidebar_list_bounds = Rc::clone(&self.sidebar_list_bounds);
         let list = div()
             .flex()
             .flex_col()
@@ -124,6 +125,9 @@ impl Shell {
             .pt(metrics.spacing_xs())
             .pb(metrics.spacing_sm())
             .gap(metrics.spacing_sm())
+            .on_prepaint(move |bounds, _, _| {
+                *sidebar_list_bounds.borrow_mut() = Some(bounds);
+            })
             .children(blocks)
             .when_some(sidebar_empty, |this, empty| this.child(empty));
         let list_section = div()
@@ -222,7 +226,7 @@ impl Shell {
             .child(
                 div()
                     .text_center()
-                    .child("Las terminales con opencode o Copilot aparecerán aquí."),
+                    .child("Las terminales con OpenCode o Copilot aparecerán aquí."),
             )
             .into_any_element()
     }
@@ -347,6 +351,26 @@ impl Shell {
             header = header.hover(move |this| this.bg(ui.surface_raised.opacity(0.55)));
         }
         let header = header
+            .on_drag_move::<axf_ui::gpui::ExternalPaths>(cx.listener(
+                move |shell,
+                      event: &axf_ui::gpui::DragMoveEvent<axf_ui::gpui::ExternalPaths>,
+                      window,
+                      cx| {
+                    // Solo los proyectos plegados necesitan expandirse al
+                    // arrastrar archivos; los visibles ya muestran sus filas.
+                    let collapsed = shell.sidebar_section == SidebarSection::All
+                        && !shell.workspace.expanded_projects().contains(&project_id);
+                    let over = collapsed
+                        && !shell.file_drag_blocked()
+                        && file_drag_over(event.bounds, event.event.position, shell.sidebar_viewport());
+                    shell.observe_file_drag(
+                        FileDragHover::SidebarProject(project_id),
+                        over,
+                        window,
+                        cx,
+                    );
+                },
+            ))
             .on_click(cx.listener(move |shell, _, window, cx| {
                 shell.activate_project_row(project_id, window, cx);
             }))

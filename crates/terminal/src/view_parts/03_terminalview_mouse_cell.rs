@@ -53,6 +53,8 @@ impl TerminalView {
         window: &mut Window,
         cx: &mut Context<'_, Self>,
     ) {
+        // Un clic real cancela cualquier marca de arrastre previa.
+        self.drag_hover = false;
         if event.button == MouseButton::Left {
             window.focus(&self.focus, cx);
         }
@@ -96,8 +98,14 @@ impl TerminalView {
         &mut self,
         event: &MouseUpEvent,
         _window: &mut Window,
-        _cx: &mut Context<'_, Self>,
+        cx: &mut Context<'_, Self>,
     ) {
+        // Un «drop» externo también llega como MouseUp; no debe convertirse
+        // en un clic dentro de una TUI con tracking de ratón.
+        if cx.has_active_drag() || self.drag_hover {
+            self.drag_hover = false;
+            return;
+        }
         let mode = self.state.borrow().mode;
         if event.button == MouseButton::Left && mode.mouse_mode == MouseMode::Off {
             if self.selection_dragging {
@@ -131,8 +139,12 @@ impl TerminalView {
         &mut self,
         event: &MouseMoveEvent,
         _window: &mut Window,
-        _cx: &mut Context<'_, Self>,
+        cx: &mut Context<'_, Self>,
     ) {
+        if cx.has_active_drag() {
+            self.drag_hover = true;
+            return;
+        }
         let mode = self.state.borrow().mode;
         if mode.mouse_mode != MouseMode::Off {
             let should_send = mode.mouse_mode == MouseMode::Motion

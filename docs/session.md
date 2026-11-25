@@ -18,7 +18,10 @@ Ambos viven en el mismo directorio de configuración:
 2. **Solo arranca la pestaña activa de cada panel visible.** Las pestañas
    ocultas no crean procesos: esperan a que las actives.
 3. Al activar una pestaña se carga su historial y se arranca el perfil guardado
-   en esa pestaña. El prompt nuevo aparece debajo del contenido anterior.
+   en esa pestaña. El PTY arranca con el tamaño de la instantánea y el primer
+   frame lo ajusta al hueco real de la ventana (el historial se refluye). El
+   prompt nuevo aparece debajo del contenido anterior, con el cursor visible y
+   la vista al final.
 4. Si una pestaña no tenía historial, se abre una terminal normal.
 5. Si el archivo de historial está dañado o es de una versión futura, se ignora,
    se abre el mismo perfil desde cero y se muestra un aviso.
@@ -63,7 +66,10 @@ scrollback/<epoch>-<terminal_id>.snap
   pestañas nuevas.
 - El contenido es una transcripción ANSI del grid: texto, colores, atributos y
   caracteres anchos. No se guardan enlaces, selección, posición de scroll ni
-  modos de ratón.
+  modos de ratón. Al restaurar se fuerza el cursor visible y el final del
+  historial: un programa que lo dejó oculto (por ejemplo, `docker compose`
+  v5 con logs en streaming) no hereda ese estado y el prompt nuevo queda
+  usable.
 - Tope: **2 MiB por terminal**. Si se supera, se conservan las líneas más
   recientes y se avisa al restaurar. El scrollback vivo tiene su propio límite
   configurable (0–50 000 líneas) y un tope de 32 MiB por terminal

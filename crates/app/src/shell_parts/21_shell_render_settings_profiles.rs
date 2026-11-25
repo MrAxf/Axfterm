@@ -195,7 +195,7 @@ impl Shell {
                 .items_center()
                 .flex_wrap()
                 .gap(metrics.spacing_sm())
-                .p(metrics.spacing_sm())
+                .p(metrics.spacing_md())
                 .rounded(metrics.radius_md())
                 .border_1()
                 .border_color(if is_default { ui.accent } else { ui.border })

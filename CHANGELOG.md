@@ -4,6 +4,38 @@ Todas las fechas usan el calendario local del proyecto. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado
 semántico.
 
+## [0.1.1] — 2026-11-25
+
+### Añadido
+
+- Comando de agente por perfil (`[profiles.agent_commands]`): OpenCode puede ser
+  `opencode` en PowerShell y `opencode2` en WSL, también al reanudar.
+- Shift+Enter inserta una nueva línea (LF) en agentes como OpenCode y Claude
+  Code; Enter sigue enviando el prompt.
+- Arrastrar archivos sobre una terminal inserta sus rutas citadas para el shell
+  del perfil (Windows, Git Bash o WSL), sin ejecutarlas.
+- Durante un drag de archivos, mantener el cursor sobre una pestaña o una fila
+  de la sidebar activa esa terminal; los proyectos plegados se expanden.
+
+### Cambiado
+
+- OpenCode aparece como «OpenCode» en sidebar, ajustes y textos de la app; las
+  claves estables de config y sesión siguen en minúsculas.
+
+### Corregido
+
+- OpenCode 2 no emite `done`: el paso de `working` a `idle`/`clear` se
+  interpreta como terminado, de modo que el aviso, el chip y la marca del
+  título aparecen al acabar una tarea.
+- Al restaurar el historial de una terminal se fuerza el cursor visible y el
+  final del scrollback: un programa que lo dejó oculto (por ejemplo,
+  `docker compose` v5 con logs en streaming) ya no deja el prompt nuevo sin
+  cursor.
+- El PTY de una pestaña restaurada arranca con el tamaño de su instantánea y el
+  primer frame lo ajusta a la ventana. Una pestaña WSL ya no se queda esperando
+  una respuesta de cursor fuera de su vista y muestra el prompt debajo del
+  historial.
+
 ## [0.1.0] — 2026-11-25
 
 Primera release para uso diario en Windows x64.

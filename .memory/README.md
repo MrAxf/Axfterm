@@ -7,7 +7,8 @@ MSI y zip portable validados. M7 Panel de ajustes implementado; pendiente
 validar por UI el conflicto externo, operaciones de perfiles/atajos/agentes y
 persistencia tras reiniciar.
 M6 Teclado y paletas cerrado. `config.toml` v2 declara `[[profiles]]` con id,
-nombre, comando e icono y `[agents.preferred_profiles]`; el descubrimiento local
+nombre, comando, icono y comandos de agente por perfil, además de
+`[agents.preferred_profiles]`; el descubrimiento local
 escribe PowerShell, cmd, Git Bash, Nu y WSL en el primer arranque, la sesión v3
 conserva host y perfil por proyecto y los iconos salen del ejecutable con caché acotada y
 fallback Tabler. Tests, clippy, fmt y release en verde; gate manual con pwsh,

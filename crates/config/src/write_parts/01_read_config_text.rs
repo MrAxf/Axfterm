@@ -289,6 +289,36 @@ fn update_profile_table(table: &mut Table, profile: &Profile) {
             table.remove("icon");
         }
     }
+    update_profile_agent_commands(table, profile);
+}
+
+fn update_profile_agent_commands(table: &mut Table, profile: &Profile) {
+    if profile.agent_commands.is_empty() {
+        table.remove("agent_commands");
+        return;
+    }
+    if table
+        .get("agent_commands")
+        .is_none_or(|item| !item.is_table())
+    {
+        let mut commands = Table::new();
+        commands.set_implicit(false);
+        table.insert("agent_commands", Item::Table(commands));
+    }
+    let Some(commands) = table.get_mut("agent_commands").and_then(Item::as_table_mut) else {
+        return;
+    };
+    let stale: Vec<String> = commands
+        .iter()
+        .map(|(agent, _)| agent.to_owned())
+        .filter(|agent| !profile.agent_commands.contains_key(agent))
+        .collect();
+    for agent in stale {
+        commands.remove(&agent);
+    }
+    for (agent, command) in &profile.agent_commands {
+        set_value(commands, agent, Value::from(command.as_str()));
+    }
 }
 fn set_optional_string(table: &mut Table, key: &str, new: &Option<String>) {
     match new {

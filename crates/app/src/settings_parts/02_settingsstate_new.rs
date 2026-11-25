@@ -129,6 +129,7 @@ impl SettingsState {
         name: String,
         command: String,
         icon: Option<PathBuf>,
+        agent_commands: BTreeMap<String, String>,
     ) -> Result<(), String> {
         let Some(profile) = self
             .draft
@@ -141,6 +142,7 @@ impl SettingsState {
         profile.name = name;
         profile.command = command;
         profile.icon = icon;
+        profile.agent_commands = agent_commands;
         Ok(())
     }
 

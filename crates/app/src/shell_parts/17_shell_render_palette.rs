@@ -83,7 +83,7 @@ impl Shell {
                         .gap(metrics.spacing_sm())
                         .flex_shrink_0()
                         .min_h(metrics.control_height_md())
-                        .px(metrics.palette_row_padding())
+                        .px(metrics.palette_row_padding_x())
                         .py(metrics.palette_row_padding())
                         .rounded(metrics.radius_sm())
                         .when(active, |this| this.bg(ui.selection))
@@ -145,7 +145,15 @@ impl Shell {
                         .children(shortcut),
                 );
             }
-            list.vertical_scrollbar(&scroll).into_any_element()
+            div()
+                .relative()
+                .w_full()
+                .child(list)
+                // Fuera del área desplazable: si colgara del div con
+                // `overflow_y_scroll`, el desplazamiento la arrastraría con el
+                // contenido.
+                .vertical_scrollbar(&scroll)
+                .into_any_element()
         };
         let mode_control = ToggleGroup::new("palette-mode")
             .small()
@@ -303,6 +311,9 @@ impl Shell {
                     shell.close_palette(window, cx);
                 }),
             )
+            // Aísla la terminal de debajo: sin esto, la rueda y el resto de
+            // eventos de ratón seguían llegando al PTY.
+            .occlude()
             .bg(ui.overlay)
             .child(panel)
             .into_any_element()

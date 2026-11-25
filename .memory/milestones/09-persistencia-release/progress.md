@@ -1,5 +1,27 @@
 # Progreso — M9 Persistencia y release
 
+## 2026-11-25 — Release 0.1.1
+
+- Publicada la release 0.1.1 con los cambios posteriores a 0.1.0: comandos de
+  agente por perfil, Shift+Enter, drag & drop de archivos con activación por
+  hover y las correcciones de restauración de historial y de OpenCode 2.
+- `Cargo.toml`, `CHANGELOG.md`, `README.md` y `docs/release.md` alineados a
+  0.1.1; el changelog conserva la 0.1.0 ya publicada y añade la sección nueva.
+
+## 2026-11-25 — Cursor y prompt al restaurar el historial
+
+- Al reproducir una instantánea se fuerza `ESC[?25h` y el desplazamiento al
+  final. Un programa que dejó el cursor oculto (por ejemplo, `docker compose`
+  v5 con logs en streaming) conserva su historial, pero el prompt nuevo se
+  dibuja con cursor visible y la terminal vuelve a ser usable.
+- El PTY y el grid restaurado comparten desde el primer byte el tamaño de la
+  instantánea; el primer frame lo ajusta a la ventana. Corrige las pestañas WSL
+  que se quedaban sin prompt: el shell pedía DSR y recibía una fila fuera de su
+  vista, así que esperaba indefinidamente.
+- Tests en `axf_terminal`: snapshot con `?25l` que se conserva y recupera el
+  cursor al restaurar, y tamaño inicial del PTY derivado de la instantánea.
+- Docs: `docs/session.md`, `docs/troubleshooting.md`, ADR 0008 y CHANGELOG.
+
 ## 2026-11-25 — Cierre de M9: release, robustez y marca
 
 Implementado el bloque que faltaba de M9. Quedan solo gates manuales de matriz

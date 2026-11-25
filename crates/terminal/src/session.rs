@@ -163,7 +163,8 @@ mod tests {
 
         // Fuerza un frame completo tras la salida para leer el grid final.
         // ConPTY puede entregar un frame completo vacío justo después del
-        // cierre; se conserva el frame con más texto no blanco.
+        // cierre; se conserva el frame con más texto no blanco y se espera a
+        // que llegue alguno con contenido antes de rendirse.
         let _ = parser.scroll(0);
         let frame_deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
         let mut final_rows: Vec<String> = rows;
@@ -192,7 +193,11 @@ mod tests {
                     got_full = true;
                 }
             }
-            if got_full {
+            if got_full
+                && final_rows
+                    .iter()
+                    .any(|line| line.chars().any(|character| !character.is_whitespace()))
+            {
                 break;
             }
             std::thread::sleep(std::time::Duration::from_millis(10));

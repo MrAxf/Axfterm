@@ -85,6 +85,11 @@ sesión más reciente.
 
 - `done` y `error` sobreviven a la salida del proceso; `working` y `blocked` se
   cierran con el proceso.
+- OpenCode 2 no envía `done`: al acabar un turno reporta `idle` en el registro
+  raíz y `clear` en el de la sesión. Axfterm interpreta ese paso de `working` a
+  `idle`/`clear` como `Finished` para que el aviso de terminado exista; los
+  `idle`/`clear` posteriores conservan el resultado pendiente hasta el foco.
+  Un nuevo `working` reanuda el ciclo con normalidad.
 - Al enfocar una pestaña, atención, terminado y error pasan a inactivo y se
   retiran las sesiones cuyo proceso ya no existe.
 - Si el proceso desaparece sin reporte final, un `working` se cierra como
@@ -99,7 +104,9 @@ El estado de alertas es runtime-only: no se escribe en `session.json` y no
 sobrevive a un reinicio. Sí se persiste qué agente seguía vivo al cerrar
 (`resume_agent`), de modo que al reabrir la pestaña se descarta cualquier TUI en
 pantalla alternativa (`ALT_SCREEN`) de la instantánea y se lanza automáticamente
-`opencode --continue` o `copilot --continue` para retomar la misma sesión.
+`opencode --continue` o `copilot --continue` para retomar la misma sesión. Si el
+perfil de la pestaña define `[profiles.agent_commands]`, se usa ese comando base
+en lugar del global: por ejemplo, `opencode2 --continue` en Ubuntu (WSL).
 
 ## Sidebar
 
@@ -120,10 +127,11 @@ persiste con la sesión.
 ## Avisos
 
 Al pasar a `done`, `blocked` o `error` se muestra un toast in-app con cola de
-hasta tres avisos, deduplicación y cooldown de 10 s. Si la pestaña ya está
-enfocada no se muestra toast, pero el icono, el chip y el título sí se
-actualizan. El título de la ventana lleva `!` mientras alguna sesión requiera
-atención.
+hasta tres avisos, deduplicación y cooldown de 10 s. En OpenCode, cuyo CLI no
+emite `done`, el paso de `working` a `idle` cuenta como terminado y produce el
+mismo aviso. Si la pestaña ya está enfocada no se muestra toast, pero el icono,
+el chip y el título sí se actualizan. El título de la ventana lleva `!` mientras
+alguna sesión requiera atención.
 
 No hay notificaciones nativas del sistema en v0.1.
 
@@ -143,6 +151,22 @@ notify_attention = true
 opencode = "pwsh"
 copilot = "pwsh"
 ```
+
+Cada perfil puede cambiar el ejecutable del agente dentro de su propio shell:
+
+```toml
+[[profiles]]
+id = "wsl-ubuntu"
+name = "Ubuntu (WSL)"
+command = 'wsl -d "Ubuntu"'
+
+[profiles.agent_commands]
+opencode = "opencode2"
+```
+
+Sin esta tabla se usan `opencode` y `copilot`. La reanudación añade `--continue`
+al comando configurado; el alias se resuelve en el shell interactivo del perfil,
+así que funciona también dentro de WSL.
 
 Se recarga en caliente como el resto de `config.toml`. Un valor fuera de rango
 es un error de campo accionable; no se corrige en silencio. Al desactivar la

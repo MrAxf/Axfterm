@@ -16,13 +16,27 @@ impl Shell {
         };
         let name_value = profile.name.clone();
         let command_value = profile.command.clone();
+        let opencode_value = profile.agent_command("opencode").unwrap_or("").to_owned();
+        let copilot_value = profile.agent_command("copilot").unwrap_or("").to_owned();
         let name = cx.new(|cx| InputState::new(window, cx).default_value(name_value));
         let command = cx.new(|cx| InputState::new(window, cx).default_value(command_value));
+        let opencode_command = cx.new(|cx| {
+            InputState::new(window, cx)
+                .default_value(opencode_value)
+                .placeholder("opencode")
+        });
+        let copilot_command = cx.new(|cx| {
+            InputState::new(window, cx)
+                .default_value(copilot_value)
+                .placeholder("copilot")
+        });
         let handle = name.read(cx).focus_handle(cx);
         self.settings_profile_editor = Some(ProfileEditor {
             mode: ProfileEditorMode::Edit(id),
             name,
             command,
+            opencode_command,
+            copilot_command,
             icon: profile.icon,
             error: None,
         });
@@ -39,11 +53,16 @@ impl Shell {
         let command_value = profile.command.clone();
         let name = cx.new(|cx| InputState::new(window, cx).default_value(name_value));
         let command = cx.new(|cx| InputState::new(window, cx).default_value(command_value));
+        let opencode_command =
+            cx.new(|cx| InputState::new(window, cx).placeholder("opencode"));
+        let copilot_command = cx.new(|cx| InputState::new(window, cx).placeholder("copilot"));
         let handle = name.read(cx).focus_handle(cx);
         self.settings_profile_editor = Some(ProfileEditor {
             mode: ProfileEditorMode::New(profile.id),
             name,
             command,
+            opencode_command,
+            copilot_command,
             icon: None,
             error: None,
         });
@@ -65,6 +84,9 @@ impl Shell {
         let mode = editor.mode.clone();
         let name = editor.name.read(cx).value().trim().to_owned();
         let command = editor.command.read(cx).value().trim().to_owned();
+        let opencode_command = editor.opencode_command.read(cx).value().trim().to_owned();
+        let copilot_command = editor.copilot_command.read(cx).value().trim().to_owned();
+        let icon = editor.icon.clone();
         if name.is_empty() {
             if let Some(editor) = &mut self.settings_profile_editor {
                 editor.error = Some("El nombre no puede estar vacío.".into());
@@ -88,7 +110,23 @@ impl Shell {
             cx.notify();
             return;
         }
-        let icon = editor.icon.clone();
+        let mut agent_commands = BTreeMap::new();
+        for (agent, label, value) in [
+            ("opencode", "OpenCode", opencode_command),
+            ("copilot", "Copilot", copilot_command),
+        ] {
+            if value.is_empty() {
+                continue;
+            }
+            if let Err(error) = axf_config::tokenize(&value) {
+                if let Some(editor) = &mut self.settings_profile_editor {
+                    editor.error = Some(format!("Comando de {label} inválido: {error}"));
+                }
+                cx.notify();
+                return;
+            }
+            agent_commands.insert(agent.to_owned(), value);
+        }
         let Some(settings) = self.settings.as_mut() else {
             return;
         };
@@ -96,9 +134,12 @@ impl Shell {
             ProfileEditorMode::New(id) => {
                 let mut profile = Profile::new(id.clone(), name, command);
                 profile.icon = icon;
+                profile.agent_commands = agent_commands;
                 settings.insert_profile(profile)
             }
-            ProfileEditorMode::Edit(id) => settings.update_profile(id, name, command, icon),
+            ProfileEditorMode::Edit(id) => {
+                settings.update_profile(id, name, command, icon, agent_commands)
+            }
         };
         if let Err(error) = result {
             settings.set_notice(error, true);

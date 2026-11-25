@@ -193,17 +193,30 @@ impl Shell {
             .child(header)
             .child(
                 div()
-                    .id("settings-content")
+                    .relative()
                     .flex_1()
                     .min_w_0()
                     .min_h_0()
-                    .overflow_x_hidden()
-                    .overflow_y_scroll()
-                    .track_scroll(&scroll)
-                    .vertical_scrollbar(&scroll)
-                    .px(metrics.spacing_lg())
-                    .pb(metrics.spacing_sm())
-                    .child(div().w(body_width).max_w(body_width).min_w_0().child(body)),
+                    .child(
+                        div()
+                            .id("settings-content")
+                            .size_full()
+                            .overflow_x_hidden()
+                            .overflow_y_scroll()
+                            .track_scroll(&scroll)
+                            .px(metrics.spacing_lg())
+                            .pb(metrics.spacing_sm())
+                            .child(
+                                div()
+                                    .w(body_width)
+                                    .max_w(body_width)
+                                    .min_w_0()
+                                    .child(body),
+                            ),
+                    )
+                    // La barra vive fuera del área desplazable: colgada del
+                    // div con `overflow_y_scroll` subía con el contenido.
+                    .vertical_scrollbar(&scroll),
             )
             .child(footer);
         let card_body = div()

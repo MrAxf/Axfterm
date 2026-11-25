@@ -94,7 +94,7 @@ PaneTree    = Split { axis, ratio, first, second } | Leaf(PaneId)
 Pane        { tabs: Vec<TabId>, active: Option<TabId> }
 Tab         { project_id, terminal_id, profile_id, title,
               agents: Vec<AgentSession> }
-Profile     { id, name, command, icon }
+Profile     { id, name, command, icon, agent_commands }
 Focus       { pane: PaneId, tab: Option<TabId> }
 ```
 
@@ -176,6 +176,10 @@ Focus       { pane: PaneId, tab: Option<TabId> }
   segundo plano) y escritura atómica una sola vez. Después manda el archivo.
 - Un perfil inexistente o un ejecutable que no arranca es un error visible en
   la pestaña, nunca un fallback silencioso a otro shell.
+- `[profiles.agent_commands]` permite sobrescribir el comando base de un agente
+  en ese perfil (`opencode = "opencode2"` en WSL), validado como una línea de
+  ejecutable + argumentos. Sin override se usan `opencode` y `copilot`; la
+  reanudación añade `--continue`.
 - La pestaña conserva su `profile_id` al moverse, duplicarse y restaurarse; el
   título inicial es el nombre del perfil.
 

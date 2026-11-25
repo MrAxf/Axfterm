@@ -60,6 +60,8 @@ impl Shell {
             last_focused_pane: None,
             tab_drop: None,
             tab_insert: None,
+            file_drag_hover: FileDragHoverState::default(),
+            sidebar_list_bounds: Rc::new(RefCell::new(None)),
             zoomed: None,
             sidebar_cursor: None,
             sidebar_section,

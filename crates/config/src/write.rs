@@ -133,6 +133,38 @@ command = "cmd /Q"
     }
 
     #[test]
+    fn profile_agent_commands_round_trip_and_remove_cleanly() {
+        let (dir, base) = prepare("agent-commands");
+        let path = dir.join("config.toml");
+        let mut draft = base.clone();
+        draft.profiles[0]
+            .agent_commands
+            .insert("opencode".into(), "opencode2".into());
+        draft.profiles.push(Profile::new("b", "B", "pwsh -NoLogo"));
+        let text = write_config(&path, &base, &draft).expect("escribe");
+        assert!(text.contains("[profiles.agent_commands]"));
+        assert!(text.contains("opencode = \"opencode2\""));
+        assert!(text.contains("# perfil base"));
+        assert!(
+            text.find("agent_commands").expect("tabla de agentes")
+                < text.find("id = \"b\"").expect("perfil b"),
+            "la tabla anidada no rompe el orden de los perfiles"
+        );
+        let reparsed = parse_str(&text, "releído").expect("válido");
+        assert_eq!(reparsed.profiles, draft.profiles);
+
+        let mut cleared = reparsed.clone();
+        cleared.profiles[0].agent_commands.clear();
+        let text = write_config(&path, &reparsed, &cleared).expect("escribe sin overrides");
+        assert!(!text.contains("agent_commands"));
+        assert_eq!(
+            parse_str(&text, "releído").expect("válido").profiles,
+            cleared.profiles
+        );
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
     fn keymap_diff_adds_and_removes_entries_without_touching_comments() {
         let (dir, base) = prepare("keymap");
         let path = dir.join("config.toml");

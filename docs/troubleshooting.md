@@ -37,6 +37,28 @@ carpetas.
 - El historial persistido tiene un tope de 2 MiB; si aparece «restaurado
   parcialmente», se conservaron las líneas más recientes.
 
+## La terminal se queda sin cursor tras usar `docker compose`
+
+Docker Compose v5 oculta el cursor mientras pinta la salida no-plain (por
+ejemplo, los logs de `docker compose up` en streaming) y algunas versiones no
+lo reponen al terminar. La sesión viva puede quedar sin prompt ni cursor
+visibles; `Ctrl+C` devuelve el control al shell, y `tput cnorm` (o `reset`)
+restaura el cursor sin reiniciar Axfterm.
+
+Al cerrar y reabrir, Axfterm conserva el historial de esa pestaña y fuerza el
+cursor visible al final: el estado del programa no se hereda.
+
+## Una pestaña WSL restaurada no muestra el prompt
+
+En builds anteriores, si la instantánea tenía más filas que la ventana, el PTY
+arrancaba en 80x24 mientras el grid restaurado era mayor. El shell de WSL pide
+la posición del cursor (DSR) y recibía una fila fuera de su vista; se quedaba
+esperando y la pestaña mostraba solo el log, sin prompt ni cursor.
+
+Ahora el PTY arranca con el tamaño de la instantánea y el primer frame lo ajusta
+a la ventana, así que el prompt aparece debajo del historial. Si sigues viendo
+una pestaña restaurada sin prompt, comprueba que ejecutas la build nueva.
+
 ## La terminal no aparece o el perfil falla
 
 - Un perfil inexistente o un ejecutable que no está en `PATH` es un error

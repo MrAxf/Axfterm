@@ -190,7 +190,7 @@ impl Shell {
                 .gap(metrics.spacing_xs())
                 .w(card_width)
                 .min_w_0()
-                .p(metrics.spacing_sm())
+                .p(metrics.spacing_md())
                 .rounded(metrics.radius_md())
                 .border_1()
                 .border_color(if focused {

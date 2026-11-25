@@ -2,10 +2,12 @@
 
 ## Esquema y validación
 
-- [x] `ProfileId` tipado y estable; `Profile { id, name, command, icon }`
+- [x] `ProfileId` tipado y estable; `Profile { id, name, command, icon, agent_commands }`
 - [x] `[[profiles]]` en la raíz y `[terminal] default_profile`
 - [x] Validación: id único y no vacío, nombre y comando no vacíos, `icon`
       opcional, `default_profile` existe, límites de ADR 0005
+- [x] `[profiles.agent_commands]` opcional (`opencode`, `copilot`), validado con
+      el tokenizer; el panel lo edita y la reanudación usa el comando del perfil
 - [x] Tokenizer de `command` → ejecutable + argv con comillas dobles/simples y
       barras invertidas literales (rutas Windows); sin expansión de shell ni
       operadores

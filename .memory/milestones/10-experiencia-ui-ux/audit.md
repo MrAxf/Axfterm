@@ -44,3 +44,12 @@
 | Media | `app.settings.appearance` | El catálogo de temas ocupaba todo el alto y ocultaba la tipografía y las métricas. | La configuración visual requería scroll. | Compactar las tarjetas de tema y usar sliders para tamaños y escala. |
 | Baja | Modal de ajustes | La cabecera mostraba `config.toml · esquema v2` y el pie alineaba las acciones a la izquierda. | Ruido técnico y jerarquía difusa. | Quitar el texto de esquema y alinear estado a la izquierda y acciones a la derecha. |
 
+## Iteración 2026-11-25 — eventos de ratón y scroll
+
+| Prioridad | Escena / estado | Problema observado | Impacto / frecuencia | Decisión |
+| --- | --- | --- | --- | --- |
+| Alta | `app.palette.*`, `app.settings.*` | La barra de scroll colgaba del div desplazable y subía con el contenido. | La barra desaparecía del borde y no se podía arrastrar con contenido largo. | Moverla a un wrapper relativo fuera del área de scroll. |
+| Alta | Paleta, ajustes, atajos y modales | La terminal de debajo recibía rueda, movimiento, pulsación y suelta porque el overlay no occluía el hit-test. | Con mouse tracking activo, la terminal reaccionaba a interacciones de la capa superior. | `occlude()` en la raíz de la paleta y en el velo de `Modal`. |
+| Media | `app.palette.commands`, `app.palette.search` | Las filas quedaban justas de padding horizontal (≈7 px) y el carril de la scrollbar pisaba el contenido. | Lectura menos cómoda de la lista de opciones. | `palette_row_padding_x()` = `spacing_md`, sin cambiar la altura vertical de la fila. |
+| Media | `app.settings.appearance` | Las tarjetas de ajustes usaban 7 px de padding interior y la muestra de tipografía llegaba al borde o se recortaba en columnas estrechas. | Contenido pegado al borde en todas las secciones de ajustes. | Padding `spacing_md` en las tarjetas y muestra monoespaciada limitada al ancho, con envoltura. |
+

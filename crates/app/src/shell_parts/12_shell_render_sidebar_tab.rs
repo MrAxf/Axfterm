@@ -269,6 +269,16 @@ impl Shell {
         }
         let has_agent = aggregate.is_some();
         let row = row
+            .on_drag_move::<axf_ui::gpui::ExternalPaths>(cx.listener(
+                move |shell,
+                      event: &axf_ui::gpui::DragMoveEvent<axf_ui::gpui::ExternalPaths>,
+                      window,
+                      cx| {
+                    let over = !shell.file_drag_blocked()
+                        && file_drag_over(event.bounds, event.event.position, shell.sidebar_viewport());
+                    shell.observe_file_drag(FileDragHover::SidebarTab(tab), over, window, cx);
+                },
+            ))
             .on_click(cx.listener(move |shell, _, window, cx| {
                 shell.activate_sidebar_tab(tab, window, cx);
             }))

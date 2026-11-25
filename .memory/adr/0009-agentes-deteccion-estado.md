@@ -57,6 +57,10 @@ atribuir el agente a la pestaña, elegir su icono y cubrir versiones antiguas.
 - OSC 9/777/1337, BEL, la actividad de salida, la quiescencia y el código de
   salida son señales de fallback. Un proceso que termina sin reporte final se
   cierra como `Finished` si salió bien o `Error` si falló.
+- OpenCode 2 no emite `done`: al terminar un turno pasa de `working` a `idle`
+  (registro raíz) o `clear` (registro de sesión). Axfterm trata ese paso como
+  `Finished` para que el aviso de terminado sea observable; el resto de agentes
+  conserva la semántica estricta de `done`.
 
 ### Modelo de sesiones
 

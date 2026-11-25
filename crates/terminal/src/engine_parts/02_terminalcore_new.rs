@@ -36,11 +36,18 @@ impl TerminalCore {
         let mut parser = Processor::new();
         let term = match restore {
             Some(restore) if !restore.is_empty() && restore.cols() > 0 && restore.rows() > 0 => {
-                let saved = GridSize::new(usize::from(restore.cols()), usize::from(restore.rows()));
-                let mut term = Term::new(config, &saved, listener);
+                // El grid se crea con el tamaño inicial del PTY, que en una
+                // restauración es el de la instantánea: PTY y motor comparten
+                // dimensiones desde el primer byte. El cuadro inicial refluye
+                // el historial al hueco real de la ventana.
+                let mut term = Term::new(config, &initial, listener);
                 // Se reproduce antes de leer el PTY: el historial queda debajo
                 // de la salida del shell nuevo.
                 parser.advance(&mut term, restore.body());
+                // El formato no guarda modos. Un programa que ocultó el cursor
+                // (docker compose v5) no debe dejar la terminal sin él al
+                // reabrir; el prompt nuevo se dibuja con el cursor visible.
+                parser.advance(&mut term, b"\x1b[?25h");
                 term.scroll_display(Scroll::Bottom);
                 term
             }

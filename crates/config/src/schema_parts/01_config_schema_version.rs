@@ -57,7 +57,7 @@ sources = []
 # "ctrl-shift-c" = "terminal.copy"
 
 [agents]
-# Detección local de agentes (opencode y Copilot) por OSC 7501 y procesos.
+# Detección local de agentes (OpenCode y Copilot) por OSC 7501 y procesos.
 enabled = true
 # Intervalo del escaneo de procesos en milisegundos (1000–2000).
 scan_interval_ms = 1500

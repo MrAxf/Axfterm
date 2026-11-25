@@ -1,6 +1,6 @@
 use crate::keymap::Keymap;
 use axf_config::{Appearance, Config, ConfigError, Profile, ProfileId};
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::path::PathBuf;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum SettingsSection {
@@ -34,7 +34,7 @@ impl SettingsSection {
             Self::Appearance => "Tema, tipografía y escala de la aplicación y la terminal.",
             Self::Profiles => "Qué programas se pueden abrir como terminal.",
             Self::Shortcuts => "Atajos de la aplicación y conflictos con la terminal.",
-            Self::Agents => "Detección local de opencode y Copilot.",
+            Self::Agents => "Detección local de OpenCode y Copilot.",
         }
     }
 

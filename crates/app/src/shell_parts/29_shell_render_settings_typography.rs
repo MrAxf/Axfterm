@@ -143,23 +143,34 @@ impl Shell {
             .flex()
             .flex_col()
             .gap(metrics.hairline())
-            .p(metrics.spacing_sm())
+            .w_full()
+            .min_w_0()
+            .overflow_hidden()
+            .p(metrics.spacing_md())
             .rounded(metrics.radius_sm())
             .border_1()
             .border_color(ui.border)
             .bg(ui.surface_raised)
             .child(
                 div()
+                    .w_full()
+                    .min_w_0()
                     .font_family(mono.clone())
                     .text_size(mono_size)
                     .text_color(ui.text)
-                    .child("C:\\proyectos\\axfterm ❯ axfterm --help"),
+                    .whitespace_normal()
+                    // La muestra se adapta al ancho de la tarjeta: si no cabe,
+                    // envuelve en vez de tocar el borde o quedar recortada.
+                    .child("❯ axfterm --help"),
             )
             .child(
                 div()
+                    .w_full()
+                    .min_w_0()
                     .font_family(mono)
                     .text_size(mono_size)
                     .text_color(ui.muted)
+                    .whitespace_normal()
                     .child("0123456789 · []{}()<> · áéíóú · ñ"),
             );
 
@@ -180,7 +191,7 @@ impl Shell {
                     .flex()
                     .flex_col()
                     .gap(metrics.spacing_xs())
-                    .p(metrics.spacing_sm())
+                    .p(metrics.spacing_md())
                     .rounded(metrics.radius_md())
                     .border_1()
                     .border_color(ui.border)
@@ -200,7 +211,7 @@ impl Shell {
                     .flex()
                     .flex_col()
                     .gap(metrics.spacing_xs())
-                    .p(metrics.spacing_sm())
+                    .p(metrics.spacing_md())
                     .rounded(metrics.radius_md())
                     .border_1()
                     .border_color(ui.border)

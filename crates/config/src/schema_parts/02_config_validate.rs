@@ -167,6 +167,36 @@ impl Config {
                     message: other.to_string(),
                 },
             })?;
+            for (agent, command) in &profile.agent_commands {
+                let field = format!("{prefix}.agent_commands.{agent}");
+                if !AGENT_PROFILE_KEYS.contains(&agent.as_str()) {
+                    return Err(ConfigError::Field {
+                        field,
+                        message: format!(
+                            "agente desconocido; usa {}",
+                            AGENT_PROFILE_KEYS.join(" o ")
+                        ),
+                    });
+                }
+                if command.trim().is_empty() {
+                    return Err(ConfigError::Field {
+                        field,
+                        message: "no puede estar vacío".into(),
+                    });
+                }
+                if command.chars().count() > MAX_PROFILE_COMMAND_CHARS {
+                    return Err(ConfigError::Field {
+                        field,
+                        message: format!(
+                            "admite como máximo {MAX_PROFILE_COMMAND_CHARS} caracteres"
+                        ),
+                    });
+                }
+                profiles::tokenize(command).map_err(|error| ConfigError::Field {
+                    field,
+                    message: error.to_string(),
+                })?;
+            }
         }
         if !self
             .profiles

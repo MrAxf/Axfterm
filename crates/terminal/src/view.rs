@@ -9,4 +9,5 @@ include!("view_parts/02_terminalview_new.rs");
 include!("view_parts/03_terminalview_mouse_cell.rs");
 include!("view_parts/04_std_fmt_debug_for_terminalview_fmt.rs");
 include!("view_parts/05_element_for_terminalelement_id.rs");
+include!("view_parts/07_terminalview_drop.rs");
 include!("view_parts/06_paint_row_background.rs");

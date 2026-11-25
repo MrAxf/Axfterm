@@ -12,6 +12,10 @@
       conserva el de la no visitada; un `.snap` corrupto cae a terminal nueva
 - [x] Gate manual: dos paneles visibles arrancan una terminal cada uno y
       restauran su historial
+- [x] Forzar cursor visible y desplazamiento al final al restaurar; cubre
+      programas que ocultaron el cursor (docker compose v5)
+- [x] Arrancar el PTY con el tamaño de la instantánea y ajustarlo al primer
+      frame; evita que WSL se quede sin prompt tras restaurar
 
 ## Robustez
 

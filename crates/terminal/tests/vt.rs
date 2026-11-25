@@ -407,6 +407,39 @@ fn snapshot_discards_alt_screen_tui_and_restores_main_screen() {
 }
 
 #[test]
+fn restoring_keeps_the_history_and_recovers_the_cursor() {
+    let mut engine = EngineBench::new(30, 4, 8, 16);
+    engine.advance(b"Attaching to el-rosal-dev\r\n");
+    // `docker compose up` oculta el cursor mientras transmite logs y no lo
+    // repone al cerrar la sesión.
+    engine.advance(b"\x1b[?25l");
+    let snapshot = engine.snapshot();
+    assert!(!snapshot.is_empty(), "el historial se conserva");
+
+    let decoded = TerminalSnapshot::decode(&snapshot.encode()).expect("decodifica");
+    let mut restored = EngineBench::from_snapshot(decoded, 30, 4, 8, 16);
+    let frame = restored.frame();
+    assert!(frame.mode.show_cursor, "el cursor debe recuperarse");
+    assert_eq!(frame.display_offset, 0, "se reabre al final del historial");
+    let visible: String = (0..frame.rows)
+        .map(|row| row_text(&frame, row))
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(visible.contains("el-rosal-dev"), "visible: {visible:?}");
+    assert!(
+        frame.cursor.is_some(),
+        "el historial restaurado debe mostrar el cursor"
+    );
+
+    restored.advance(b"$ ");
+    let frame = restored.frame();
+    assert!(
+        frame.cursor.is_some(),
+        "el prompt nuevo debe conservar el cursor"
+    );
+}
+
+#[test]
 fn corrupt_snapshots_are_rejected() {
     let mut engine = EngineBench::new(20, 4, 8, 16);
     engine.advance(b"hola");

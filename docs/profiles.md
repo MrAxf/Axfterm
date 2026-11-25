@@ -29,6 +29,23 @@ command = 'wsl -d "Ubuntu"'
   caracteres.
 - `command`: una línea con ejecutable y argumentos. Máximo 1024 caracteres.
 - `icon`: opcional. Ruta relativa al directorio de config o absoluta.
+- `agent_commands`: opcional. Fija el comando base de un agente dentro de este
+  perfil, para hosts donde el ejecutable cambia de nombre:
+
+  ```toml
+  [[profiles]]
+  id = "wsl-ubuntu"
+  name = "Ubuntu (WSL)"
+  command = 'wsl -d "Ubuntu"'
+
+  [profiles.agent_commands]
+  opencode = "opencode2"
+  ```
+
+  Las claves válidas son `opencode` y `copilot`. Si falta una, se usa el comando
+  global del agente (`opencode`/`copilot`). El valor se valida con el mismo
+  tokenizer y se escribe en el shell del perfil, así que respeta sus alias y
+  funciones. La reanudación automática conserva su flag: `opencode2 --continue`.
 - `default_profile` debe existir en `[[profiles]]`. Un id repetido, vacío, un
   `name`/`command` vacío o un `default_profile` inexistente es un error de
   campo; no se corrige en silencio.
@@ -40,9 +57,10 @@ perfiles" no es válido: si el archivo queda sin perfiles, la app vuelve a
 detectar terminales y escribe el resultado una sola vez.
 
 El panel de ajustes (`Ctrl+Alt+T`, sección Perfiles) permite alta, edición,
-duplicado, orden, icono y borrado protegido, además de «Detectar terminales» con
-vista previa y fusión sin duplicados. El `id` no cambia al renombrar y el perfil
-en uso por una pestaña conserva su configuración. Ver `docs/settings.md`.
+duplicado, orden, icono, comandos de agente y borrado protegido, además de
+«Detectar terminales» con vista previa y fusión sin duplicados. El `id` no cambia
+al renombrar y el perfil en uso por una pestaña conserva su configuración. Ver
+`docs/settings.md`.
 
 ## Perfil del proyecto y WSL
 

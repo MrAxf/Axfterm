@@ -7,7 +7,7 @@
 </p>
 
 Axfterm reúne las terminales de cada proyecto en una barra lateral, con paneles
-y pestañas en el área central, y muestra los agentes de IA (opencode y GitHub
+y pestañas en el área central, y muestra los agentes de IA (OpenCode y GitHub
 Copilot) con su estado en la misma vista.
 
 - **Windows primero**: ConPTY, grupos de procesos y apertura desde Explorer.
@@ -26,10 +26,10 @@ Copilot) con su estado en la misma vista.
 
 Requisitos: Windows 10 1809 o superior / Windows 11, x64.
 
-- **MSI**: `Axfterm-0.1.0-win-x64.msi` instala por usuario en
+- **MSI**: `Axfterm-0.1.1-win-x64.msi` instala por usuario en
   `%LOCALAPPDATA%\Programs\Axfterm`, con acceso directo en el menú Inicio,
   `App Paths` y «Abrir con Axfterm» en carpetas.
-- **Zip portable**: descomprime `Axfterm-0.1.0-win-x64.zip` y ejecuta
+- **Zip portable**: descomprime `Axfterm-0.1.1-win-x64.zip` y ejecuta
   `axfterm.exe`. No requiere instalación.
 
 También puedes lanzar una carpeta desde la terminal:

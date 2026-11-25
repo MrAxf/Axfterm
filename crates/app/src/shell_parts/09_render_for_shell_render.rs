@@ -25,10 +25,13 @@ impl Render for Shell {
         }
 
         // Un drag cancelado o soltado fuera de un destino no debe dejar el
-        // resaltado de drop pegado en pantalla.
-        if !cx.has_active_drag() && (self.tab_drop.is_some() || self.tab_insert.is_some()) {
-            self.tab_drop = None;
-            self.tab_insert = None;
+        // resaltado de drop pegado en pantalla ni un cambio de pestaña armado.
+        if !cx.has_active_drag() {
+            if self.tab_drop.is_some() || self.tab_insert.is_some() {
+                self.tab_drop = None;
+                self.tab_insert = None;
+            }
+            self.file_drag_hover.clear();
         }
 
         // Los paneles cerrados no deben dejar límites fantasma para el drag.
@@ -162,6 +165,7 @@ impl Render for Shell {
             .on_action(cx.listener(Self::toggle_shortcuts))
             .on_drop::<axf_ui::gpui::ExternalPaths>(cx.listener(
                 |shell, paths: &axf_ui::gpui::ExternalPaths, window, cx| {
+                    shell.file_drag_hover.clear();
                     for path in &paths.0 {
                         if path.is_dir() {
                             shell.open_project_path(path.clone(), window, cx);

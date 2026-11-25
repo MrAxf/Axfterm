@@ -93,3 +93,71 @@ fn context_path_hides_the_root_and_compacts_parents() {
         Some(format!("…{separator}lugar"))
     );
 }
+#[test]
+fn file_drag_hover_rearms_only_when_the_target_changes() {
+    let mut state = FileDragHoverState::default();
+    let tab = FileDragHover::Tab(TabId::new(1));
+    let other = FileDragHover::Tab(TabId::new(2));
+    let seq = state.observe(tab, true).expect("arma el temporizador");
+    assert!(state.is_current(tab, seq));
+    // Moverse dentro del mismo objetivo no reinicia la espera.
+    assert_eq!(state.observe(tab, true), None);
+    assert!(state.is_current(tab, seq));
+    // Otro objetivo cancela el anterior por secuencia.
+    let next = state.observe(other, true).expect("arma el nuevo objetivo");
+    assert!(!state.is_current(tab, seq));
+    assert!(state.is_current(other, next));
+    // Salir de un objetivo que no está armado no afecta al vigente.
+    assert_eq!(state.observe(tab, false), None);
+    assert!(state.is_current(other, next));
+    // Salir del objetivo vigente lo desarma.
+    assert_eq!(state.observe(other, false), None);
+    assert!(!state.is_current(other, next));
+}
+#[test]
+fn clearing_file_drag_hover_invalidates_pending_timers() {
+    let mut state = FileDragHoverState::default();
+    let tab = FileDragHover::Tab(TabId::new(7));
+    let seq = state.observe(tab, true).expect("arma el temporizador");
+    state.clear();
+    assert!(!state.is_current(tab, seq));
+    let next = state.observe(tab, true).expect("vuelve a armar");
+    assert_ne!(next, seq);
+}
+#[test]
+fn file_drag_rows_outside_the_viewport_do_not_count() {
+    let row = Bounds::new(point(px(20.0), px(120.0)), size(px(200.0), px(32.0)));
+    let viewport = Bounds::new(point(px(0.0), px(100.0)), size(px(240.0), px(200.0)));
+    assert!(file_drag_over(
+        row,
+        point(px(30.0), px(130.0)),
+        Some(viewport)
+    ));
+    // La fila existe por encima del viewport, pero está oculta por el scroll.
+    assert!(!file_drag_over(
+        row,
+        point(px(30.0), px(90.0)),
+        Some(viewport)
+    ));
+    // Sin viewport medido todavía mandan solo los bounds de la fila.
+    assert!(file_drag_over(row, point(px(30.0), px(130.0)), None));
+}
+#[test]
+fn resume_command_uses_the_profile_override_and_keeps_continue() {
+    assert_eq!(
+        agent_resume_command(Some("opencode2"), AgentKind::OpenCode),
+        "opencode2 --continue"
+    );
+    assert_eq!(
+        agent_resume_command(Some("  bun x opencode  "), AgentKind::OpenCode),
+        "bun x opencode --continue"
+    );
+    assert_eq!(
+        agent_resume_command(None, AgentKind::OpenCode),
+        "opencode --continue"
+    );
+    assert_eq!(
+        agent_resume_command(None, AgentKind::Copilot),
+        "copilot --continue"
+    );
+}

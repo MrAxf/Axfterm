@@ -203,6 +203,23 @@ mod tests {
     }
 
     #[test]
+    fn duplicating_a_profile_copies_its_agent_commands() {
+        let mut state = state();
+        state.draft.profiles[0]
+            .agent_commands
+            .insert("opencode".into(), "opencode2".into());
+        let copy = state
+            .duplicate_profile(&ProfileId::new("a"))
+            .expect("duplica");
+        let duplicated = state
+            .profiles()
+            .iter()
+            .find(|profile| profile.id == copy)
+            .expect("copia presente");
+        assert_eq!(duplicated.agent_command("opencode"), Some("opencode2"));
+    }
+
+    #[test]
     fn last_profile_cannot_be_deleted() {
         let mut state = state();
         state.draft.profiles.truncate(1);
@@ -412,6 +429,9 @@ mod tests {
                 "Shell de prueba".into(),
                 "cmd /Q".into(),
                 None,
+                [("opencode".to_owned(), "opencode2".to_owned())]
+                    .into_iter()
+                    .collect(),
             )
             .expect("actualiza perfil");
         state
@@ -447,6 +467,10 @@ mod tests {
             Some("Cascadia Mono")
         );
         assert_eq!(reloaded.profiles[0].name, "Shell de prueba");
+        assert_eq!(
+            reloaded.profiles[0].agent_command("opencode"),
+            Some("opencode2")
+        );
         assert_eq!(reloaded.terminal.default_profile, ProfileId::new("b"));
         assert_eq!(reloaded.fonts.sources, vec![PathBuf::from("fonts")]);
         assert_eq!(reloaded.agents.scan_interval_ms, 1800);

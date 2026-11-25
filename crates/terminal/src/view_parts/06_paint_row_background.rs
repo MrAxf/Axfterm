@@ -387,6 +387,17 @@ mod tests {
     use super::*;
 
     #[test]
+    fn restore_starts_with_the_snapshot_size() {
+        let mut engine = crate::EngineBench::new(20, 5, 8, 16);
+        engine.advance(b"hola");
+        let snapshot = engine.snapshot();
+        let restored = initial_grid(Some(&snapshot));
+        assert_eq!((restored.columns, restored.screen_lines), (20, 5));
+        let fresh = initial_grid(None);
+        assert_eq!((fresh.columns, fresh.screen_lines), (80, 24));
+    }
+
+    #[test]
     fn wheel_direction_matches_the_physical_wheel() {
         assert_eq!(wheel_action(0.0, -1.0), MouseAction::WheelDown);
         assert_eq!(wheel_action(0.0, 1.0), MouseAction::WheelUp);

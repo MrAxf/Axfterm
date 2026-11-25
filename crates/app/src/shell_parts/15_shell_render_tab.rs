@@ -117,6 +117,17 @@ impl Shell {
                     cx.new(|_| DragGhost::tab(drag.title.clone(), drag.icon.clone(), drag.status))
                 },
             )
+            .on_drag_move::<axf_ui::gpui::ExternalPaths>(cx.listener(
+                move |shell,
+                      event: &axf_ui::gpui::DragMoveEvent<axf_ui::gpui::ExternalPaths>,
+                      window,
+                      cx| {
+                    let viewport = shell.pane_scroll.get(&pane_id).map(|scroll| scroll.bounds());
+                    let over = !shell.file_drag_blocked()
+                        && file_drag_over(event.bounds, event.event.position, viewport);
+                    shell.observe_file_drag(FileDragHover::Tab(tab), over, window, cx);
+                },
+            ))
             .on_drop::<TabDrag>(cx.listener(move |shell, drag: &TabDrag, window, cx| {
                 // El indicador de inserción manda: así el drop coincide con la
                 // barra que el usuario ve, incluso dentro del mismo chip.

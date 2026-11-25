@@ -1,5 +1,25 @@
 # Progreso — M10 Rediseño de experiencia UI/UX
 
+## 2026-11-25 — Correcciones de uso con agentes
+
+- La etiqueta visible de `AgentKind::OpenCode` pasa a «OpenCode»; también los
+  textos de sidebar, ajustes, plantilla de config y README. Las claves estables
+  (`opencode`, `app=opencode`, `[agents.preferred_profiles]`) no cambian.
+- Shift+Enter envía LF (`Ctrl+J`) para insertar nueva línea en OpenCode y otras
+  TUIs sin someter el prompt; Enter sigue enviando CR.
+- Arrastrar archivos sobre una terminal inserta las rutas citadas para el shell
+  del perfil (Windows, Git Bash o WSL con `/mnt/<unidad>`), sin ejecutarlas y
+  sin convertirse en un clic dentro de la TUI.
+- Al arrastrar archivos, mantener el cursor 500 ms sobre una pestaña o una fila
+  de la sidebar activa esa terminal; los proyectos plegados se expanden. Cada
+  handler comprueba sus bounds y el viewport visible, y los temporizadores
+  viejos se invalidan por secuencia.
+- OpenCode 2 no emite `done`: el paso de `working` a `idle`/`clear` se interpreta
+  como `Finished` para que aparezcan el toast, el chip y la marca del título.
+  Un `idle`/`clear` posterior conserva el aviso pendiente hasta enfocar.
+- Tests nuevos en `axf_agents` y `axf_terminal`; `check.ps1` y build release en
+  verde.
+
 ## 2026-11-24 — Milestone creado y baseline visual
 
 - Se reprodujeron y revisaron las 34 escenas de `studio/scenes/`; las capturas
@@ -57,3 +77,23 @@
   esquema y alinea las acciones a la derecha.
 - Escenas actualizadas: se retiran terminal/fuentes/avanzado y se añaden
   `app.settings.profiles.editor` y `app.settings.shortcuts.capture`.
+
+## 2026-11-25 — Scroll, overlays y padding de la paleta
+
+- Las scrollbars de la paleta y de Ajustes vivían dentro del div con
+  `overflow_y_scroll`, así que el offset las arrastraba con el contenido. Ahora
+  cuelgan de un wrapper relativo, igual que en `overflow_y_scrollbar` de
+  gpui-kit, y la lista conserva `track_scroll` para la navegación por teclado.
+- La raíz de la paleta y el velo de `Modal` llaman a `occlude()`. Antes la
+  terminal seguía en el hit-test y recibía rueda, movimiento (mouse reporting),
+  pulsación y suelta a través de paleta, ajustes, atajos y diálogos.
+- Las filas de la paleta usan `palette_row_padding_x()` (`spacing_md`): más aire
+  horizontal y sin que el carril de la scrollbar pise el texto.
+- Las tarjetas de ajustes (temas, tipografía, perfiles, atajos y agentes) pasan
+  de `spacing_sm` a `spacing_md` de padding interior. La muestra monoespaciada de
+  tipografía se limita al ancho de la tarjeta y envuelve en vez de tocar el borde
+  o quedar recortada.
+- Verificado con `scripts/check.ps1`, `cargo-low.ps1 build --release`,
+  `test-cargo-low.ps1` y clippy con `--features studio`. Gate manual pendiente:
+  reiniciar la app (la instancia en curso ocupa el mutex de Studio) y probar
+  rueda/arrastre de scrollbar/velo en paleta y ajustes con mouse tracking activo.

@@ -31,6 +31,8 @@ impl Shell {
         let metrics = state.metrics;
         let name_input = editor.name.clone();
         let command_input = editor.command.clone();
+        let opencode_input = editor.opencode_command.clone();
+        let copilot_input = editor.copilot_command.clone();
         let icon = editor.icon.clone();
         let error = editor.error.clone();
         let title = match &editor.mode {
@@ -142,6 +144,61 @@ impl Shell {
                             .aria_label("Comando"),
                     ),
             )
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(metrics.spacing_xxs())
+                    .child(
+                        div()
+                            .text_size(metrics.font_size * 0.6875)
+                            .text_color(ui.muted)
+                            .child("Comandos de agente (opcional)"),
+                    )
+                    .child(
+                        div()
+                            .text_size(metrics.font_size * 0.625)
+                            .text_color(ui.muted)
+                            .child(
+                                "Vacío usa el comando global del agente. La reanudación \
+                                 añade --continue.",
+                            ),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap(metrics.hairline())
+                            .child(
+                                div()
+                                    .text_size(metrics.font_size * 0.625)
+                                    .text_color(ui.muted)
+                                    .child("OpenCode"),
+                            )
+                            .child(
+                                TextField::new(opencode_input)
+                                    .size(ControlSize::Md)
+                                    .aria_label("Comando de OpenCode"),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap(metrics.hairline())
+                            .child(
+                                div()
+                                    .text_size(metrics.font_size * 0.625)
+                                    .text_color(ui.muted)
+                                    .child("Copilot"),
+                            )
+                            .child(
+                                TextField::new(copilot_input)
+                                    .size(ControlSize::Md)
+                                    .aria_label("Comando de Copilot"),
+                            ),
+                    ),
+            )
             .when_some(error, |this, error| {
                 this.child(
                     div()
@@ -233,7 +290,7 @@ impl Shell {
                     .items_center()
                     .justify_between()
                     .gap(metrics.spacing_sm())
-                    .p(metrics.spacing_sm())
+                    .p(metrics.spacing_md())
                     .rounded(metrics.radius_sm())
                     .border_1()
                     .border_color(ui.border)

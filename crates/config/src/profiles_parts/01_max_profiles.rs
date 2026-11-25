@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 pub const MAX_PROFILES: usize = 32;
@@ -68,6 +69,11 @@ pub struct Profile {
     /// el icono del ejecutable.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon: Option<PathBuf>,
+    /// Comando base con el que se ejecuta cada agente dentro de este perfil.
+    /// La clave es el nombre estable del agente (`opencode`, `copilot`). Si
+    /// falta, se usa el comando global del agente.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub agent_commands: BTreeMap<String, String>,
 }
 impl Profile {
     /// Crea un perfil completo.
@@ -81,7 +87,13 @@ impl Profile {
             name: name.into(),
             command: command.into(),
             icon: None,
+            agent_commands: BTreeMap::new(),
         }
+    }
+
+    /// Comando configurado para un agente en este perfil.
+    pub fn agent_command(&self, agent: &str) -> Option<&str> {
+        self.agent_commands.get(agent).map(String::as_str)
     }
 
     /// Icono explícito.

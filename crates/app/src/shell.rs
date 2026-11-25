@@ -39,6 +39,7 @@ include!("shell_parts/29_shell_render_settings_typography.rs");
 include!("shell_parts/30_shell_wsl.rs");
 include!("shell_parts/31_shell_wsl_projects.rs");
 include!("shell_parts/32_shell_render_wsl.rs");
+include!("shell_parts/33_shell_file_drag.rs");
 #[cfg(feature = "studio")]
 include!("shell_parts/25_studio_surface.rs");
 #[cfg(test)]

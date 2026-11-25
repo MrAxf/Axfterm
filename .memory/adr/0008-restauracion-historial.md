@@ -42,7 +42,9 @@ tiene que ser perezosa.
   checksum incorrecto, dimensiones absurdas o tamaño excesivo se descarta.
 - No se guardan hipervínculos OSC 8, selección, modos de ratón, bracketed paste,
   pantalla alternativa ni posición de scroll. El historial se reabre abajo y el
-  shell nuevo decide sus propios modos.
+  shell nuevo decide sus propios modos. Al restaurar se fuerza `ESC[?25h`: un
+  programa que ocultó el cursor y no lo repuso (por ejemplo, `docker compose`
+  v5 con logs en streaming) no deja la terminal sin prompt utilizable.
 - Se conservan las líneas más recientes si la transcripción supera el límite.
   El flag `truncated` viaja en la cabecera para avisar al restaurar.
 - Escritura atómica con `axf_config::write_atomic`.
@@ -58,6 +60,10 @@ tiene que ser perezosa.
 
 - Al arrancar se carga `session.json` como siempre, pero solo se arranca la
   pestaña activa de cada panel visible. Las pestañas ocultas no crean PTY.
+- El PTY se abre con las dimensiones de la instantánea y el primer frame lo
+  redimensiona al hueco real; el historial se refluye. Así un shell que pide la
+  posición del cursor (DSR, habitual en WSL) recibe una fila dentro de su vista
+  y dibuja el prompt en lugar de quedarse esperando.
 - Al activar una pestaña (clic, teclado, paleta o foco de panel) se lee su
   instantánea en el ejecutor de fondo, se inyecta en el parser **antes** de
   consumir los bytes del PTY y se arranca el perfil guardado en la pestaña.
@@ -99,6 +105,8 @@ tiene que ser perezosa.
 - El coste de arranque no depende del número de pestañas guardadas.
 - Un archivo corrupto no impide trabajar: fallback visible a terminal nueva.
 - El formato es legible y testeable sin levantar una ventana.
+- Un programa que dejó la terminal sin cursor no impide usar el prompt nuevo al
+  reabrir: el cursor se normaliza durante la restauración.
 
 ### Negativas y riesgos
 

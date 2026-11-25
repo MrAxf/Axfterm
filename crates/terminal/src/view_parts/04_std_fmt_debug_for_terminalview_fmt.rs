@@ -207,6 +207,7 @@ impl Render for TerminalView {
             .key_context(TERMINAL_CONTEXT)
             .track_focus(&self.focus)
             .on_key_down(cx.listener(Self::on_key_down))
+            .on_drop::<ExternalPaths>(cx.listener(Self::on_file_drop))
             .on_action(cx.listener(Self::copy_action))
             .on_action(cx.listener(Self::paste_action))
             .on_action(cx.listener(Self::tab_action))

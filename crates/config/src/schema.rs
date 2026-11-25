@@ -130,6 +130,86 @@ command = "cmd \"sin cerrar"
     }
 
     #[test]
+    fn profile_agent_commands_are_parsed_and_validated() {
+        let valid = r#"schema_version = 2
+
+[terminal]
+default_profile = "a"
+
+[[profiles]]
+id = "a"
+name = "A"
+command = "cmd"
+
+[profiles.agent_commands]
+opencode = "opencode2"
+"#;
+        let config = parse_str(valid, "config.toml").expect("comandos de agente válidos");
+        assert_eq!(
+            config.profiles[0].agent_command("opencode"),
+            Some("opencode2")
+        );
+        assert_eq!(config.profiles[0].agent_command("copilot"), None);
+
+        for (field, source) in [
+            (
+                "profiles[0].agent_commands.desconocido",
+                r#"schema_version = 2
+
+[terminal]
+default_profile = "a"
+
+[[profiles]]
+id = "a"
+name = "A"
+command = "cmd"
+
+[profiles.agent_commands]
+desconocido = "otro"
+"#,
+            ),
+            (
+                "profiles[0].agent_commands.opencode",
+                r#"schema_version = 2
+
+[terminal]
+default_profile = "a"
+
+[[profiles]]
+id = "a"
+name = "A"
+command = "cmd"
+
+[profiles.agent_commands]
+opencode = "   "
+"#,
+            ),
+            (
+                "profiles[0].agent_commands.opencode",
+                r#"schema_version = 2
+
+[terminal]
+default_profile = "a"
+
+[[profiles]]
+id = "a"
+name = "A"
+command = "cmd"
+
+[profiles.agent_commands]
+opencode = "opencode2 \"sin cerrar"
+"#,
+            ),
+        ] {
+            let error = parse_str(source, "config.toml").expect_err("debe rechazarse");
+            assert!(
+                matches!(error, ConfigError::Field { field: ref actual, .. } if actual == field),
+                "campo inesperado: {error}"
+            );
+        }
+    }
+
+    #[test]
     fn v1_config_is_migrated_and_rewritten_without_losing_comments() {
         let dir = temp_dir("migrate-v1");
         let path = dir.join("config.toml");

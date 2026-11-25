@@ -182,3 +182,15 @@ command = 'pwsh -NoLogo'
   `$PROFILE` del usuario. Solo se pasa `-NoLogo`; desactivar el perfil es una
   decisión explícita del usuario en `command`.
 
+## Nota de enmienda (2026-11-25) — comandos de agente por perfil
+
+- `Profile` añade `agent_commands: BTreeMap<String, String>` (`[profiles.agent_commands]`),
+  opcional y sin migración: el esquema sigue en v2. Las claves válidas son
+  `opencode` y `copilot` y cada valor se valida con el mismo tokenizer.
+- El ejecutable de OpenCode puede cambiar entre hosts (`opencode` en PowerShell,
+  `opencode2` en Ubuntu/WSL). El perfil es el ámbito correcto porque ya fija el
+  shell y la distro; la reanudación automática usa ese comando base y le añade
+  `--continue`. El lanzador de agentes de v0.2 leerá el mismo campo.
+- Sin override se conservan los comandos globales `opencode` y `copilot`; no hay
+  fallback silencioso entre nombres.
+

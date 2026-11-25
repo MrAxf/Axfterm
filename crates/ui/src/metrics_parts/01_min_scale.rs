@@ -163,9 +163,17 @@ impl UiMetrics {
             .min(self.font_size * 22.0)
     }
 
-    /// Padding interior de una fila de la paleta.
+    /// Padding vertical de una fila de la paleta.
     pub fn palette_row_padding(self) -> Pixels {
         self.spacing_sm()
+    }
+
+    /// Padding horizontal de una fila de la paleta.
+    ///
+    /// Las filas compactas piden 8–12 px a tamaño de fuente normal; `spacing_sm`
+    /// (≈7 px) dejaba el icono y el atajo pegados al borde de la tarjeta.
+    pub fn palette_row_padding_x(self) -> Pixels {
+        self.spacing_md()
     }
 
     /// Carril fijo del icono de una fila de la paleta.

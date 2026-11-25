@@ -71,7 +71,7 @@ use axf_workspace::{
     TerminalId, Workspace,
 };
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -378,6 +378,8 @@ struct ProfileEditor {
     mode: ProfileEditorMode,
     name: Entity<InputState>,
     command: Entity<InputState>,
+    opencode_command: Entity<InputState>,
+    copilot_command: Entity<InputState>,
     icon: Option<PathBuf>,
     error: Option<String>,
 }
@@ -422,6 +424,8 @@ pub(crate) struct Shell {
     last_focused_pane: Option<PaneId>,
     tab_drop: Option<TabDropTarget>,
     tab_insert: Option<(PaneId, usize)>,
+    file_drag_hover: FileDragHoverState,
+    sidebar_list_bounds: Rc<RefCell<Option<Bounds<Pixels>>>>,
     zoomed: Option<PaneId>,
     sidebar_cursor: Option<SidebarRow>,
     sidebar_section: SidebarSection,

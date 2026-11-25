@@ -19,7 +19,7 @@ impl AgentKind {
     /// Etiqueta visible.
     pub const fn label(self) -> &'static str {
         match self {
-            Self::OpenCode => "opencode",
+            Self::OpenCode => "OpenCode",
             Self::Copilot => "Copilot",
         }
     }
@@ -265,20 +265,58 @@ impl AgentSession {
     /// Aplica un reporte OSC 7501. El reporte reemplaza el registro completo.
     pub fn apply_report(&mut self, report: &AgentReport, now: SystemTime) -> AgentTransition {
         let from = self.state;
+        let was_reported = self.reported;
         self.reported = true;
         self.last_activity = now;
         self.app = report.app.clone();
         self.title = report.title.clone();
 
+        // OpenCode 2 no emite `done`: al acabar un turno reporta `idle` en el
+        // registro raíz y `clear` en el registro de la sesión. Para que el
+        // aviso de «terminado» exista, ambos cierran el trabajo en curso como
+        // `Finished`. Un `idle`/`clear` posterior conserva el resultado
+        // pendiente hasta que el usuario enfoque la pestaña. Exigimos que el
+        // `Working` viniera de un reporte OSC: el arranque de la TUI produce
+        // salida y no debe confundirse con una tarea terminada.
+        let settles_opencode = self.kind == AgentKind::OpenCode
+            && was_reported
+            && from == AgentState::Working
+            && (report.clear || report.state == AgentState::Idle);
+        let keeps_finished = self.kind == AgentKind::OpenCode
+            && from == AgentState::Finished
+            && (report.clear || report.state == AgentState::Idle);
+        if keeps_finished {
+            self.attention = None;
+            self.progress = None;
+            self.message = if report.clear {
+                None
+            } else {
+                report.message.clone()
+            };
+            return AgentTransition {
+                from,
+                to: from,
+                notify: false,
+            };
+        }
+
         if report.clear {
-            self.state = AgentState::Idle;
+            self.state = if settles_opencode {
+                AgentState::Finished
+            } else {
+                AgentState::Idle
+            };
             self.attention = None;
             self.progress = None;
             self.message = None;
             return AgentTransition::new(from, self.state);
         }
 
-        self.state = report.state;
+        self.state = if settles_opencode {
+            AgentState::Finished
+        } else {
+            report.state
+        };
         self.attention = (report.state == AgentState::NeedsAttention)
             .then_some(report.attention)
             .flatten();

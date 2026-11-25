@@ -162,6 +162,7 @@ impl RenderOnce for Modal {
             })
             .when(!self.align_top, |this| this.items_center())
             .justify_center()
+            .occlude()
             .bg(ui.overlay);
         if let Some(handler) = close {
             overlay = overlay.on_click(move |event: &ClickEvent, window, cx| {

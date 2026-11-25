@@ -234,12 +234,16 @@ impl Shell {
             .as_deref()
             .and_then(AgentKind::from_name)
         {
-            let command = resume.resume_command();
+            let command = self
+                .workspace
+                .tab(tab)
+                .map(|tab| self.resume_command(&tab.profile_id, resume))
+                .unwrap_or_else(|| resume.resume_command().to_owned());
             cx.spawn(async move |_, cx| {
                 cx.background_executor()
                     .timer(Duration::from_millis(250))
                     .await;
-                let _ = view.update(cx, |view, _| view.send_command(command));
+                let _ = view.update(cx, |view, _| view.send_command(&command));
             })
             .detach();
             self.persist(cx);
@@ -247,6 +251,19 @@ impl Shell {
         if focus {
             self.pending_focus = Some(tab);
         }
+    }
+
+    /// Comando con el que se reanuda un agente al restaurar su pestaña.
+    ///
+    /// El perfil puede sobrescribir el ejecutable (por ejemplo `opencode2` en
+    /// WSL); la reanudación conserva el flag `--continue` del agente.
+    fn resume_command(&self, profile: &ProfileId, agent: AgentKind) -> String {
+        agent_resume_command(
+            self.theme_host
+                .profile(profile)
+                .and_then(|profile| profile.agent_command(agent.as_str())),
+            agent,
+        )
     }
 
     fn default_profile(&self) -> Option<(ProfileId, String)> {
@@ -443,4 +460,11 @@ impl Shell {
         .detach();
         cx.notify();
     }
+}
+
+/// Comando de reanudación con el override opcional del perfil.
+fn agent_resume_command(override_command: Option<&str>, agent: AgentKind) -> String {
+    override_command
+        .map(|command| format!("{} --continue", command.trim()))
+        .unwrap_or_else(|| agent.resume_command().to_owned())
 }

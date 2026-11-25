@@ -55,6 +55,7 @@ impl TerminalView {
                     selection_anchor: None,
                     selection_dragging: false,
                     selection_moved: false,
+                    drag_hover: false,
                     _focus_in: focus_in,
                     _focus_out: focus_out,
                     _pump: Some(pump),
@@ -81,6 +82,7 @@ impl TerminalView {
                 selection_anchor: None,
                 selection_dragging: false,
                 selection_moved: false,
+                drag_hover: false,
                 _focus_in: None,
                 _focus_out: None,
                 _pump: None,
@@ -200,13 +202,22 @@ impl TerminalView {
             focus: _,
         } = options;
         let (commands, inbox) = async_channel::bounded(64);
-        let initial = GridSize::new(80, 24);
+        // El PTY arranca con el mismo tamaño que la instantánea restaurada:
+        // si arrancara en 80x24 y el grid restaurado fuese mayor, un shell que
+        // pide la posición del cursor (DSR) recibiría una fila fuera de su
+        // vista y se quedaría esperando sin dibujar el prompt (WSL).
+        let initial = initial_grid(restore.as_ref());
         let cell_width = pixels_to_u16(metrics.cell_width);
         let cell_height = pixels_to_u16(metrics.line_height);
 
         let session = TerminalSession::spawn(
             &cwd,
-            crate::PtySizeSpec::new(80, 24, cell_width, cell_height),
+            crate::PtySizeSpec::new(
+                initial.columns,
+                initial.screen_lines,
+                cell_width,
+                cell_height,
+            ),
             commands.clone(),
             spec,
         )?;
@@ -446,4 +457,16 @@ impl TerminalView {
         self.write(&bytes);
         cx.notify();
     }
+}
+
+/// Tamaño inicial del PTY y del grid restaurado.
+///
+/// Con instantánea se usa el tamaño guardado para que el shell y el motor
+/// compartan dimensiones desde el primer byte; sin ella, 80x24. El primer
+/// frame ajusta el grid al hueco real de la ventana.
+fn initial_grid(restore: Option<&crate::TerminalSnapshot>) -> GridSize {
+    restore
+        .filter(|restore| restore.cols() > 0 && restore.rows() > 0)
+        .map(|restore| GridSize::new(usize::from(restore.cols()), usize::from(restore.rows())))
+        .unwrap_or(GridSize::new(80, 24))
 }

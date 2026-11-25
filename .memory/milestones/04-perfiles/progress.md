@@ -1,5 +1,14 @@
 # Progreso — M4 Perfiles
 
+## 2026-11-25 — Comandos de agente por perfil
+
+- `Profile.agent_commands` (`[profiles.agent_commands]`) permite que un perfil
+  use otro ejecutable para OpenCode o Copilot (`opencode2` en WSL). Se valida con
+  el tokenizer, se escribe preservando comentarios y el panel lo edita en el
+  modal de perfil. La reanudación usa el comando base del perfil y conserva
+  `--continue`; sin override se mantienen `opencode`/`copilot`. Tests de config,
+  escritura, panel y comando de reanudación.
+
 ## 2026-11-22 — Corrección: PowerShell 7 carga el perfil del usuario
 
 - El descubrimiento de `pwsh` ya no añade `-NoProfile`; solo `-NoLogo`. Así se

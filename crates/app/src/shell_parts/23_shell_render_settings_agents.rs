@@ -98,8 +98,8 @@ impl Shell {
         let preferences = card("Perfil preferido", metrics, ui)
             .child(preference_row(
                 cx,
-                "opencode",
-                "Con qué perfil se abrirá opencode.",
+                "OpenCode",
+                "Con qué perfil se abrirá OpenCode.",
                 opencode.as_ref(),
             ))
             .child(preference_row(
@@ -251,7 +251,7 @@ fn card(title: &'static str, metrics: UiMetrics, ui: axf_ui::theme::UiTokens) ->
         .flex()
         .flex_col()
         .gap(metrics.spacing_sm())
-        .p(metrics.spacing_sm())
+        .p(metrics.spacing_md())
         .rounded(metrics.radius_md())
         .border_1()
         .border_color(ui.border)

@@ -15,6 +15,14 @@ use crate::engine::ModeFlags;
 pub fn encode(keystroke: &Keystroke, prefer_character_input: bool, mode: ModeFlags) -> Vec<u8> {
     let modifiers = keystroke.modifiers;
 
+    // OpenCode, Claude Code y otras TUIs mapean Ctrl+J (LF) a «nueva línea».
+    // Shift+Enter no se distingue de Enter en terminales sin protocolo Kitty,
+    // así que se envía LF para no someter el prompt. Va antes del input de
+    // caracteres para que un `key_char` de control no lo degrade a Enter.
+    if modifiers.shift && matches!(keystroke.key.as_str(), "enter" | "return") {
+        return vec![b'\n'];
+    }
+
     // AltGr en Windows llega como ctrl+alt. Si el layout produjo un carácter,
     // ese carácter manda y no debe interpretarse como Ctrl+Alt.
     if prefer_character_input && let Some(text) = &keystroke.key_char {
@@ -164,6 +172,42 @@ mod tests {
                 ModeFlags::default()
             ),
             b"\x1b"
+        );
+    }
+
+    #[test]
+    fn shift_enter_inserts_a_newline() {
+        assert_eq!(
+            encode(
+                &key("enter", None, false, false, true),
+                false,
+                ModeFlags::default()
+            ),
+            b"\n"
+        );
+        assert_eq!(
+            encode(
+                &key("enter", Some("\r"), false, false, true),
+                true,
+                ModeFlags::default()
+            ),
+            b"\n"
+        );
+        assert_eq!(
+            encode(
+                &key("return", None, false, false, true),
+                false,
+                ModeFlags::default()
+            ),
+            b"\n"
+        );
+        assert_eq!(
+            encode(
+                &key("enter", None, false, false, false),
+                false,
+                ModeFlags::default()
+            ),
+            b"\r"
         );
     }
 
