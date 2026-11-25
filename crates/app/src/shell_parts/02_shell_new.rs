@@ -337,12 +337,8 @@ impl Shell {
         let mut persist = false;
         for update in updates {
             changed |= update.changed;
-            let resume = self
-                .workspace
-                .tab_agents(update.tab)
-                .and_then(|sessions| sessions.iter().find(|session| session.alive))
-                .map(|session| session.kind.as_str().to_owned());
-            if self.workspace.set_tab_resume_agent(update.tab, resume) {
+            let resume = self.tab_resume(update.tab, cx);
+            if self.workspace.set_tab_resume(update.tab, resume) {
                 persist = true;
             }
             for (session, transition) in update.transitions {
@@ -382,7 +378,11 @@ impl Shell {
                         sessions.truncate(1);
                         let id = match sessions.first_mut() {
                             Some(session) => {
-                                if let Some(kind) = hint {
+                                if let Some(kind) = hint
+                                    && session.kind != kind
+                                {
+                                    // El id anterior pertenece a otro programa.
+                                    session.external_id = None;
                                     session.kind = kind;
                                 }
                                 session.id
@@ -419,12 +419,8 @@ impl Shell {
             }
         }
         self.agents.seq = next_id;
-        let resume = self
-            .workspace
-            .tab_agents(tab)
-            .and_then(|sessions| sessions.iter().find(|session| session.alive))
-            .map(|session| session.kind.as_str().to_owned());
-        let persist = self.workspace.set_tab_resume_agent(tab, resume);
+        let resume = self.tab_resume(tab, cx);
+        let persist = self.workspace.set_tab_resume(tab, resume);
         for (session, transition) in transitions {
             changed = true;
             self.notify_agent_transition(tab, session, transition, cx);

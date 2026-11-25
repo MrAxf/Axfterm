@@ -211,6 +211,10 @@ impl Shell {
                                     .w(body_width)
                                     .max_w(body_width)
                                     .min_w_0()
+                                    // El anillo de foco se pinta fuera del
+                                    // control; el scroll recorta lo que quede
+                                    // pegado al borde superior.
+                                    .pt(metrics.spacing_sm())
                                     .child(body),
                             ),
                     )

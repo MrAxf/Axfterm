@@ -152,6 +152,24 @@ fn terminal_tab_icon(program: Option<&str>) -> &'static str {
         _ => icons::TERMINAL,
     }
 }
+impl Shell {
+    /// Agente y sesión vivos de una pestaña, listos para persistir.
+    ///
+    /// El título del terminal decide entre varias sesiones reportadas por el
+    /// mismo proceso (OpenCode comparte su tira de pestañas por directorio).
+    fn tab_resume(&self, tab: TabId, cx: &Context<'_, Self>) -> Option<ResumeAgent> {
+        let model_tab = self.workspace.tab(tab)?;
+        let session = model_tab.agents.iter().find(|session| session.alive)?;
+        let title = self
+            .terminals
+            .get(&model_tab.terminal_id)
+            .and_then(|entry| entry.view.read(cx).title());
+        Some(ResumeAgent {
+            kind: session.kind.as_str().to_owned(),
+            session: session.resume_session_id(title).map(str::to_owned),
+        })
+    }
+}
 fn program_stem(program: &str) -> &str {
     std::path::Path::new(program)
         .file_stem()

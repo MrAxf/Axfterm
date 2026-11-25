@@ -1,5 +1,13 @@
 # Progreso — M5 Agentes y sidebar
 
+## 2026-11-25 — Reanudación por sesión
+
+- OSC 7501 aporta el id de sesión (`ses_…`) en sus registros hijos; se conserva
+  como `AgentSession.external_id` y se persiste por pestaña como
+  `resume_session`. Al restaurar se lanza `opencode --session <id>` (o
+  `copilot --resume=<id>`) y dos pestañas del mismo proyecto dejan de abrir la
+  misma conversación. Sin id se mantiene `--continue` como fallback.
+
 ## 2026-11-23 — Rediseño de selección en curso
 
 - La terminal activa usa el fondo de selección del tema y peso tipográfico,

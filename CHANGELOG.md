@@ -4,6 +4,35 @@ Todas las fechas usan el calendario local del proyecto. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado
 semántico.
 
+## [0.2.0] — 2026-11-25
+
+### Añadido
+
+- Accesos rápidos a agentes: el pie de la sidebar y el desplegable del «+» de la
+  pestaña abren OpenCode o Copilot en una pestaña nueva del proyecto actual,
+  con `Ctrl+Alt+1` / `Ctrl+Alt+2`, paleta y `[keymap]`. El perfil preferido por
+  agente se consume por fin, validado contra el host del proyecto.
+- El pie de la sidebar usa icon-buttons de agente —preparados para crecer— y
+  añade una línea con la versión y el resumen de proyectos, terminales y
+  agentes activos.
+- Al restaurar una pestaña se reanuda la sesión concreta del agente reportada
+  por OSC 7501 (`opencode --session <id>`, `copilot --resume=<id>`); dos
+  pestañas del mismo proyecto ya no abren la misma conversación. Sin id se
+  mantiene `--continue`.
+
+### Corregido
+
+- El empaquetado ya no puede publicar un release sin el icono de la app: una
+  build release falla si `rc.exe` no puede embeber el icono y los metadatos,
+  `scripts/package.ps1` verifica que el `.exe` contiene `axfterm.ico` y el
+  `.ico` viaja en el zip y se instala junto al ejecutable en el MSI.
+- Los avisos in-app dejan de ser transparentes sobre el terminal: usan la
+  superficie elevada del tema y una sombra de overlay.
+- Ajustes › Atajos vuelve a tener una sola región de scroll: la rueda y la
+  scrollbar recorren la misma lista y llegan hasta el final.
+- El anillo de foco del buscador de Atajos ya no se recorta en el borde superior
+  del área desplazable.
+
 ## [0.1.1] — 2026-11-25
 
 ### Añadido

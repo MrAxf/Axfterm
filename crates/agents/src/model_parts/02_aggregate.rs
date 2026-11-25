@@ -1,3 +1,8 @@
+impl AgentKind {
+    /// Agentes reconocidos, en el orden estable de la UI.
+    pub const ALL: [Self; 2] = [Self::OpenCode, Self::Copilot];
+}
+
 pub fn aggregate(sessions: &[AgentSession]) -> Option<AgentAggregate> {
     let dominant = sessions
         .iter()
@@ -98,6 +103,69 @@ mod tests {
         assert_eq!(AgentKind::Copilot.label(), "Copilot");
         assert_eq!(AgentKind::OpenCode.resume_command(), "opencode --continue");
         assert_eq!(AgentKind::Copilot.resume_command(), "copilot --continue");
+        assert!(AgentKind::OpenCode.is_resumable_session_id("ses_dedee5759ffe9Dkg5yMdr6d3xb"));
+        assert!(!AgentKind::OpenCode.is_resumable_session_id("opencode"));
+        assert!(!AgentKind::OpenCode.is_resumable_session_id("ses_0000000000000000"));
+        assert!(AgentKind::Copilot.is_resumable_session_id("0cb916db-26aa-40f2-86b5-1ba81b225fd2"));
+        assert!(!AgentKind::Copilot.is_resumable_session_id("opencode"));
+    }
+
+    #[test]
+    fn reports_keep_only_resumable_session_ids() {
+        let mut opencode = session(1, AgentKind::OpenCode, 10, 1);
+        let mut report = AgentReport::new(AgentState::Working);
+        report.id = Some("opencode".into());
+        opencode.apply_report(&report, at(2));
+        assert_eq!(opencode.external_id, None, "el registro raíz no es sesión");
+
+        report.id = Some("ses_dedee5759ffe9Dkg5yMdr6d3xb".into());
+        opencode.apply_report(&report, at(3));
+        assert_eq!(
+            opencode.external_id.as_deref(),
+            Some("ses_dedee5759ffe9Dkg5yMdr6d3xb")
+        );
+
+        // Un reporte posterior sin id (raíz) no borra la sesión conocida.
+        opencode.apply_report(&AgentReport::new(AgentState::Idle), at(4));
+        assert_eq!(
+            opencode.external_id.as_deref(),
+            Some("ses_dedee5759ffe9Dkg5yMdr6d3xb")
+        );
+
+        let mut copilot = session(2, AgentKind::Copilot, 11, 1);
+        let mut report = AgentReport::new(AgentState::Working);
+        report.id = Some("0cb916db-26aa-40f2-86b5-1ba81b225fd2".into());
+        copilot.apply_report(&report, at(2));
+        assert_eq!(
+            copilot.external_id.as_deref(),
+            Some("0cb916db-26aa-40f2-86b5-1ba81b225fd2")
+        );
+    }
+
+    #[test]
+    fn terminal_title_selects_the_session_shown_by_opencode() {
+        let first = "ses_dedee5759ffe9Dkg5yMdr6d3xb";
+        let second = "ses_dee4ccdc5ffeJkW0PVp9sp4yNj";
+        let mut shared = session(1, AgentKind::OpenCode, 10, 1);
+        let mut report = AgentReport::new(AgentState::Working);
+        report.id = Some(first.into());
+        report.title = Some("Alpha".into());
+        shared.apply_report(&report, at(2));
+        report.id = Some(second.into());
+        report.title = Some("Beta".into());
+        shared.apply_report(&report, at(3));
+
+        assert_eq!(shared.resume_session_id(Some("OC | Alpha")), Some(first));
+        assert_eq!(shared.resume_session_id(Some("OC | Beta")), Some(second));
+        // Sin coincidencia queda el último id válido como fallback.
+        assert_eq!(shared.resume_session_id(None), Some(second));
+
+        let mut only = session(2, AgentKind::OpenCode, 11, 1);
+        let mut report = AgentReport::new(AgentState::Working);
+        report.id = Some(first.into());
+        report.title = Some("Alpha".into());
+        only.apply_report(&report, at(2));
+        assert_eq!(only.resume_session_id(Some("shell")), Some(first));
     }
 
     #[test]

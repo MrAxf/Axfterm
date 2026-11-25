@@ -162,6 +162,8 @@ impl Render for Shell {
             .on_action(cx.listener(Self::import_theme))
             .on_action(cx.listener(Self::export_theme))
             .on_action(cx.listener(Self::agent_next_attention))
+            .on_action(cx.listener(Self::open_opencode))
+            .on_action(cx.listener(Self::open_copilot))
             .on_action(cx.listener(Self::toggle_shortcuts))
             .on_drop::<axf_ui::gpui::ExternalPaths>(cx.listener(
                 |shell, paths: &axf_ui::gpui::ExternalPaths, window, cx| {

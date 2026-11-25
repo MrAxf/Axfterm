@@ -22,6 +22,14 @@ fn main() {
         if let Err(error) = resource.compile() {
             // Un fallo del compilador de recursos no debe romper una build de
             // desarrollo sin SDK; se avisa y el binario sigue sin metadatos.
+            // En release es distinto: publicar un binario sin icono ni versión
+            // es un error visible y silencioso; el empaquetado aborta aquí.
+            if std::env::var("PROFILE").as_deref() == Ok("release") {
+                panic!(
+                    "no se pudieron embeber el icono y los metadatos de Windows: {error}. \
+                     Instala el Windows SDK (rc.exe) o define RC antes de empaquetar."
+                );
+            }
             println!("cargo:warning=no se pudieron embeber los metadatos de Windows: {error}");
         }
     }

@@ -4,4 +4,5 @@
 //! detectado es una `AgentSession`; una pestaña puede tener varias.
 
 include!("model_parts/01_agentsessionid.rs");
+include!("model_parts/03_session_id.rs");
 include!("model_parts/02_aggregate.rs");

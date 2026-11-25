@@ -1,5 +1,14 @@
 # Progreso — M9 Persistencia y release
 
+## 2026-11-25 — Icono garantizado en release
+
+- El icono de la app sale de una sola fuente, `crates/app/assets/axfterm.ico`:
+  `build.rs` lo embebe (release falla sin `rc.exe` en vez de avisar), el zip lo
+  adjunta, el MSI lo instala junto al `.exe` y el acceso directo usa el icono
+  del propio ejecutable. `scripts/verify-exe-icon.ps1` comprueba que cada
+  imagen del `.ico` está dentro del PE y `package.ps1` lo ejecuta antes de
+  generar artefactos.
+
 ## 2026-11-25 — Release 0.1.1
 
 - Publicada la release 0.1.1 con los cambios posteriores a 0.1.0: comandos de

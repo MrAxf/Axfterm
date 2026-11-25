@@ -67,6 +67,8 @@ Todos los atajos se pueden cambiar en la sección `[keymap]` de
 | Acción | Atajo | Id |
 | --- | --- | --- |
 | Ir al siguiente agente que requiere atención | `ctrl-alt-j` | `agent.next_attention` |
+| Abrir OpenCode en una pestaña nueva | `ctrl-alt-1` | `agent.open_opencode` |
+| Abrir Copilot en una pestaña nueva | `ctrl-alt-2` | `agent.open_copilot` |
 
 ## Ayuda
 

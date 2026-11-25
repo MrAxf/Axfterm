@@ -218,7 +218,8 @@ impl Shell {
             "agent.next_attention" => Box::new(AgentNextAttention),
             "help.shortcuts" => Box::new(ShowShortcuts),
             "app.quit" | "project.open" | "theme.open_folder" | "theme.import"
-            | "theme.export" | "terminal.copy" | "terminal.paste" => {
+            | "theme.export" | "terminal.copy" | "terminal.paste"
+            | "agent.open_opencode" | "agent.open_copilot" => {
                 return Err(format!("acción no permitida en Studio: {id}"));
             }
             other => return Err(format!("acción desconocida: {other}")),

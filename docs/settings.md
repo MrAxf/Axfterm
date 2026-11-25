@@ -126,9 +126,11 @@ copilot = "pwsh"
 ```
 
 `preferred_profiles` asocia cada agente reconocido (`opencode`, `copilot`) con un
-id de `[[profiles]]`. Se valida que el perfil exista. En v0.1 solo se guarda: lo
-consumirá el lanzador de agentes de v0.2. Los valores de detección y avisos se
-aplican en caliente al guardar.
+id de `[[profiles]]`. Se valida que el perfil exista. Lo consume el lanzador de
+agentes (M11): al abrir OpenCode o Copilot desde el pie de la sidebar o el
+desplegable del «+» se usa ese perfil si encaja con el host del proyecto; si no,
+se cae al perfil del proyecto y al global con un aviso. Los valores de detección
+y avisos se aplican en caliente al guardar.
 
 ## Archivos y valores por defecto
 

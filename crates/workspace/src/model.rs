@@ -456,15 +456,16 @@ mod tests {
         let (mut workspace, _project, tab) = workspace_with_project("agents-duplicate");
         let session = AgentSession::new(1, AgentKind::OpenCode, 100, SystemTime::now());
         assert!(workspace.set_tab_agents(tab.tab, vec![session]));
-        assert!(workspace.set_tab_resume_agent(tab.tab, Some("opencode".into())));
+        let resume = ResumeAgent {
+            kind: "opencode".into(),
+            session: Some("ses_dedee5759ffe9Dkg5yMdr6d3xb".into()),
+        };
+        assert!(workspace.set_tab_resume(tab.tab, Some(resume.clone())));
         let copy = workspace.duplicate_tab(tab.tab).expect("duplica");
         assert!(workspace.tab_agents(copy.tab).expect("copia").is_empty());
-        assert_eq!(workspace.take_tab_resume_agent(copy.tab), None);
-        assert_eq!(
-            workspace.take_tab_resume_agent(tab.tab),
-            Some("opencode".into())
-        );
-        assert_eq!(workspace.take_tab_resume_agent(tab.tab), None);
+        assert_eq!(workspace.take_tab_resume(copy.tab), None);
+        assert_eq!(workspace.take_tab_resume(tab.tab), Some(resume));
+        assert_eq!(workspace.take_tab_resume(tab.tab), None);
     }
 
     impl Workspace {

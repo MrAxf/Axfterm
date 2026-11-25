@@ -71,6 +71,10 @@ pub(crate) const SEARCH_PALETTE: &str = "ctrl-p";
 pub(crate) const TOGGLE_SIDEBAR_AGENTS: &str = "ctrl-alt-a";
 /// Ir al siguiente agente que requiere atención.
 pub(crate) const AGENT_NEXT_ATTENTION: &str = "ctrl-alt-j";
+/// Abrir OpenCode en una pestaña nueva.
+pub(crate) const OPEN_OPENCODE: &str = "ctrl-alt-1";
+/// Abrir Copilot en una pestaña nueva.
+pub(crate) const OPEN_COPILOT: &str = "ctrl-alt-2";
 /// Ver la pantalla de atajos.
 pub(crate) const SHOW_SHORTCUTS: &str = "ctrl-alt-k";
 

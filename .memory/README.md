@@ -13,7 +13,7 @@ escribe PowerShell, cmd, Git Bash, Nu y WSL en el primer arranque, la sesión v3
 conserva host y perfil por proyecto y los iconos salen del ejecutable con caché acotada y
 fallback Tabler. Tests, clippy, fmt y release en verde; gate manual con pwsh,
 cmd y WSL.
-Spikes S1–S8 hechos y medidos; ADR 0001–0011 aceptados en `adr/`.
+Spikes S1–S8 hechos y medidos; ADR 0001–0012 aceptados en `adr/`.
 Adelanto de M9: cada terminal guarda su historial en `scrollback/` y lo restaura
 al activar su pestaña; el fallo visible abre el mismo perfil desde cero.
 M5 Agentes y sidebar implementado: OSC 7501 + árbol de procesos, varias sesiones
@@ -40,6 +40,10 @@ carpetas WSL
 (ADR 0011). Gate end-to-end con Ubuntu, nueva pestaña, split, reinicio y cierre;
 quedan DPI 100/200, un cierre con proceso hijo largo y OSC 7 host-aware.
 Persistencia/release pasa a M9 y el rediseño UI/UX a M10.
+M11 implementado para v0.2: accesos rápidos que abren OpenCode o Copilot en una
+pestaña nueva desde el pie de la sidebar y desde el desplegable del «+»,
+consumiendo `[agents.preferred_profiles]`. Quedan el gate manual y la captura de
+Studio.
 Stack: Rust 2024 + gpui-kit + alacritty_terminal + portable-pty. Windows primero.
 
 ## Cómo leer
@@ -48,7 +52,7 @@ Stack: Rust 2024 + gpui-kit + alacritty_terminal + portable-pty. Windows primero
 2. `milestones/<slug>/README.md` — objetivo y criterio de hecho.
 3. `milestones/<slug>/tasks.md` — tareas ejecutables.
 4. `milestones/<slug>/progress.md` — avances, lo más reciente arriba.
-5. `adr/` — decisiones de arquitectura aceptadas (0001–0011).
+5. `adr/` — decisiones de arquitectura aceptadas (0001–0012).
 
 Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho.
 
@@ -65,6 +69,7 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho.
 - [M8 Proyectos en WSL](milestones/08-proyectos-wsl/README.md) — implementado; quedan gates de DPI, cierre prolongado y OSC 7
 - [M9 Persistencia y release](milestones/09-persistencia-release/README.md) — implementado; quedan gates manuales de DPI, teclados ES/CJK y un día de uso
 - [M10 Rediseño de experiencia UI/UX](milestones/10-experiencia-ui-ux/README.md) — implementado anticipadamente por solicitud
+- [M11 Accesos rápidos a agentes](milestones/11-accesos-agentes/README.md) — implementado (v0.2); quedan gate manual y captura de Studio
 - [99 Futuro](milestones/99-futuro/README.md)
 
 Reglas de producto y arquitectura: ver `AGENTS.md` en la raíz.

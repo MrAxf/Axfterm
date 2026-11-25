@@ -40,6 +40,9 @@ include!("shell_parts/30_shell_wsl.rs");
 include!("shell_parts/31_shell_wsl_projects.rs");
 include!("shell_parts/32_shell_render_wsl.rs");
 include!("shell_parts/33_shell_file_drag.rs");
+include!("shell_parts/34_agent_resume.rs");
+include!("shell_parts/35_launch_agent.rs");
+include!("shell_parts/36_sidebar_footer.rs");
 #[cfg(feature = "studio")]
 include!("shell_parts/25_studio_surface.rs");
 #[cfg(test)]

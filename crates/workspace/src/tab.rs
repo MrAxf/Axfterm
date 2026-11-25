@@ -6,6 +6,15 @@ use serde::{Deserialize, Serialize};
 
 use crate::{ProjectId, TabId, TerminalId};
 
+/// Agente que se reanuda al restaurar una pestaña.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ResumeAgent {
+    /// Clave estable del agente (`"opencode"` o `"copilot"`).
+    pub kind: String,
+    /// Sesión concreta, si el agente la reportó.
+    pub session: Option<String>,
+}
+
 /// Pestaña de un panel.
 ///
 /// `project_id`, `terminal_id` y `profile_id` no cambian al mover la pestaña
@@ -31,6 +40,10 @@ pub struct Tab {
     /// reanudar automáticamente su última sesión al reabrir la pestaña.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resume_agent: Option<String>,
+    /// Sesión concreta del agente, para que dos pestañas del mismo proyecto no
+    /// reabran la misma conversación.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resume_session: Option<String>,
     /// Sesiones de agentes detectadas en esta pestaña.
     ///
     /// Es estado runtime-only (ADR 0009): no se serializa en `session.json`.
@@ -55,7 +68,46 @@ impl Tab {
             auto_title: title,
             custom_title: false,
             resume_agent: None,
+            resume_session: None,
             agents: Vec::new(),
+        }
+    }
+
+    /// Agente y sesión pendientes de reanudar, si hay alguno.
+    pub fn resume(&self) -> Option<ResumeAgent> {
+        self.resume_agent.clone().map(|kind| ResumeAgent {
+            kind,
+            session: self.resume_session.clone(),
+        })
+    }
+
+    /// Define el agente y la sesión a reanudar. Devuelve `true` si cambió.
+    pub fn set_resume(&mut self, resume: Option<ResumeAgent>) -> bool {
+        let (agent, session) = match resume {
+            Some(resume) => (Some(resume.kind), resume.session),
+            None => (None, None),
+        };
+        let session = session.filter(|id| !id.trim().is_empty());
+        if self.resume_agent == agent && self.resume_session == session {
+            return false;
+        }
+        self.resume_agent = agent;
+        self.resume_session = session;
+        true
+    }
+
+    /// Retira el agente y la sesión pendientes. Devuelve `true` si había algo.
+    pub fn clear_resume(&mut self) -> bool {
+        let had = self.resume_agent.is_some() || self.resume_session.is_some();
+        self.resume_agent = None;
+        self.resume_session = None;
+        had
+    }
+
+    /// Impide que una sesión quede huérfana sin agente en una sesión cargada.
+    pub fn repair_resume(&mut self) {
+        if self.resume_agent.is_none() {
+            self.resume_session = None;
         }
     }
 

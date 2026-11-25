@@ -1,7 +1,7 @@
 use crate::ids::IdCounters;
 use crate::layout::{Branch, PaneTree, SplitAxis};
 use crate::project::{Project, ProjectHost, SidebarState};
-use crate::tab::{Focus, Pane, Tab};
+use crate::tab::{Focus, Pane, ResumeAgent, Tab};
 use crate::{PaneId, ProjectId, TabId, TerminalId};
 use axf_agents::AgentSession;
 use axf_config::ProfileId;

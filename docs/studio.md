@@ -9,7 +9,7 @@ pwsh scripts/studio.ps1 -All -Hidden
 ```
 
 Compila `axfterm` con `--features studio`, arranca una instancia aislada y
-Reproduce las escenas de `studio/scenes/` (34 en v0.1). Las capturas quedan en
+Reproduce las escenas de `studio/scenes/` (36 en v0.1). Las capturas quedan en
 `target/studio/shots/` y el índice en `target/studio/manifest.json`.
 
 ## Aislamiento

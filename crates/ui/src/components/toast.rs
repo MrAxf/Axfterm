@@ -66,6 +66,11 @@ impl RenderOnce for Toast {
             .rounded(metrics.radius_md())
             .border_1()
             .border_color(tone.opacity(0.45))
+            // El aviso flota sobre el terminal: sin fondo propio se lee el
+            // contenido de detrás y los colores se mezclan.
+            .bg(ui.surface_raised)
+            .text_color(ui.text)
+            .shadow_md()
             .child(Icon::new(self.icon).size(IconSize::Md).color(tone))
             .child(
                 div()

@@ -79,6 +79,8 @@ actions!(
         ImportTheme,
         ExportTheme,
         AgentNextAttention,
+        OpenOpenCode,
+        OpenCopilot,
         ShowShortcuts,
         PaletteNext,
         PalettePrevious,

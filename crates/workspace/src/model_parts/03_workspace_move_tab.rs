@@ -237,30 +237,27 @@ impl Workspace {
                 tab.agents.clear();
                 changed = true;
             }
-            if tab.resume_agent.take().is_some() {
+            if tab.clear_resume() {
                 changed = true;
             }
         }
         changed
     }
 
-    /// Define el agente a reanudar al reabrir una pestaña. Devuelve `true` si cambió.
-    pub fn set_tab_resume_agent(&mut self, tab: TabId, agent: Option<String>) -> bool {
-        let Some(model_tab) = self.tabs.get_mut(&tab) else {
-            return false;
-        };
-        if model_tab.resume_agent == agent {
-            return false;
-        }
-        model_tab.resume_agent = agent;
-        true
-    }
-
-    /// Toma y limpia el agente pendiente de reanudar de una pestaña.
-    pub fn take_tab_resume_agent(&mut self, tab: TabId) -> Option<String> {
+    /// Define el agente y la sesión a reanudar al reabrir una pestaña.
+    /// Devuelve `true` si cambió.
+    pub fn set_tab_resume(&mut self, tab: TabId, resume: Option<ResumeAgent>) -> bool {
         self.tabs
             .get_mut(&tab)
-            .and_then(|model_tab| model_tab.resume_agent.take())
+            .is_some_and(|model_tab| model_tab.set_resume(resume))
+    }
+
+    /// Toma y limpia el agente y la sesión pendientes de reanudar.
+    pub fn take_tab_resume(&mut self, tab: TabId) -> Option<ResumeAgent> {
+        let model_tab = self.tabs.get_mut(&tab)?;
+        let resume = model_tab.resume()?;
+        model_tab.clear_resume();
+        Some(resume)
     }
 
     /// Elimina un proyecto y todas sus pestañas.
@@ -419,10 +416,11 @@ impl Workspace {
         let valid_panes: HashSet<_> = leaves.into_iter().collect();
         self.panes.retain(|id, _| valid_panes.contains(id));
         for tab_id in &placed_tabs {
-            if let Some(tab) = self.tabs.get_mut(tab_id)
-                && tab.auto_title.is_empty()
-            {
-                tab.auto_title = tab.title.clone();
+            if let Some(tab) = self.tabs.get_mut(tab_id) {
+                tab.repair_resume();
+                if tab.auto_title.is_empty() {
+                    tab.auto_title = tab.title.clone();
+                }
             }
         }
         self.tabs.retain(|id, _| placed_tabs.contains(id));

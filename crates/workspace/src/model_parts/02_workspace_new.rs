@@ -305,7 +305,7 @@ impl Workspace {
         let terminal = self.ids.take_terminal();
         let mut copy = original;
         copy.terminal_id = terminal;
-        copy.resume_agent = None;
+        copy.clear_resume();
         copy.agents.clear();
         self.tabs.insert(new_tab, copy);
         let pane = self

@@ -67,8 +67,8 @@ use axf_ui::icons;
 use axf_ui::metrics::UiMetrics;
 use axf_ui::theme;
 use axf_workspace::{
-    Branch, PaneId, PaneTree, ProjectHost, ProjectId, SessionFile, SidebarSection, SplitAxis, TabId,
-    TerminalId, Workspace,
+    Branch, PaneId, PaneTree, ProjectHost, ProjectId, ResumeAgent, SessionFile, SidebarSection,
+    SplitAxis, TabId, TerminalId, Workspace,
 };
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};

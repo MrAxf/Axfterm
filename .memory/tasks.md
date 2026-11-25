@@ -13,6 +13,7 @@
 - [~] M8 Proyectos en WSL (implementado; quedan DPI, cierre prolongado y OSC 7)
 - [~] M9 Persistencia, robustez y release v0.1 (implementado; quedan gates manuales de DPI, teclados ES/CJK y un día de uso)
 - [x] M10 Rediseño de experiencia UI/UX (implementado anticipadamente por solicitud)
+- [~] M11 Accesos rápidos a agentes (v0.2; implementado, quedan gate manual y captura de Studio)
 
 ## Transversal
 

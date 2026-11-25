@@ -228,17 +228,16 @@ impl Shell {
                 _subscription: subscription,
             },
         );
-        if let Some(resume) = self
+        if let Some((agent, session)) = self
             .workspace
-            .take_tab_resume_agent(tab)
-            .as_deref()
-            .and_then(AgentKind::from_name)
+            .take_tab_resume(tab)
+            .and_then(|resume| AgentKind::from_name(&resume.kind).map(|kind| (kind, resume.session)))
         {
             let command = self
                 .workspace
                 .tab(tab)
-                .map(|tab| self.resume_command(&tab.profile_id, resume))
-                .unwrap_or_else(|| resume.resume_command().to_owned());
+                .map(|tab| self.resume_command(&tab.profile_id, agent, session.as_deref()))
+                .unwrap_or_else(|| agent_resume_command(None, agent, session.as_deref()));
             cx.spawn(async move |_, cx| {
                 cx.background_executor()
                     .timer(Duration::from_millis(250))
@@ -256,13 +255,20 @@ impl Shell {
     /// Comando con el que se reanuda un agente al restaurar su pestaña.
     ///
     /// El perfil puede sobrescribir el ejecutable (por ejemplo `opencode2` en
-    /// WSL); la reanudación conserva el flag `--continue` del agente.
-    fn resume_command(&self, profile: &ProfileId, agent: AgentKind) -> String {
+    /// WSL); si se conoce la sesión se reanuda exactamente esa y, si no, se
+    /// conserva el fallback `--continue` del agente.
+    fn resume_command(
+        &self,
+        profile: &ProfileId,
+        agent: AgentKind,
+        session: Option<&str>,
+    ) -> String {
         agent_resume_command(
             self.theme_host
                 .profile(profile)
                 .and_then(|profile| profile.agent_command(agent.as_str())),
             agent,
+            session,
         )
     }
 
@@ -460,11 +466,4 @@ impl Shell {
         .detach();
         cx.notify();
     }
-}
-
-/// Comando de reanudación con el override opcional del perfil.
-fn agent_resume_command(override_command: Option<&str>, agent: AgentKind) -> String {
-    override_command
-        .map(|command| format!("{} --continue", command.trim()))
-        .unwrap_or_else(|| agent.resume_command().to_owned())
 }

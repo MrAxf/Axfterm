@@ -566,14 +566,14 @@ dependencies = [
 
 [[package]]
 name = "axf_agents"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "sysinfo 0.40.4",
 ]
 
 [[package]]
 name = "axf_config"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "async-channel",
  "notify",
@@ -586,7 +586,7 @@ dependencies = [
 
 [[package]]
 name = "axf_terminal"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "alacritty_terminal",
  "async-channel",
@@ -598,7 +598,7 @@ dependencies = [
 
 [[package]]
 name = "axf_ui"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "gpui-kit",
@@ -613,7 +613,7 @@ dependencies = [
 
 [[package]]
 name = "axf_workspace"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "axf_agents",
  "axf_config",
@@ -625,7 +625,7 @@ dependencies = [
 
 [[package]]
 name = "axfterm"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-channel",

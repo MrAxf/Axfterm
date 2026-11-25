@@ -3,8 +3,9 @@
 - [ ] Sidebar derecha con contenedores (Docker/Podman) y puertos
 - [ ] `SidebarHost` izquierda/derecha y trait `SidebarPanel` con registro de
       paneles; mover paneles entre slots (v0.2)
-- [ ] Lanzar agentes desde la app: perfil preferido por agente, argumentos extra,
-      apertura en el cwd del proyecto y guía si falta el binario (v0.2)
+- [x] Lanzar agentes desde la app: perfil preferido por agente, argumentos extra,
+      apertura en el cwd del proyecto y guía si falta el binario (v0.2) — movido
+      a M11 (`11-accesos-agentes`)
 - [ ] SSH/remoto con reconexión
 - [ ] Plugins de terceros (WASM o proceso)
 - [ ] kitty graphics / sixel / imágenes inline

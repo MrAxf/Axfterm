@@ -233,6 +233,10 @@ pub struct AgentSession {
     pub title: Option<String>,
     /// `app` reportada por el programa.
     pub app: Option<String>,
+    /// Id de sesión reportado por el agente, para reanudarla al reabrir.
+    pub external_id: Option<String>,
+    /// Sesiones observadas por OSC y su título, para elegir la del terminal.
+    pub observed_sessions: Vec<ReportedSession>,
     /// Inicio de la sesión.
     pub started_at: SystemTime,
     /// Última actividad o reporte.
@@ -255,6 +259,8 @@ impl AgentSession {
             progress: None,
             title: None,
             app: None,
+            external_id: None,
+            observed_sessions: Vec::new(),
             started_at: now,
             last_activity: now,
             reported: false,
@@ -270,6 +276,34 @@ impl AgentSession {
         self.last_activity = now;
         self.app = report.app.clone();
         self.title = report.title.clone();
+        // El registro raíz no trae id; conservamos el último id de sesión
+        // válido para poder reanudar exactamente esta conversación. OpenCode
+        // comparte la tira de pestañas entre terminales del mismo directorio,
+        // así que también guardamos el título para elegir la sesión actual.
+        if let Some(id) = report
+            .id
+            .as_deref()
+            .filter(|id| self.kind.is_resumable_session_id(id))
+        {
+            self.external_id = Some(id.to_owned());
+            if let Some(known) = self
+                .observed_sessions
+                .iter_mut()
+                .find(|known| known.id == id)
+            {
+                if report.title.is_some() {
+                    known.title = report.title.clone();
+                }
+            } else {
+                self.observed_sessions.push(ReportedSession {
+                    id: id.to_owned(),
+                    title: report.title.clone(),
+                });
+                if self.observed_sessions.len() > MAX_OBSERVED_SESSIONS {
+                    self.observed_sessions.remove(0);
+                }
+            }
+        }
 
         // OpenCode 2 no emite `done`: al acabar un turno reporta `idle` en el
         // registro raíz y `clear` en el registro de la sesión. Para que el

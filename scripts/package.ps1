@@ -8,6 +8,10 @@
     si WiX está disponible, construye el MSI per-user. Todo se escribe en
     `dist/`. No firma el binario: la firma de código se evalúa post-v0.1.
 
+    Antes de empaquetar comprueba con `scripts/verify-exe-icon.ps1` que el
+    ejecutable release lleva embebido `crates/app/assets/axfterm.ico`; sin
+    icono no se generan artefactos.
+
     Uso:
         pwsh -File scripts/package.ps1
         pwsh -File scripts/package.ps1 -SkipBuild
@@ -37,6 +41,7 @@ try {
     $stem = "Axfterm-$version-win-x64"
     $zip = Join-Path $dist "$stem.zip"
     $msi = Join-Path $dist "$stem.msi"
+    $icon = Join-Path $repoRoot 'crates/app/assets/axfterm.ico'
 
     if (-not $SkipBuild) {
         & (Join-Path $PSScriptRoot 'cargo-low.ps1') build --release
@@ -47,6 +52,9 @@ try {
     if (-not (Test-Path $exe)) {
         throw "No existe $exe. Ejecuta sin -SkipBuild."
     }
+    # El icono del ejecutable es el que se empaqueta: si el release salió sin
+    # recursos (rc.exe ausente) o con un .ico distinto, no se genera nada.
+    & (Join-Path $PSScriptRoot 'verify-exe-icon.ps1') -Exe $exe -Icon $icon
 
     New-Item -ItemType Directory -Path $dist -Force | Out-Null
 
@@ -57,6 +65,7 @@ try {
         }
         New-Item -ItemType Directory -Path $staging -Force | Out-Null
         Copy-Item $exe (Join-Path $staging 'axfterm.exe')
+        Copy-Item $icon (Join-Path $staging 'axfterm.ico')
         foreach ($name in @('README.md', 'NOTICE', 'LICENSE-MIT', 'LICENSE-APACHE')) {
             Copy-Item (Join-Path $repoRoot $name) $staging
         }

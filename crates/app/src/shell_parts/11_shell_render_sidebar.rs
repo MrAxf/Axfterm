@@ -155,6 +155,7 @@ impl Shell {
             .on_key_down(cx.listener(Self::sidebar_key))
             .child(top)
             .child(list_section)
+            .child(self.render_sidebar_footer(cx))
             .into_any_element()
     }
 

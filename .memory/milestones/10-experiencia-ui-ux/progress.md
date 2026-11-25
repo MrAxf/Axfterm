@@ -2,6 +2,12 @@
 
 ## 2026-11-25 — Correcciones de uso con agentes
 
+- Los toasts usan `surface_raised`, texto del tema y sombra media: dejan de
+  transparentarse sobre el terminal.
+- Ajustes › Atajos usa una sola región de scroll. La lista interna ya no consume
+  la rueda mientras la scrollbar exterior se quedaba a medio camino.
+- El contenido desplazable de Ajustes reserva respiro superior para que el
+  anillo de foco del buscador no se recorte.
 - La etiqueta visible de `AgentKind::OpenCode` pasa a «OpenCode»; también los
   textos de sidebar, ajustes, plantilla de config y README. Las claves estables
   (`opencode`, `app=opencode`, `[agents.preferred_profiles]`) no cambian.

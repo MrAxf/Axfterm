@@ -20,4 +20,4 @@ pub use session::{
     MAX_SESSION_BYTES, SESSION_VERSION, SessionError, SessionFile, SessionLoad, backup_session,
     load_or_recover, load_session, save_session,
 };
-pub use tab::{Focus, Pane, Tab};
+pub use tab::{Focus, Pane, ResumeAgent, Tab};

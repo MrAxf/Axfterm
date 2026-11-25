@@ -102,11 +102,19 @@ sesión más reciente.
 
 El estado de alertas es runtime-only: no se escribe en `session.json` y no
 sobrevive a un reinicio. Sí se persiste qué agente seguía vivo al cerrar
-(`resume_agent`), de modo que al reabrir la pestaña se descarta cualquier TUI en
-pantalla alternativa (`ALT_SCREEN`) de la instantánea y se lanza automáticamente
-`opencode --continue` o `copilot --continue` para retomar la misma sesión. Si el
+(`resume_agent`) y, cuando el agente lo reportó por OSC 7501, el id de su sesión
+(`resume_session`). Al reabrir la pestaña se descarta cualquier TUI en pantalla
+alternativa (`ALT_SCREEN`) de la instantánea y se reanuda exactamente esa
+conversación con `opencode --session <id>` o `copilot --resume=<id>`. Así dos
+pestañas del mismo proyecto no abren la misma sesión: OpenCode comparte su tira
+de pestañas entre terminales del mismo directorio y reporta varias, así que se
+elige la que coincide con el título del terminal (`OC | <sesión>`). Si el título
+está desactivado, se usa la única sesión observada o el último id válido. Si el
+agente nunca reportó un id (versión antigua o todavía no ha trabajado), se
+conserva el fallback `--continue` y puede coincidir con otra pestaña del mismo
+directorio. Si el
 perfil de la pestaña define `[profiles.agent_commands]`, se usa ese comando base
-en lugar del global: por ejemplo, `opencode2 --continue` en Ubuntu (WSL).
+en lugar del global: por ejemplo, `opencode2 --session <id>` en Ubuntu (WSL).
 
 ## Sidebar
 
@@ -164,9 +172,10 @@ command = 'wsl -d "Ubuntu"'
 opencode = "opencode2"
 ```
 
-Sin esta tabla se usan `opencode` y `copilot`. La reanudación añade `--continue`
-al comando configurado; el alias se resuelve en el shell interactivo del perfil,
-así que funciona también dentro de WSL.
+Sin esta tabla se usan `opencode` y `copilot`. La reanudación añade
+`--session <id>` (o `--resume=<id>` en Copilot) al comando configurado y cae a
+`--continue` si no hay id; el alias se resuelve en el shell interactivo del
+perfil, así que funciona también dentro de WSL.
 
 Se recarga en caliente como el resto de `config.toml`. Un valor fuera de rango
 es un error de campo accionable; no se corrige en silencio. Al desactivar la
@@ -174,8 +183,35 @@ detección se retiran las sesiones en memoria.
 
 El panel de ajustes (`Ctrl+Alt+T`, sección Agentes) edita estos campos con
 borrador y guardado atómico. `preferred_profiles` se valida contra los perfiles
-existentes y lo consumirá el lanzador de agentes de v0.2; en v0.1 solo se
-persiste. Ver `docs/settings.md`.
+existentes y lo consume el lanzador de agentes (M11); ver la sección siguiente y
+`docs/settings.md`.
+
+## Abrir agentes desde la app
+
+- **Pie de la sidebar**: un acceso por agente. Abre una pestaña nueva en el
+  proyecto actual y escribe el comando en su shell; al salir del agente se
+  vuelve al prompt. Los accesos son iconos de marca, en una fila pensada para
+  crecer con más agentes; el tooltip incluye el atajo y el estado del agente en
+  el proyecto. Bajo ellos, el pie muestra la versión y el resumen del workspace
+  (proyectos, terminales y agentes activos).
+- **Desplegable del «+» de la pestaña**: «Abrir OpenCode» y «Abrir Copilot» en
+  ese panel y su proyecto actual.
+- **Teclado y paleta**: `Ctrl+Alt+1` y `Ctrl+Alt+2`, además de las acciones
+  `agent.open_opencode` y `agent.open_copilot` en la paleta y en `[keymap]`.
+  Los atajos no usan teclas reservadas del terminal y AltGr/IME se entregan como
+  texto; con una terminal enfocada funcionan como el resto de acciones de app.
+
+Cada gesto abre siempre una pestaña nueva; no se enfoca una sesión existente. El
+perfil se elige así:
+
+1. `[agents.preferred_profiles]` si existe y encaja con el host del proyecto.
+2. Perfil del proyecto.
+3. Perfil global.
+
+Un preferido inexistente o incompatible (por ejemplo, un perfil WSL en un
+proyecto local) produce un aviso y se usa el siguiente. El comando base sale de
+`[profiles.agent_commands]` o del nombre del agente. Si el ejecutable no está
+instalado, el error aparece en la propia terminal.
 
 ## Diagnóstico y pruebas
 
@@ -195,6 +231,11 @@ Gate manual recomendado:
 4. Deja una pestaña en segundo plano con atención pendiente: debe aparecer el
    toast y el `!` en el título; al enfocarla, ambos desaparecen.
 5. Mueve una pestaña de panel: sus sesiones se conservan.
+6. Abre OpenCode y Copilot desde el pie de la sidebar y desde el «+» de la
+   pestaña: cada gesto crea una pestaña nueva, arranca en el cwd del proyecto y
+   respeta el perfil preferido. Prueba también con la sidebar estrecha (iconos),
+   con un perfil preferido de otra distro (aviso) y sin el binario (error en la
+   terminal).
 
 ## Limitaciones conocidas
 
@@ -204,8 +245,17 @@ Gate manual recomendado:
   aplican a la sesión más reciente y el árbol conserva el conteo.
 - Se valida el `id` de OSC 7501 y su jerarquía, pero v0.1 modela un único
   registro raíz por terminal; los ids no crean sesiones separadas por sí solos.
+  Solo se guarda un id de sesión reanudable (`ses_…` o UUID) como
+  `resume_session`; el registro sintético `opencode` se ignora. La sesión actual
+  se reconoce por el título del terminal cuando OpenCode comparte la tira de
+  pestañas; con `terminal.title=false` la elección puede ser ambigua.
+- Sin `resume_session`, el fallback `--continue` reanuda la última sesión del
+  directorio y dos pestañas del mismo proyecto pueden coincidir.
 - `sysinfo` no ve procesos Linux dentro de WSL, así que ahí el estado depende de
   OSC 7501.
+- Los accesos rápidos siempre abren una pestaña nueva: puede haber varias
+  sesiones del mismo agente en un proyecto. Es deliberado y el tooltip avisa de
+  que ya hay una activa.
 - Los nombres de proceso pueden cambiar entre versiones; el matcher se cubre con
   snapshots y se documenta.
 - Los avisos son in-app; no hay notificaciones del sistema ni sonido.

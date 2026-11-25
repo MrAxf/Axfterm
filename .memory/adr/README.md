@@ -32,6 +32,7 @@ Cada ADR usa MADR-lite en español:
 | [0009](0009-agentes-deteccion-estado.md) | Detección y estado de agentes con OSC 7501 y árbol de procesos | Aceptado | 2026-11-22 |
 | [0010](0010-panel-ajustes-reorganizacion.md) | Reorganización del panel de ajustes: cuatro secciones, tipografía en Apariencia y acciones en el pie | Aceptado | 2026-11-24 |
 | [0011](0011-proyectos-wsl.md) | Proyectos WSL y hosts de proyecto | Aceptado | 2026-11-24 |
+| [0012](0012-lanzamiento-agentes.md) | Lanzamiento de agentes desde la app: pestaña nueva, perfil por host y comando inyectado | Aceptado | 2026-11-25 |
 
 ## Cuándo escribir uno
 

@@ -43,6 +43,7 @@ impl Shell {
         let right_scroll = scroll.clone();
         let pane_menu_this = this.clone();
         let default_profile = self.theme_host.settings.terminal.default_profile.clone();
+        let at_limit = self.workspace.tab_count() >= MAX_TABS;
         let local_project = pane
             .active
             .and_then(|tab| self.workspace.tab(tab))
@@ -227,6 +228,40 @@ impl Shell {
                                         submenu
                                     })
                                 };
+                                let open_agent = |kind: AgentKind| -> PopupMenuItem {
+                                    let this = this.clone();
+                                    PopupMenuItem::element(move |_, cx| {
+                                        let metrics = theme::metrics(cx);
+                                        let theme_state = theme::state(cx);
+                                        let ui = theme_state.theme.ui;
+                                        div()
+                                            .flex()
+                                            .items_center()
+                                            .gap(metrics.spacing_xs())
+                                            .child(
+                                                Icon::new(agent_icon(kind))
+                                                    .size(IconSize::Sm)
+                                                    .color(ui.text),
+                                            )
+                                            .child(kind.label())
+                                            .child(
+                                                div()
+                                                    .ml_auto()
+                                                    .text_size(metrics.font_size * 0.6875)
+                                                    .text_color(ui.muted)
+                                                    .child(keys::format_chord(agent_shortcut(kind))),
+                                            )
+                                            .into_any_element()
+                                    })
+                                    .disabled(at_limit)
+                                    .on_click(move |_, window, cx| {
+                                        if let Some(this) = this.upgrade() {
+                                            let _ = this.update(cx, |shell, cx| {
+                                                shell.launch_agent(kind, Some(pane_id), window, cx);
+                                            });
+                                        }
+                                    })
+                                };
                                 menu.item(PopupMenuItem::new("Nueva terminal").on_click({
                                     let this = this.clone();
                                     move |_, window, cx| {
@@ -240,6 +275,9 @@ impl Shell {
                                 .when(!profile_items.is_empty(), |menu| {
                                     menu.item(PopupMenuItem::submenu("Con perfil", profile_menu))
                                 })
+                                .item(open_agent(AgentKind::OpenCode))
+                                .item(open_agent(AgentKind::Copilot))
+                                .separator()
                                 .item(PopupMenuItem::new("Dividir a la derecha").on_click({
                                     let this = this.clone();
                                     move |_, window, cx| {

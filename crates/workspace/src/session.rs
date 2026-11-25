@@ -308,6 +308,25 @@ mod tests {
     }
 
     #[test]
+    fn resume_session_round_trips_with_its_agent() {
+        let (mut workspace, root) = sample_workspace("resume-session");
+        let project = workspace.projects()[0].id;
+        let tab = workspace.project_tabs(project)[0];
+        let resume = crate::ResumeAgent {
+            kind: "opencode".into(),
+            session: Some("ses_dedee5759ffe9Dkg5yMdr6d3xb".into()),
+        };
+        assert!(workspace.set_tab_resume(tab, Some(resume.clone())));
+        let path = root.join("session.json");
+        save_session(&path, &SessionFile::current(workspace)).expect("guarda");
+
+        let mut loaded = load_session(&path, &profile())
+            .expect("carga")
+            .expect("existe");
+        assert_eq!(loaded.workspace.take_tab_resume(tab), Some(resume));
+    }
+
+    #[test]
     fn loaded_session_is_repaired() {
         let (workspace, root) = sample_workspace("repair-load");
         let path = root.join("session.json");
@@ -317,6 +336,18 @@ mod tests {
         // Arranca un ratio imposible y un foco a un panel inexistente.
         value["workspace"]["layout"]["value"]["ratio"] = serde_json::json!(99.0);
         value["workspace"]["focus"]["pane"] = serde_json::json!(9999);
+        // Una sesión huérfana sin agente no debe reanudar nada.
+        if let Some(tabs) = value["workspace"]["tabs"].as_object_mut() {
+            for tab in tabs.values_mut() {
+                if let Some(object) = tab.as_object_mut() {
+                    object.remove("resume_agent");
+                    object.insert(
+                        "resume_session".into(),
+                        serde_json::json!("ses_dedee5759ffe9Dkg5yMdr6d3xb"),
+                    );
+                }
+            }
+        }
         std::fs::write(&path, serde_json::to_vec_pretty(&value).expect("json")).expect("escribe");
 
         let loaded = load_session(&path, &profile())
@@ -328,5 +359,11 @@ mod tests {
         );
         let focus_pane = loaded.workspace.focus().pane;
         assert!(loaded.workspace.layout().leaves().contains(&focus_pane));
+        for project in loaded.workspace.projects() {
+            for tab in loaded.workspace.project_tabs(project.id) {
+                let tab = loaded.workspace.tab(tab).expect("tab");
+                assert_eq!(tab.resume_session, None, "sin agente no hay sesión");
+            }
+        }
     }
 }

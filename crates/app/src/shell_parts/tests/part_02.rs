@@ -143,21 +143,76 @@ fn file_drag_rows_outside_the_viewport_do_not_count() {
     assert!(file_drag_over(row, point(px(30.0), px(130.0)), None));
 }
 #[test]
-fn resume_command_uses_the_profile_override_and_keeps_continue() {
+fn resume_command_uses_the_profile_override_and_prefers_the_reported_session() {
+    let opencode = "ses_dedee5759ffe9Dkg5yMdr6d3xb";
     assert_eq!(
-        agent_resume_command(Some("opencode2"), AgentKind::OpenCode),
+        agent_resume_command(Some("opencode2"), AgentKind::OpenCode, None),
         "opencode2 --continue"
     );
     assert_eq!(
-        agent_resume_command(Some("  bun x opencode  "), AgentKind::OpenCode),
+        agent_resume_command(Some("  bun x opencode  "), AgentKind::OpenCode, None),
         "bun x opencode --continue"
     );
     assert_eq!(
-        agent_resume_command(None, AgentKind::OpenCode),
+        agent_resume_command(None, AgentKind::OpenCode, None),
         "opencode --continue"
     );
     assert_eq!(
-        agent_resume_command(None, AgentKind::Copilot),
+        agent_resume_command(Some("opencode2"), AgentKind::OpenCode, Some(opencode)),
+        format!("opencode2 --session {opencode}")
+    );
+    assert_eq!(
+        agent_resume_command(None, AgentKind::OpenCode, Some("opencode")),
+        "opencode --continue",
+        "un id de registro no se escribe en el shell"
+    );
+    let copilot = "0cb916db-26aa-40f2-86b5-1ba81b225fd2";
+    assert_eq!(
+        agent_resume_command(None, AgentKind::Copilot, Some(copilot)),
+        format!("copilot --resume={copilot}")
+    );
+    assert_eq!(
+        agent_resume_command(None, AgentKind::Copilot, Some(opencode)),
         "copilot --continue"
+    );
+}
+#[test]
+fn launch_command_uses_the_profile_override_or_the_agent_name() {
+    assert_eq!(agent_launch_command(None, AgentKind::OpenCode), "opencode");
+    assert_eq!(
+        agent_launch_command(Some("opencode2"), AgentKind::OpenCode),
+        "opencode2"
+    );
+    assert_eq!(
+        agent_launch_command(Some("  bun x copilot  "), AgentKind::Copilot),
+        "bun x copilot"
+    );
+    assert_eq!(
+        agent_launch_command(Some("   "), AgentKind::Copilot),
+        "copilot"
+    );
+}
+#[test]
+fn sidebar_footer_counts_only_live_agents() {
+    let (mut workspace, _project, tab) = sidebar_workspace("footer-live");
+    let live = test_agent(1, AgentKind::OpenCode, 10, AgentState::Working, 1);
+    let mut dead = test_agent(2, AgentKind::Copilot, 11, AgentState::Finished, 2);
+    dead.alive = false;
+    workspace.set_tab_agents(tab, vec![live, dead]);
+    assert_eq!(active_agent_count(&workspace), 1);
+}
+#[test]
+fn sidebar_footer_summary_uses_singular_and_plural() {
+    assert_eq!(
+        sidebar_status_summary(1, 1, 1),
+        (
+            "1 proy · 1 term · 1 ag".to_owned(),
+            "1 proyecto, 1 terminal y 1 agente activo".to_owned()
+        )
+    );
+    assert_eq!(sidebar_status_summary(0, 3, 0).0, "0 proy · 3 term · 0 ag");
+    assert_eq!(
+        sidebar_status_summary(2, 3, 4).1,
+        "2 proyectos, 3 terminales y 4 agentes activos"
     );
 }

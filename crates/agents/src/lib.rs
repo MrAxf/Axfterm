@@ -13,6 +13,6 @@ mod process;
 
 pub use model::{
     AgentAggregate, AgentKind, AgentReport, AgentSession, AgentSessionId, AgentState,
-    AgentTransition, AttentionKind, aggregate,
+    AgentTransition, AttentionKind, ReportedSession, aggregate,
 };
 pub use process::{DetectedAgent, ProcessInfo, ProcessScanner, ProcessSnapshot};

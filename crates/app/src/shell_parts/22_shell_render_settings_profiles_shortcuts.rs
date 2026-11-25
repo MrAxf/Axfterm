@@ -361,11 +361,10 @@ impl Shell {
                 )
             })
             .child(
-                div()
-                    .id("settings-shortcut-list")
-                    .max_h(metrics.font_size * 26.0)
-                    .overflow_y_scroll()
-                    .child(list),
+                // Una sola región de scroll: la del cuerpo de Ajustes. Con una
+                // lista interna, la rueda movía la lista y la scrollbar visible
+                // seguía midiendo solo la página exterior.
+                div().id("settings-shortcut-list").child(list),
             )
             .child(
                 div()

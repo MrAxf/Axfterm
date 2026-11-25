@@ -1,8 +1,8 @@
 use crate::{
     AgentNextAttention, ClosePane, CloseTab, DuplicateTab, ExportTheme, FocusNextPane,
     FocusPreviousPane, FocusSidebar, ImportTheme, MoveTabNextPane, NewTab, NextTab, NextTheme,
-    OpenCommandPalette, OpenProject, OpenSearchPalette, OpenSettings, OpenThemesFolder,
-    OpenWslProject,
+    OpenCommandPalette, OpenCopilot, OpenOpenCode, OpenProject, OpenSearchPalette, OpenSettings,
+    OpenThemesFolder, OpenWslProject,
     PreviousTab, PreviousTheme, Quit, ReloadThemes, RenameTab, RestartTab, ShowShortcuts,
     SplitHorizontal, SplitVertical, ToggleSidebar, ToggleSidebarAgents, ToggleThemeVariant,
     ToggleZoom,
@@ -70,6 +70,9 @@ pub(crate) const ALL_CONTEXTS: &[&str] = &[
     axf_terminal::TERMINAL_CONTEXT,
 ];
 pub(crate) const TERMINAL_CONTEXT_ONLY: &[&str] = &[axf_terminal::TERMINAL_CONTEXT];
+/// Acciones de app que no deben robar teclas dentro de la terminal.
+pub(crate) const WORKSPACE_SIDEBAR_CONTEXTS: &[&str] =
+    &[crate::WORKSPACE_CONTEXT, crate::SIDEBAR_CONTEXT];
 pub(crate) const ALL_CONTEXT_ACTIONS: &[ActionMeta] = &[
     meta(
         "app.quit",
@@ -342,6 +345,22 @@ pub(crate) const ALL_CONTEXT_ACTIONS: &[ActionMeta] = &[
         &["agente", "atencion", "attention", "jump"],
     ),
     meta(
+        "agent.open_opencode",
+        "Abrir OpenCode en una pestaña nueva",
+        ActionCategory::Agent,
+        crate::keys::OPEN_OPENCODE,
+        WORKSPACE_SIDEBAR_CONTEXTS,
+        &["agente", "opencode", "abrir", "nueva", "terminal"],
+    ),
+    meta(
+        "agent.open_copilot",
+        "Abrir Copilot en una pestaña nueva",
+        ActionCategory::Agent,
+        crate::keys::OPEN_COPILOT,
+        WORKSPACE_SIDEBAR_CONTEXTS,
+        &["agente", "copilot", "abrir", "nueva", "terminal"],
+    ),
+    meta(
         "help.shortcuts",
         "Ver todos los atajos",
         ActionCategory::Help,
@@ -440,6 +459,8 @@ pub(crate) fn action_for(id: &str) -> Option<Box<dyn Action>> {
         "theme.import" => Box::new(ImportTheme),
         "theme.export" => Box::new(ExportTheme),
         "agent.next_attention" => Box::new(AgentNextAttention),
+        "agent.open_opencode" => Box::new(OpenOpenCode),
+        "agent.open_copilot" => Box::new(OpenCopilot),
         "help.shortcuts" => Box::new(ShowShortcuts),
         "terminal.copy" => Box::new(CopySelection),
         "terminal.paste" => Box::new(PasteSelection),
