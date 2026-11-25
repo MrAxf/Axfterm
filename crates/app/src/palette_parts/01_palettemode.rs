@@ -137,6 +137,24 @@ pub(crate) struct PaletteRow {
     /// Índices del texto original que deben resaltarse.
     pub(crate) indices: Vec<usize>,
 }
+fn sort_rows(rows: &mut [PaletteRow], items: &[PaletteItem], query: &str) {
+    let blank = query.trim().is_empty();
+    rows.sort_by(|left, right| {
+        let defer_quit = |row: &PaletteRow| {
+            blank && matches!(items[row.item].target, PaletteTarget::Command("app.quit"))
+        };
+        defer_quit(left)
+            .cmp(&defer_quit(right))
+            .then_with(|| right.score.cmp(&left.score))
+            .then_with(|| {
+                items[left.item]
+                    .kind
+                    .order()
+                    .cmp(&items[right.item].kind.order())
+            })
+            .then_with(|| left.item.cmp(&right.item))
+    });
+}
 #[derive(Clone, Debug, Default)]
 pub(crate) struct PaletteHistory {
     recent: Vec<String>,
@@ -274,18 +292,7 @@ impl PaletteState {
             })
             .collect();
 
-        rows.sort_by(|left, right| {
-            right
-                .score
-                .cmp(&left.score)
-                .then_with(|| {
-                    self.items[left.item]
-                        .kind
-                        .order()
-                        .cmp(&self.items[right.item].kind.order())
-                })
-                .then_with(|| left.item.cmp(&right.item))
-        });
+        sort_rows(&mut rows, &self.items, query);
         self.rows = rows;
         if self.rows.is_empty() {
             self.selected = 0;

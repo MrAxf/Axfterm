@@ -1,5 +1,17 @@
 # Progreso — M6 Teclado y paleta
 
+## 2026-11-24 — Legibilidad del resaltado de búsqueda
+
+- Los fragmentos coincidentes y no coincidentes ya no se separan con el gap
+  reservado para controles; las etiquetas fuzzy mantienen el espaciado natural
+  del texto. Studio confirma «copilot requiere atención» legible con la consulta
+  `open`.
+
+## 2026-11-23 — Revisión de la paleta
+
+- Con la consulta vacía, «Salir de Axfterm» se ordena tras los demás
+  comandos, incluso si es reciente; al buscarlo conserva el ranking normal.
+
 ## 2026-11-23 — Registro, keymap y paleta
 
 - `actions.rs` centraliza `ActionMeta` (id, etiqueta, categoría, contexto,

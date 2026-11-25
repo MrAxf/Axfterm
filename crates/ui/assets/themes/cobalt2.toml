@@ -18,7 +18,7 @@ danger = "#ff628c"
 warning = "#ffc600"
 success = "#3ad900"
 info = "#80ffbb"
-selection = "#ffc6004d"
+selection = "#ffc6002e"
 focus = "#ffc600"
 
 [terminal]

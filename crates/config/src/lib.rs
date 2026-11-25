@@ -12,17 +12,21 @@ mod write;
 mod timestamp;
 
 pub use paths::{
-    PathError, config_dir, config_path, ensure_config_dir, scrollback_dir, session_path, themes_dir,
+    PathError, config_dir, config_path, ensure_config_dir, logs_dir, scrollback_dir, session_path,
+    themes_dir,
 };
 pub use profiles::{
     CommandError, CommandLine, DetectedProfile, Discovery, MAX_ICON_BYTES,
     MAX_PROFILE_COMMAND_CHARS, MAX_PROFILE_NAME_CHARS, MAX_PROFILES, Profile, ProfileId, discover,
-    discover_wsl, fallback_profile, resolve_executable, tokenize,
+    discover_wsl, fallback_profile, parse_wsl_distros, resolve_executable, tokenize,
+    wsl_distro_from, wsl_distros,
 };
 pub use schema::{
     AGENT_PROFILE_KEYS, AgentsConfig, Appearance, CONFIG_SCHEMA_VERSION, CONFIG_TEMPLATE_HEADER,
-    Config, ConfigError, FontsConfig, LoadedConfig, MAX_CONFIG_BYTES, TerminalConfig, UiConfig,
-    append_profiles, default_template, load, load_or_create, parse_str, write_atomic,
+    Config, ConfigError, FontsConfig, LoadedConfig, MAX_CONFIG_BYTES, MAX_SCROLLBACK_BYTES,
+    MAX_SCROLLBACK_LINES, TerminalConfig, UiConfig, append_profiles, default_template, load,
+    load_or_create, parse_str, write_atomic,
 };
+pub use timestamp::stamp as utc_stamp;
 pub use watch::{ConfigWatcher, DEBOUNCE, WatchError, WatchEvent, watch};
-pub use write::{read_config_text, write_config};
+pub use write::{read_config_text, write_config, write_config_checked};

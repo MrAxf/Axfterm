@@ -1,0 +1,12 @@
+{
+  "name": "app.workspace.agents",
+  "steps": [
+    { "cmd": "theme", "args": ["One Dark"] },
+    { "cmd": "variant", "args": ["dark"] },
+    { "cmd": "size", "args": ["1440x900"] },
+    { "cmd": "workspace", "args": ["demo"] },
+    { "cmd": "open", "args": ["app.sidebar.agents"] },
+    { "cmd": "wait", "args": ["2500"] },
+    { "cmd": "shot", "args": ["app-workspace-agents"] }
+  ]
+}

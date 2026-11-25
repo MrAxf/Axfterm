@@ -35,13 +35,12 @@ impl Shell {
             return;
         };
         let pane = self.workspace.focus().pane;
-        let Some((profile, title)) = self.default_profile() else {
-            self.set_notice(
-                "No hay un perfil por defecto válido en config.toml.",
-                true,
-                cx,
-            );
-            return;
+        let (profile, title) = match self.resolve_project_profile(project, None) {
+            Ok(profile) => profile,
+            Err(error) => {
+                self.set_notice(error, true, cx);
+                return;
+            }
         };
         let new_pane = match self.workspace.split_pane(pane, axis) {
             Ok(pane) => pane,
@@ -264,13 +263,16 @@ impl Shell {
     /// Cambia una pestaña sin perfil al predeterminado tras una elección
     /// explícita del usuario.
     fn use_default_profile(&mut self, tab: TabId, window: &mut Window, cx: &mut Context<'_, Self>) {
-        let Some((profile, title)) = self.default_profile() else {
-            self.set_notice(
-                "No hay un perfil por defecto válido en config.toml.",
-                true,
-                cx,
-            );
+        let Some(project) = self.workspace.tab(tab).map(|tab| tab.project_id) else {
+            self.set_notice("La pestaña ya no existe.", true, cx);
             return;
+        };
+        let (profile, title) = match self.resolve_project_profile(project, None) {
+            Ok(profile) => profile,
+            Err(error) => {
+                self.set_notice(error, true, cx);
+                return;
+            }
         };
         if let Err(error) = self.workspace.set_tab_profile(tab, profile, &title) {
             self.set_notice(error.to_string(), true, cx);
@@ -355,6 +357,7 @@ impl Shell {
             .collect();
         match self.workspace.remove_project(project) {
             Ok(_tabs) => {
+                self.project_health.remove(&project);
                 for terminal in terminals {
                     self.terminals.remove(&terminal);
                     self.pending_terminals.remove(&terminal);
@@ -395,15 +398,14 @@ impl Shell {
         window: &mut Window,
         cx: &mut Context<'_, Self>,
     ) {
-        let cwd = self
+        let target = self
             .workspace
             .tab(tab)
-            .and_then(|tab| self.workspace.project(tab.project_id))
-            .map(|project| project.root.clone());
-        self.spawn_terminal_with_cwd(
+            .and_then(|tab| self.project_target(tab.project_id));
+        self.spawn_terminal_with_target(
             tab,
             terminal,
-            cwd,
+            target,
             SpawnOptions {
                 restore: None,
                 focus: true,

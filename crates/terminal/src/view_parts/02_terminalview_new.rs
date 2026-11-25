@@ -1,3 +1,14 @@
+/// Opciones de arranque de una terminal.
+#[derive(Clone, Debug)]
+pub struct TerminalOptions {
+    /// Historial previo que se reproduce antes de leer el PTY.
+    pub restore: Option<crate::TerminalSnapshot>,
+    /// Líneas de scrollback pedidas por la configuración.
+    pub scrollback: usize,
+    /// Llevar el foco de teclado a la terminal al crearla.
+    pub focus: bool,
+}
+
 impl TerminalView {
     /// Arranca el PTY y el parser. Si falla, la vista muestra el error en vez
     /// de tumbar la ventana.
@@ -7,18 +18,17 @@ impl TerminalView {
         style: TerminalStyle,
         cwd: PathBuf,
         spec: &crate::SpawnSpec,
-        restore: Option<crate::TerminalSnapshot>,
-        focus: bool,
+        options: TerminalOptions,
     ) -> Self {
         let focus_handle = cx.focus_handle();
-        if focus {
+        if options.focus {
             window.focus(&focus_handle, cx);
         }
         let metrics = Metrics::new(window, &style);
         let state = Rc::new(RefCell::new(RenderState::new()));
         let debug = DebugRender::from_env();
 
-        match Self::start(&metrics, &state, cwd, spec, restore, cx) {
+        match Self::start(&metrics, &state, cwd, spec, options, cx) {
             Ok((session, parser, pump)) => {
                 let writer = session.writer();
                 let pid = session.pid();
@@ -181,9 +191,14 @@ impl TerminalView {
         state: &Rc<RefCell<RenderState>>,
         cwd: PathBuf,
         spec: &crate::SpawnSpec,
-        restore: Option<crate::TerminalSnapshot>,
+        options: TerminalOptions,
         cx: &mut Context<'_, Self>,
     ) -> Result<(TerminalSession, ParserHandle, Task<()>), TerminalError> {
+        let TerminalOptions {
+            restore,
+            scrollback,
+            focus: _,
+        } = options;
         let (commands, inbox) = async_channel::bounded(64);
         let initial = GridSize::new(80, 24);
         let cell_width = pixels_to_u16(metrics.cell_width);
@@ -210,6 +225,7 @@ impl TerminalView {
                 cell_width,
                 cell_height,
                 restore,
+                scrollback,
             },
         )?;
 

@@ -4,16 +4,26 @@
 //! El modelo de workspace vive en `axf_workspace`; este crate solo conecta ese
 //! modelo con entidades de terminal y vistas.
 
+// La app es GUI: sin consola al abrirla desde Explorer en release.
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod actions;
 mod font_select;
 mod fuzzy;
 mod history;
 mod keymap;
 mod keys;
+mod logging;
 mod palette;
+mod profile_select;
 mod settings;
 mod shell;
+mod single_instance;
+#[cfg(feature = "studio")]
+mod studio;
 mod theme_host;
+mod wsl;
+mod wsl_open;
 
 use std::path::PathBuf;
 
@@ -28,12 +38,20 @@ use axf_ui::gpui::{
 use shell::Shell;
 use theme_host::ThemeHost;
 
+/// Instante de arranque para medir el primer frame (M9).
+static PROCESS_START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+
+pub(crate) fn process_start() -> std::time::Instant {
+    *PROCESS_START.get_or_init(std::time::Instant::now)
+}
+
 actions!(
     axfterm,
     [
         Quit,
         ToggleSidebar,
         OpenProject,
+        OpenWslProject,
         NewTab,
         CloseTab,
         NextTab,
@@ -100,6 +118,9 @@ const PALETTE_INPUT_CONTEXT: &str = "Palette > Input";
 /// Contexto de teclado de la pantalla de atajos.
 pub(crate) const SHORTCUTS_CONTEXT: &str = "Shortcuts";
 
+/// Contexto de teclado del modal de proyectos WSL.
+pub(crate) const WSL_CONTEXT: &str = "WslProject";
+
 /// Contexto de teclado del panel de ajustes.
 pub(crate) const SETTINGS_CONTEXT: &str = "Settings";
 
@@ -111,10 +132,30 @@ pub(crate) const SETTINGS_INPUT_CONTEXT: &str = "Settings > Input";
     reason = "fallo fatal de arranque, antes de que exista logging configurado"
 )]
 fn main() {
-    let startup = std::env::args_os()
-        .skip(1)
-        .map(PathBuf::from)
-        .find(|path| !path.as_os_str().is_empty());
+    let _ = process_start();
+    logging::init();
+    let args: Vec<PathBuf> = std::env::args_os().skip(1).map(PathBuf::from).collect();
+    #[cfg(feature = "studio")]
+    let mut args = args;
+    #[cfg(feature = "studio")]
+    let studio_launch = studio::parse_args(&mut args);
+    let startup: Vec<PathBuf> = args
+        .into_iter()
+        .filter(|path| !path.as_os_str().is_empty())
+        .collect();
+
+    // Una segunda instancia reenvía sus carpetas y sale antes de crear ventana.
+    let _instance = match single_instance::acquire() {
+        single_instance::Instance::Primary(guard) => guard,
+        single_instance::Instance::Secondary => {
+            let _ = single_instance::forward(&startup);
+            return;
+        }
+    };
+    #[cfg(feature = "studio")]
+    let studio_hidden = studio_launch.as_ref().is_some_and(|launch| launch.hidden);
+    #[cfg(not(feature = "studio"))]
+    let studio_hidden = false;
 
     axf_ui::gpui::application()
         .with_assets(Assets)
@@ -140,7 +181,17 @@ fn main() {
                 }
                 None => (px(1280.0), px(800.0)),
             };
-            let bounds = Bounds::centered(None, size(width, height), cx);
+            let bounds = if studio_hidden {
+                // Una ventana oculta no pinta frames; se coloca fuera del
+                // escritorio para que GPUI siga renderizando y la captura
+                // funcione sin tapar el trabajo del usuario.
+                Bounds {
+                    origin: point(px(-20_000.0), px(-20_000.0)),
+                    size: size(width, height),
+                }
+            } else {
+                Bounds::centered(None, size(width, height), cx)
+            };
             let window_options = WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 // Chrome propio: la barra nativa se oculta y el shell dibuja la
@@ -153,6 +204,8 @@ fn main() {
                 }),
                 app_owns_titlebar_drag: true,
                 window_min_size: Some(size(px(900.0), px(560.0))),
+                show: true,
+                focus: !studio_hidden,
                 ..Default::default()
             };
 
@@ -166,6 +219,8 @@ fn main() {
                         theme_host,
                         keymap,
                         keymap_errors,
+                        #[cfg(feature = "studio")]
+                        studio_launch,
                     )
                 })
             }) {

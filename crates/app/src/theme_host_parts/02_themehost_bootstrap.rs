@@ -72,6 +72,7 @@ impl ThemeHost {
             selected,
             preview_variant: None,
             preview: None,
+            preview_previous_theme: None,
             watcher,
             fonts,
             display_scale: 1.0,
@@ -224,6 +225,7 @@ impl ThemeHost {
                         != resolved_font_sources(&self.settings, &self.config_dir);
                     self.settings = config;
                     self.preview = None;
+                    self.preview_previous_theme = None;
                     self.profile_icons.clear();
                     report.applied = true;
                     if sources_changed {
@@ -360,12 +362,22 @@ impl ThemeHost {
     pub(crate) fn preview_settings(&mut self, draft: &Config, cx: &mut App) -> Vec<String> {
         let sources_changed = resolved_font_sources(draft, &self.config_dir)
             != resolved_font_sources(self.visual(), &self.config_dir);
+        let families_changed = draft.ui.font_family != self.visual().ui.font_family
+            || draft.terminal.font_family != self.visual().terminal.font_family;
+        if self.preview.is_none() {
+            self.preview_previous_theme = Some(self.selected.clone());
+        }
         self.preview = Some(draft.clone());
         self.preview_variant = None;
+        if self.catalog.find(&draft.ui.theme).is_some() {
+            self.selected = draft.ui.theme.clone();
+        }
         let mut messages = if sources_changed {
             self.reload_fonts(cx)
-        } else {
+        } else if families_changed {
             self.refresh_font_resolution(cx)
+        } else {
+            Vec::new()
         };
         messages.extend(self.apply_current(cx));
         messages
@@ -376,6 +388,9 @@ impl ThemeHost {
         let Some(previous) = self.preview.take() else {
             return Vec::new();
         };
+        if let Some(previous_theme) = self.preview_previous_theme.take() {
+            self.selected = previous_theme;
+        }
         let sources_changed = resolved_font_sources(&previous, &self.config_dir)
             != resolved_font_sources(&self.settings, &self.config_dir);
         let mut messages = if sources_changed {
@@ -395,6 +410,7 @@ impl ThemeHost {
         let sources_changed = resolved_font_sources(&draft, &self.config_dir)
             != resolved_font_sources(&self.settings, &self.config_dir);
         self.preview = None;
+        self.preview_previous_theme = None;
         self.preview_variant = None;
         self.settings = draft;
         self.profile_icons.clear();
@@ -432,8 +448,11 @@ impl ThemeHost {
             )
         })?;
         let _icon = self.resolve_icon(&profile, Some(&executable));
+        let program = executable.to_string_lossy().into_owned();
+        let wsl_distro = axf_config::wsl_distro_from(&program, &line.args);
         Ok(PreparedProfile {
-            spec: SpawnSpec::new(executable.to_string_lossy().into_owned(), line.args),
+            spec: SpawnSpec::new(program, line.args),
+            wsl_distro,
         })
     }
 }

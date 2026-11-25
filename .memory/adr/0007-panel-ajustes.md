@@ -3,6 +3,9 @@
 - **Estado**: Aceptado
 - **Fecha**: 2026-11-22
 - **Decidores**: Juan Andrés
+- **Revisión 2026-11-24**: la lista de secciones, la ubicación de las acciones
+  avanzadas y la edición de perfiles se sustituyen por ADR 0010. Las reglas de
+  borrador, guardado, conflicto y hot reload de este ADR siguen vigentes.
 
 ## Contexto
 
@@ -112,6 +115,16 @@ Restricciones reales:
   rechazado.
 - **Panel solo de lectura**: no cumple el objetivo de configurar la app desde la
   UI; rechazado.
+
+## Nota de cierre M9 (2026-11-25)
+
+- `axf_config::write_config_checked(path, expected, base, draft)` cierra la
+  carrera entre la comprobación del borrador y la escritura: relee el archivo y
+  devuelve `ConfigError::Conflict` si el texto ya no coincide con el que el panel
+  guardó como baseline. La única vía que ignora esa comprobación es la
+  sobrescritura explícita tras el conflicto.
+- La UI muestra el conflicto como error de guardado y conserva tanto el borrador
+  como el archivo externo; no hay merge automático.
 
 ## Referencias
 

@@ -8,9 +8,21 @@ license.workspace = true
 authors.workspace = true
 publish.workspace = true
 
+[features]
+# Galería visual del sistema de diseño (solo desarrollo).
+gallery = []
+# Utilidades de captura y control para Axfterm Studio (solo desarrollo).
+#
+# Se activa `gpui/test-support` directamente sobre el paquete fijado por
+# gpui-kit, no `gpui-kit/test-support`: ese último arrastra gpui-fast y su
+# versión de wgpu entra en conflicto con el renderer de Windows.
+studio = ["gallery", "dep:gpui-pre", "dep:gpui-pre-windows"]
+
 [dependencies]
 anyhow.workspace = true
 gpui-kit.workspace = true
+# Solo para habilitar `gpui/test-support` (Window::render_to_image) en Studio.
+gpui-pre = { version = "=0.3.12", package = "gpui-pre", optional = true, features = ["test-support"] }
 # Esquema TOML de temas de usuario (ADR 0004).
 serde.workspace = true
 thiserror.workspace = true
@@ -19,6 +31,12 @@ toml.workspace = true
 png.workspace = true
 [target.'cfg(windows)'.dependencies]
 windows-sys.workspace = true
+# Habilita el readback DirectX de `Window::render_to_image` en Studio.
+gpui-pre-windows = { version = "=0.3.12", package = "gpui-pre-windows", optional = true, default-features = false, features = ["test-support"] }
+
+[[example]]
+name = "gallery"
+required-features = ["gallery"]
 
 [lints]
 workspace = true

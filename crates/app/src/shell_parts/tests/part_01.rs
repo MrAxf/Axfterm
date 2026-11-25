@@ -1,5 +1,33 @@
 use super::*;
 use axf_ui::gpui::size;
+#[cfg(feature = "studio")]
+#[test]
+fn studio_demo_isolates_powershell_profile_without_changing_normal_spawns() {
+    let powershell = axf_terminal::SpawnSpec::new(
+        r"C:\Program Files\PowerShell\7\pwsh.exe",
+        vec!["-NoLogo".into()],
+    );
+    assert_eq!(
+        studio_spawn_spec(powershell.clone(), true),
+        axf_terminal::SpawnSpec::new(
+            r"C:\Program Files\PowerShell\7\pwsh.exe",
+            vec!["-NoLogo".into(), "-NoProfile".into()],
+        )
+    );
+    assert_eq!(studio_spawn_spec(powershell.clone(), false), powershell);
+    assert_eq!(
+        studio_spawn_spec(
+            axf_terminal::SpawnSpec::new("powershell.EXE", vec!["-noprofile".into()]),
+            true,
+        )
+        .args,
+        ["-noprofile"]
+    );
+    assert_eq!(
+        studio_spawn_spec(axf_terminal::SpawnSpec::new("cmd.exe", vec![]), true),
+        axf_terminal::SpawnSpec::new("cmd.exe", vec![])
+    );
+}
 #[test]
 fn split_keys_are_stable_and_unambiguous() {
     assert_eq!(split_key(&[]), "");
@@ -389,6 +417,15 @@ fn sidebar_sections_toggle_between_all_and_agents() {
     assert_eq!(SidebarSection::Agents.toggled(), SidebarSection::All);
     assert_eq!(SidebarSection::All.label(), "Todas");
     assert_eq!(SidebarSection::Agents.label(), "Agentes");
+}
+#[test]
+fn sidebar_agent_metadata_shows_state_before_truncated_detail() {
+    let mut session = test_agent(1, AgentKind::Copilot, 1, AgentState::NeedsAttention, 1);
+    session.progress = Some(52);
+    assert_eq!(
+        sidebar_agent_metadata(&session, Some("orbit".into())),
+        ["Copilot", "atención", "orbit", "52%", "tarea 1"]
+    );
 }
 #[test]
 fn agent_states_map_to_tab_status_and_icons() {

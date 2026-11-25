@@ -63,7 +63,10 @@ impl Shell {
                     .into_iter()
                     .map(|span| {
                         div()
-                            .when(span.matched, |this| this.text_color(ui.accent))
+                            .when(span.matched && active, |this| {
+                                this.font_weight(FontWeight::SEMIBOLD)
+                            })
+                            .when(span.matched && !active, |this| this.text_color(ui.accent))
                             .child(span.text)
                             .into_any_element()
                     })
@@ -110,7 +113,6 @@ impl Shell {
                                     div()
                                         .flex()
                                         .items_center()
-                                        .gap(metrics.spacing_xxs())
                                         .text_size(metrics.palette_label_size())
                                         .line_height(metrics.font_size * 1.05)
                                         .children(spans),
@@ -124,7 +126,7 @@ impl Shell {
                                             .text_ellipsis()
                                             .text_size(metrics.palette_detail_size())
                                             .line_height(metrics.font_size * 0.9)
-                                            .text_color(ui.muted)
+                                            .text_color(if active { ui.text } else { ui.muted })
                                             .child(detail),
                                     )
                                 }),
@@ -136,7 +138,7 @@ impl Shell {
                                     .flex_shrink_0()
                                     .text_right()
                                     .text_size(metrics.palette_meta_size())
-                                    .text_color(ui.muted)
+                                    .text_color(if active { ui.text } else { ui.muted })
                                     .child(item.kind.label()),
                             )
                         })
@@ -403,9 +405,19 @@ impl Shell {
     ) -> Stateful<Div> {
         let key: ElementId = id.into();
         let handle = window
-            .use_keyed_state(key.clone(), cx, |_, cx| cx.focus_handle())
+            .use_keyed_state(key.clone(), cx, |_, cx| cx.focus_handle().tab_stop(true))
             .read(cx)
             .clone();
-        div().id(key).min_w_0().track_focus(&handle).tab_stop(true)
+        let ui = theme::state(cx).theme.ui;
+        div()
+            .id(key)
+            .min_w_0()
+            .track_focus(&handle)
+            .border_1()
+            .border_color(if handle.is_focused(window) {
+                ui.focus
+            } else {
+                ui.border.opacity(0.0)
+            })
     }
 }

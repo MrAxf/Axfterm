@@ -123,6 +123,7 @@ mod tests {
                 cell_width: 8,
                 cell_height: 16,
                 restore: None,
+                scrollback: 10_000,
             },
         )
         .expect("el parser arranca");
@@ -161,6 +162,8 @@ mod tests {
         }
 
         // Fuerza un frame completo tras la salida para leer el grid final.
+        // ConPTY puede entregar un frame completo vacío justo después del
+        // cierre; se conserva el frame con más texto no blanco.
         let _ = parser.scroll(0);
         let frame_deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
         let mut final_rows: Vec<String> = rows;
@@ -168,11 +171,24 @@ mod tests {
             let mut got_full = false;
             while let Ok(frame) = frame_inbox.try_recv() {
                 if frame.full {
-                    final_rows = frame
+                    let candidate: Vec<String> = frame
                         .updates
                         .iter()
                         .map(|update| update.cells.iter().map(|cell| cell.ch).collect())
                         .collect();
+                    let candidate_score = candidate
+                        .iter()
+                        .flat_map(|line| line.chars())
+                        .filter(|ch| !ch.is_whitespace())
+                        .count();
+                    let current_score = final_rows
+                        .iter()
+                        .flat_map(|line| line.chars())
+                        .filter(|ch| !ch.is_whitespace())
+                        .count();
+                    if candidate_score >= current_score {
+                        final_rows = candidate;
+                    }
                     got_full = true;
                 }
             }

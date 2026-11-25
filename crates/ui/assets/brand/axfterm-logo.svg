@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 738 140" width="738" height="140" role="img" aria-label="Axfterm">
+  <defs>
+    <linearGradient id="axfterm-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#222328" />
+      <stop offset="100%" stop-color="#141518" />
+    </linearGradient>
+    <filter id="axfterm-relief" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000000" flood-opacity="0.35" />
+    </filter>
+  </defs>
+
+  <rect x="4" y="4" width="730" height="132" rx="28" fill="url(#axfterm-bg)" />
+
+  <g fill="none" stroke="#F2F2F4" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" filter="url(#axfterm-relief)">
+    <!-- A dibujada como ^, fiel al icono -->
+    <path d="M 50 102 L 81 38 L 112 102" />
+    <path d="M 134 38 L 192 102 M 192 38 L 134 102" />
+    <path d="M 222 102 L 222 38 L 272 38 M 222 70 L 262 70" />
+    <path d="M 298 38 L 356 38 M 327 38 L 327 102" />
+    <path d="M 434 38 L 384 38 L 384 102 L 434 102 M 384 70 L 424 70" />
+    <path d="M 466 102 L 466 38 L 496 38 C 512 38 518 46 518 55 C 518 64 512 72 496 72 L 466 72 M 494 72 L 518 102" />
+    <path d="M 544 102 L 544 38 L 573 76 L 602 38 L 602 102" />
+    <path d="M 624 102 L 686 102" />
+  </g>
+</svg>

@@ -1,5 +1,22 @@
 # Progreso — M3 Sistema visual
 
+## 2026-11-24 — Axfterm Studio y galería automatizada
+
+- Se añade `scripts/studio.ps1` (feature `studio`): navega superficies,
+  reproduce escenas y captura PNGs con `Window::render_to_image` en un perfil
+  aislado. La galería del sistema de diseño vive en `crates/ui/src/gallery/` y
+  cubre tokens, ANSI, tipografía, primitivas, componentes de gpui-kit, iconos y
+  composiciones. `pwsh scripts/studio.ps1 -All` genera 23 capturas y un
+  manifiesto en `target/studio`. Ver `docs/studio.md`.
+
+## 2026-11-23 — Contraste de selección en curso
+
+- La selección de One Dark y Cobalt2 es menos opaca; sus acentos e identidad
+  ANSI se conservan. Se comprueba el contraste del texto seleccionado sobre
+  las superficies de los seis temas incluidos.
+- La revisión visual de los cambios en claro, oscuro y temas externos sigue
+  pendiente; el esquema de temas personalizados no cambia.
+
 ## 2026-11-22 — Sin barra de estado
 
 - Se retira la barra inferior. Duplicaba información que ya está en la
@@ -42,8 +59,8 @@
 - Arrastre, doble clic para maximizar/restaurar, snap layouts y minimizar siguen
   siendo nativos (`WindowControlArea`). El cierre pasa por
   `on_window_should_close` → `request_quit`, así que guarda historial y sesión.
-- Provisional hasta M8: la marca es el glifo de terminal en acento; el `.ico`
-  del ejecutable y su extracción quedan en M8.
+- Provisional hasta M9: la marca es el glifo de terminal en acento; el `.ico`
+  del ejecutable y su extracción quedan en M9.
 
 ## 2026-11-22 — Pestañas contiguas y nombres de shell
 
@@ -227,7 +244,7 @@ ni recrear PTYs.
   la misma versión que ya usa gpui-kit, y el lock fija `notify-types` 2.1.0
   (2.3.x también exige 1.91). `AGENTS.md` actualizado.
 - No se embebe un archivo Nerd Font: se detectan y usan las familias
-  instaladas; el empaquetado de fuentes queda para M8. El fallback y
+  instaladas; el empaquetado de fuentes queda para M9. El fallback y
   `add_fonts` están cubiertos.
 - El parser conserva la paleta con la que arrancó para responder `OSC 10/11/12`;
   el repintado usa la paleta nueva. Reiniciar la pestaña sincroniza ambas.
@@ -237,5 +254,5 @@ ni recrear PTYs.
 ### Pendiente fuera de M3
 
 - Pasada manual de teclado real con las nuevas acciones (se solapa con M6).
-- Empaquetar una Nerd Font y validar CJK/emoji en release (M8).
+- Empaquetar una Nerd Font y validar CJK/emoji en release (M9).
 - Detección real de agentes para poblar `TabStatus` en la UI (M5).

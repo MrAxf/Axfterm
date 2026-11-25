@@ -24,6 +24,8 @@ pub(crate) struct ApplyReport {
 pub(crate) struct PreparedProfile {
     /// Programa y argumentos resueltos.
     pub(crate) spec: SpawnSpec,
+    /// Distro WSL que arranca el perfil, si es un comando `wsl`.
+    pub(crate) wsl_distro: Option<String>,
 }
 #[derive(Debug)]
 pub(crate) struct ThemeHost {
@@ -36,6 +38,8 @@ pub(crate) struct ThemeHost {
     pub(crate) preview_variant: Option<ThemeVariant>,
     /// Borrador visual del panel de ajustes; `None` muestra `settings`.
     pub(crate) preview: Option<Config>,
+    /// Tema activo antes de iniciar la previsualización del borrador.
+    pub(crate) preview_previous_theme: Option<String>,
     pub(crate) watcher: Option<ConfigWatcher>,
     pub(crate) fonts: FontSet,
     pub(crate) display_scale: f32,

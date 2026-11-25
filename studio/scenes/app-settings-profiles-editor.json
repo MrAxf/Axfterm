@@ -1,0 +1,12 @@
+{
+  "name": "app.settings.profiles.editor",
+  "steps": [
+    { "cmd": "theme", "args": ["One Dark"] },
+    { "cmd": "variant", "args": ["dark"] },
+    { "cmd": "size", "args": ["1440x900"] },
+    { "cmd": "scale", "args": ["1"] },
+    { "cmd": "workspace", "args": ["demo"] },
+    { "cmd": "open", "args": ["app.settings.profiles.editor"] },
+    { "cmd": "shot", "args": ["app-settings-profiles-editor"] }
+  ]
+}

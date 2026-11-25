@@ -43,20 +43,26 @@ impl Shell {
         let right_scroll = scroll.clone();
         let pane_menu_this = this.clone();
         let default_profile = self.theme_host.settings.terminal.default_profile.clone();
-        let profile_ids: Vec<ProfileId> = self
-            .theme_host
-            .profiles()
-            .iter()
-            .map(|profile| profile.id.clone())
-            .collect();
-        let profile_items: Vec<(ProfileId, String, bool, ProfileIconSource)> = profile_ids
-            .into_iter()
-            .filter_map(|id| {
-                let name = self.theme_host.profile_name(&id)?;
-                let icon = self.theme_host.profile_icon(&id);
-                Some((id.clone(), name, id == default_profile, icon))
-            })
-            .collect();
+        let local_project = pane
+            .active
+            .and_then(|tab| self.workspace.tab(tab))
+            .and_then(|tab| self.workspace.project(tab.project_id))
+            .is_none_or(|project| !project.host.is_remote());
+        let profiles: Vec<(ProfileId, String)> = if local_project {
+            self.theme_host
+                .profiles()
+                .iter()
+                .map(|profile| (profile.id.clone(), profile.name.clone()))
+                .collect()
+        } else {
+            Vec::new()
+        };
+        let mut profile_items: Vec<(ProfileId, String, bool, ProfileIconSource)> =
+            Vec::with_capacity(profiles.len());
+        for (id, name) in profiles {
+            let icon = self.theme_host.profile_icon(&id);
+            profile_items.push((id.clone(), name, id == default_profile, icon));
+        }
         div()
             .flex()
             .items_center()

@@ -7,6 +7,10 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 pub const CONFIG_SCHEMA_VERSION: u32 = 2;
 pub const MAX_CONFIG_BYTES: usize = 1024 * 1024;
+/// Líneas de scrollback configurables por terminal (ADR 0005).
+pub const MAX_SCROLLBACK_LINES: u32 = 50_000;
+/// Tope efectivo de memoria por terminal; puede recortar las líneas pedidas.
+pub const MAX_SCROLLBACK_BYTES: u64 = 32 * 1024 * 1024;
 pub const CONFIG_TEMPLATE_HEADER: &str = r#"# Axfterm — configuración de usuario.
 # El archivo es la interfaz: se recarga en caliente al guardar.
 schema_version = 2
@@ -31,6 +35,9 @@ scale = 1.0
 font_size = 13.0
 # Multiplicador de altura de línea (1.0–2.5). 1.0 usa la altura natural.
 line_height = 1.0
+# Líneas de historial por terminal (0–50000). Además hay un tope de 32 MiB
+# por terminal que puede recortar este número en anchos grandes.
+scrollback_lines = 10000
 # Perfil que usan las pestañas nuevas. Debe existir en [[profiles]].
 default_profile = "__default__"
 
@@ -178,6 +185,8 @@ pub struct TerminalConfig {
     pub font_size: f32,
     /// Multiplicador de altura de línea; 1.0 usa la altura natural del glifo.
     pub line_height: f32,
+    /// Líneas de historial por terminal (0–50000).
+    pub scrollback_lines: u32,
     /// Perfil que usan las pestañas nuevas.
     pub default_profile: ProfileId,
 }
@@ -187,6 +196,7 @@ impl Default for TerminalConfig {
             font_family: None,
             font_size: 13.0,
             line_height: 1.0,
+            scrollback_lines: 10_000,
             default_profile: ProfileId::fallback(),
         }
     }
@@ -274,6 +284,14 @@ pub enum ConfigError {
     TooLarge {
         /// Tope.
         limit: usize,
+    },
+    /// El archivo cambió entre la comprobación y la escritura.
+    #[error(
+        "config.toml cambió fuera del panel mientras se guardaba; no se escribió nada. Recarga o confirma la sobrescritura."
+    )]
+    Conflict {
+        /// Archivo afectado.
+        path: String,
     },
 }
 #[derive(Clone, Debug)]

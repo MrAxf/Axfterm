@@ -335,30 +335,41 @@ impl Workspace {
 
     fn repair_projects(&mut self) {
         let mut seen_ids = HashSet::new();
-        let mut seen_roots = HashSet::new();
+        let mut seen_roots: HashSet<(ProjectHost, PathBuf)> = HashSet::new();
         let mut replacements: HashMap<ProjectId, ProjectId> = HashMap::new();
         let mut kept = Vec::with_capacity(self.projects.len());
 
         for mut project in self.projects.drain(..) {
             // Las sesiones anteriores guardaban la forma verbatim; se sanea
             // antes de deduplicar para que `\\?\C:\x` y `C:\x` sean el mismo.
-            project.root = axf_terminal::paths::normalize(&project.root);
+            // Las rutas WSL no pasan por reglas de Windows.
+            match &project.host {
+                ProjectHost::Local => {
+                    project.root = axf_terminal::paths::normalize(&project.root);
+                }
+                ProjectHost::Wsl { .. } => {
+                    if let Ok(root) = normalize_posix(&project.root) {
+                        project.root = root;
+                    }
+                }
+            }
             if seen_ids.contains(&project.id) {
                 continue;
             }
-            if seen_roots.contains(&project.root) {
-                // Mismo root canónico: se conserva el primero y se reasignan
-                // sus pestañas en `repair_panes_and_tabs` vía `replacements`.
+            let key = (project.host.clone(), project.root.clone());
+            if seen_roots.contains(&key) {
+                // Mismo host y root canónico: se conserva el primero y se
+                // reasignan sus pestañas en `repair_panes_and_tabs`.
                 if let Some(owner) = kept
                     .iter()
-                    .find(|kept: &&Project| kept.root == project.root)
+                    .find(|kept: &&Project| kept.host == project.host && kept.root == project.root)
                 {
                     replacements.insert(project.id, owner.id);
                 }
                 continue;
             }
             seen_ids.insert(project.id);
-            seen_roots.insert(project.root.clone());
+            seen_roots.insert(key);
             kept.push(project);
         }
         self.projects = kept;

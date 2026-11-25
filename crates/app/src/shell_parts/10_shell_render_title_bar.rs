@@ -26,8 +26,8 @@ impl Shell {
             metrics.titlebar_padding(),
         );
 
-        // Provisional hasta M8: el .exe aún no embebe un icono propio. Cuando
-        // exista, este bloque pasa a mostrar el icono extraído del ejecutable.
+        // La marca vive en `crates/ui/assets/brand` y se tiñe con el tema. El
+        // .ico que embebe el ejecutable comparte el mismo dibujo (M9).
         let brand = div()
             .id("title-brand")
             .flex()
@@ -43,7 +43,7 @@ impl Shell {
                 axf_ui::gpui::base::GlobalState::suppress_text_selection(cx);
             })
             .child(
-                Icon::new(icons::TERMINAL)
+                Icon::new(icons::AXFTERM)
                     .size(IconSize::Custom(metrics.titlebar_icon()))
                     .color(ui.accent),
             )
@@ -161,18 +161,54 @@ impl Shell {
         } else {
             "Abre una terminal en el proyecto actual o registra otra carpeta."
         };
+        let open_this = cx.entity().downgrade();
         EmptyState::new(icons::FOLDER, message, detail)
             .action(
                 div()
                     .flex()
                     .gap(metrics.spacing_sm())
                     .child(
-                        Button::new("onboarding-open", "Abrir carpeta")
+                        DropdownButton::new("onboarding-open")
                             .primary()
-                            .icon(icons::FOLDER_OPEN)
-                            .on_click(cx.listener(|shell, _, window, cx| {
-                                shell.open_project_path_dialog(window, cx);
-                            })),
+                            .button(
+                                KitButton::new("onboarding-open-local")
+                                    .label("Abrir carpeta…")
+                                    .on_click(cx.listener(|shell, _, window, cx| {
+                                        shell.open_project_path_dialog(window, cx);
+                                    })),
+                            )
+                            .dropdown_menu_with_anchor(
+                                Anchor::BottomLeft,
+                                move |menu, _, _| {
+                                    let local = open_this.clone();
+                                    let wsl = open_this.clone();
+                                    menu.item(
+                                        PopupMenuItem::new("Carpeta local…").on_click(
+                                            move |_, window, cx| {
+                                                if let Some(this) = local.upgrade() {
+                                                    let _ = this.update(cx, |shell, cx| {
+                                                        shell.open_project_path_dialog(
+                                                            window, cx,
+                                                        );
+                                                    });
+                                                }
+                                            },
+                                        ),
+                                    )
+                                    .item(
+                                        PopupMenuItem::new("Proyecto en WSL…").on_click(
+                                            move |_, window, cx| {
+                                                if let Some(this) = wsl.upgrade() {
+                                                    let _ = this.update(cx, |shell, cx| {
+                                                        shell.open_wsl_modal(window, cx);
+                                                    });
+                                                }
+                                            },
+                                        ),
+                                    )
+                                },
+                            )
+                            .menu_accessibility_label("Más formas de abrir un proyecto"),
                     )
                     .when(!empty_project, |this| {
                         this.child(

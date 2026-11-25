@@ -146,7 +146,7 @@ Los TOML viven en `crates/ui/assets/themes/` y se embeben en el binario.
 
 | Acción | Atajo | Uso |
 | --- | --- | --- |
-| Mostrar tema y fuentes | `Ctrl+Alt+T` | Modal con catálogo, fuentes y rutas |
+| Mostrar tema y fuentes | `Ctrl+Alt+T` | Modal con catálogo, tipografía y escala |
 | Cerrar modal | `Esc` | Vuelve el foco a la terminal activa |
 | Alternar variante | `Ctrl+Alt+V` | Previsualiza claro/oscuro |
 | Tema siguiente/anterior | `Ctrl+Alt+N` / `Ctrl+Alt+P` | Cicla el catálogo |

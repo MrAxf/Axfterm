@@ -1,3 +1,19 @@
+fn sidebar_agent_metadata(session: &AgentSession, context: Option<String>) -> Vec<String> {
+    let mut parts = vec![
+        session.kind.label().to_owned(),
+        session.state.label().to_ascii_lowercase(),
+    ];
+    if let Some(context) = context {
+        parts.push(context);
+    }
+    if let Some(progress) = session.progress {
+        parts.push(format!("{progress}%"));
+    }
+    if let Some(message) = &session.message {
+        parts.push(message.clone());
+    }
+    parts
+}
 impl Shell {
     fn render_sidebar_tab(
         &mut self,
@@ -16,10 +32,7 @@ impl Shell {
         let title = self.tab_title(tab, cx);
         let focused = self.workspace.focus().tab == Some(tab);
         let selected = cursor == Some(SidebarRow::Tab(tab));
-        let missing = self
-            .workspace
-            .project(project)
-            .is_some_and(|project| !project.root.is_dir());
+        let missing = self.project_missing(project);
         let aggregate = self
             .workspace
             .tab(tab)
@@ -31,10 +44,17 @@ impl Shell {
         let profile = self
             .profile_title(&model_tab.profile_id)
             .unwrap_or_else(|| model_tab.profile_id.to_string());
-        let live_cwd = self
-            .terminals
-            .get(&model_tab.terminal_id)
-            .and_then(|entry| entry.view.read(cx).cwd().cloned());
+        let remote = self
+            .workspace
+            .project(project)
+            .is_some_and(|project| project.host.is_remote());
+        let live_cwd = (!remote)
+            .then(|| {
+                self.terminals
+                    .get(&model_tab.terminal_id)
+                    .and_then(|entry| entry.view.read(cx).cwd().cloned())
+            })
+            .flatten();
         let project_root = self
             .workspace
             .project(project)
@@ -64,19 +84,7 @@ impl Shell {
             meta_parts.push("error de arranque".to_owned());
         } else if let Some(aggregate) = &aggregate {
             let session = &aggregate.dominant;
-            let status = tab_status_from_state(session.state);
-            meta_parts.push(session.kind.label().to_owned());
-            if let Some(context) = context {
-                meta_parts.push(context);
-            }
-            if let Some(progress) = session.progress {
-                meta_parts.push(format!("{progress}%"));
-            }
-            if let Some(message) = &session.message {
-                meta_parts.push(message.clone());
-            } else {
-                meta_parts.push(status.label().to_ascii_lowercase());
-            }
+            meta_parts = sidebar_agent_metadata(session, context);
         } else {
             if profile != title {
                 meta_parts.push(profile.clone());
@@ -108,6 +116,8 @@ impl Shell {
         let title_color = if missing { ui.danger } else { ui.text };
         let meta_color = if missing || spawn_error {
             ui.danger
+        } else if focused {
+            ui.text
         } else {
             ui.muted
         };
@@ -183,6 +193,7 @@ impl Shell {
                             .text_ellipsis()
                             .text_size(metrics.font_size * 0.875)
                             .text_color(title_color)
+                            .when(focused, |this| this.font_weight(FontWeight::SEMIBOLD))
                             .child(title),
                     )
                     .child(
@@ -246,19 +257,12 @@ impl Shell {
         );
         row = row.child(slot);
         if focused {
-            row = row.bg(ui.surface_raised).child(
-                div()
-                    .absolute()
-                    .left_0()
-                    .top(metrics.spacing_xs())
-                    .bottom(metrics.spacing_xs())
-                    .w(metrics.tab_indicator())
-                    .rounded(metrics.radius_full())
-                    .bg(ui.accent),
-            );
+            row = row.bg(ui.selection);
         }
         if selected && sidebar_focused {
-            row = row.bg(ui.surface_raised).border_color(ui.focus);
+            row = row
+                .when(!focused, |this| this.bg(ui.surface_raised))
+                .border_color(ui.focus);
         }
         if !focused && !(selected && sidebar_focused) {
             row = row.hover(move |this| this.bg(ui.surface_raised.opacity(0.55)));

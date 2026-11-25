@@ -5,7 +5,7 @@ use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
-pub const SESSION_VERSION: u32 = 2;
+pub const SESSION_VERSION: u32 = 3;
 pub const MAX_SESSION_BYTES: u64 = 4 * 1024 * 1024;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SessionFile {

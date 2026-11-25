@@ -28,7 +28,7 @@ tiene que ser perezosa.
   Cada parser vivo recibe una petición de instantánea, la UI espera las
   respuestas y escribe los archivos antes de guardar `session.json` y salir.
 - Un crash, un `taskkill` o un corte de luz pierde la última tanda. El
-  autoguardado periódico queda para M8 si las mediciones lo justifican.
+  autoguardado periódico queda para M9 si las mediciones lo justifican.
 
 ### Formato
 
@@ -116,4 +116,4 @@ tiene que ser perezosa.
 - ADR 0004 — formato y recuperación de la sesión.
 - ADR 0005 — límites de v0.1.
 - ADR 0006 — perfiles y ausencia de fallback silencioso.
-- `.memory/milestones/08-persistencia-release/tasks.md` — seguimiento.
+- `.memory/milestones/09-persistencia-release/tasks.md` — seguimiento.

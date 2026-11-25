@@ -55,6 +55,17 @@ impl std::fmt::Debug for EngineBench {
 impl EngineBench {
     /// Crea un motor con un escritor que guarda las respuestas.
     pub fn new(cols: usize, rows: usize, cell_width: u16, cell_height: u16) -> Self {
+        Self::with_scrollback(cols, rows, cell_width, cell_height, SCROLLBACK_LINES)
+    }
+
+    /// Motor con un historial explícito, para probar el tope de memoria.
+    pub fn with_scrollback(
+        cols: usize,
+        rows: usize,
+        cell_width: u16,
+        cell_height: u16,
+        scrollback: usize,
+    ) -> Self {
         let written = Arc::new(Mutex::new(Vec::new()));
         let setup = ParserSetup {
             writer: PtyWriter::new(Box::new(CaptureWriter(Arc::clone(&written)))),
@@ -63,6 +74,7 @@ impl EngineBench {
             cell_width,
             cell_height,
             restore: None,
+            scrollback,
         };
         Self {
             core: TerminalCore::new(setup),
@@ -86,6 +98,7 @@ impl EngineBench {
             cell_width,
             cell_height,
             restore: Some(snapshot),
+            scrollback: SCROLLBACK_LINES,
         };
         Self {
             core: TerminalCore::new(setup),

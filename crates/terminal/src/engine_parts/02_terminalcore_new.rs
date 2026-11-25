@@ -7,6 +7,7 @@ impl TerminalCore {
             cell_width,
             cell_height,
             restore,
+            scrollback,
         } = setup;
         let metrics = Arc::new(Mutex::new(WindowMetrics {
             cols: initial.columns(),
@@ -21,8 +22,15 @@ impl TerminalCore {
             palette,
             events: Rc::clone(&events),
         };
+        // La restauración puede traer un ancho distinto al inicial; el tope de
+        // memoria se calcula con el ancho real del primer grid.
+        let restore_cols = restore
+            .as_ref()
+            .filter(|restore| !restore.is_empty() && restore.cols() > 0)
+            .map(|restore| usize::from(restore.cols()))
+            .unwrap_or_else(|| initial.columns());
         let config = Config {
-            scrolling_history: SCROLLBACK_LINES,
+            scrolling_history: crate::engine::effective_scrollback(scrollback, restore_cols),
             ..Default::default()
         };
         let mut parser = Processor::new();
@@ -46,6 +54,7 @@ impl TerminalCore {
             events,
             metrics,
             writer,
+            requested_scrollback: scrollback,
         }
     }
 
@@ -83,6 +92,10 @@ impl TerminalCore {
             metrics.cell_height = request.cell_height;
         }
         self.term.resize(GridSize::new(request.cols, request.rows));
+        // El tope de 32 MiB depende del ancho: al ensanchar se recorta el
+        // historial antiguo para no superarlo.
+        let limit = crate::engine::effective_scrollback(self.requested_scrollback, request.cols);
+        self.term.grid_mut().update_history(limit);
     }
 
     fn scroll(&mut self, delta: i32) {

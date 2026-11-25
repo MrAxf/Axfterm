@@ -1,48 +1,12 @@
 #[cfg(windows)]
 fn discover_wsl_windows() -> Vec<DetectedProfile> {
-    use std::os::windows::process::CommandExt as _;
-    use std::process::{Command, Stdio};
-    use std::time::{Duration, Instant};
-
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    let mut child = match Command::new("wsl")
-        .args(["-l", "-q"])
-        .creation_flags(CREATE_NO_WINDOW)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-    {
-        Ok(child) => child,
-        Err(_) => return Vec::new(),
+    let Ok(distros) = wsl_distros() else {
+        return Vec::new();
     };
-    let deadline = Instant::now() + Duration::from_millis(1500);
-    loop {
-        match child.try_wait() {
-            Ok(Some(_)) => break,
-            Ok(None) if Instant::now() < deadline => {
-                std::thread::sleep(Duration::from_millis(20));
-            }
-            _ => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Vec::new();
-            }
-        }
-    }
-    let output = match child.wait_with_output() {
-        Ok(output) => output,
-        Err(_) => return Vec::new(),
-    };
-    let text = decode_wsl_output(&output.stdout);
     let mut seen = std::collections::HashSet::new();
     let mut profiles = Vec::new();
-    for line in text.lines() {
-        let name = line.trim().trim_matches('\0').trim();
-        if name.is_empty() || name.eq_ignore_ascii_case("Windows Subsystem for Linux") {
-            continue;
-        }
-        let id = format!("wsl-{}", slugify(name));
+    for name in distros {
+        let id = format!("wsl-{}", slugify(&name));
         if !seen.insert(id.clone()) {
             continue;
         }
@@ -56,6 +20,83 @@ fn discover_wsl_windows() -> Vec<DetectedProfile> {
         });
     }
     profiles
+}
+
+/// Distros WSL instaladas, en el orden que devuelve `wsl -l -q`.
+///
+/// No abre una ventana, no bloquea al llamador más de 2,5 s y devuelve un
+/// error accionable si WSL no responde. La UI debe llamarlo fuera del hilo de
+/// UI (ADR 0011).
+#[cfg(windows)]
+pub fn wsl_distros() -> Result<Vec<String>, String> {
+    use std::os::windows::process::CommandExt as _;
+    use std::process::{Command, Stdio};
+    use std::time::{Duration, Instant};
+
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let mut child = Command::new("wsl")
+        .args(["-l", "-q"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("no se pudo ejecutar wsl: {error}"))?;
+    let deadline = Instant::now() + Duration::from_millis(2_500);
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) if Instant::now() < deadline => {
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            Ok(None) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err("wsl -l -q no respondió a tiempo".into());
+            }
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!("wsl -l -q falló: {error}"));
+            }
+        }
+    }
+    let output = child
+        .wait_with_output()
+        .map_err(|error| format!("no se pudo leer wsl -l -q: {error}"))?;
+    let stderr = decode_wsl_output(&output.stderr);
+    let distros = parse_wsl_distros(&decode_wsl_output(&output.stdout));
+    if !output.status.success() && distros.is_empty() {
+        let detail = stderr.trim();
+        return Err(if detail.is_empty() {
+            "wsl -l -q falló".into()
+        } else {
+            detail.to_owned()
+        });
+    }
+    Ok(distros)
+}
+
+/// `wsl -l -q` fuera de Windows no existe.
+#[cfg(not(windows))]
+pub fn wsl_distros() -> Result<Vec<String>, String> {
+    Err("WSL solo está disponible en Windows".into())
+}
+
+/// Parsea la salida de `wsl -l -q` (UTF-16 ya decodificado a texto).
+pub fn parse_wsl_distros(text: &str) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    let mut distros = Vec::new();
+    for line in text.lines() {
+        let name = line.trim().trim_matches('\0').trim();
+        if name.is_empty() || name.eq_ignore_ascii_case("Windows Subsystem for Linux") {
+            continue;
+        }
+        if seen.insert(name.to_owned()) {
+            distros.push(name.to_owned());
+        }
+    }
+    distros
 }
 #[cfg(windows)]
 fn decode_wsl_output(bytes: &[u8]) -> String {
@@ -106,6 +147,25 @@ mod tests {
     use std::sync::Mutex;
 
     static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    #[test]
+    fn wsl_profiles_expose_their_distro() {
+        let profile = Profile::new("wsl-ubuntu", "Ubuntu", r#"wsl -d "Ubuntu 22.04""#);
+        assert_eq!(profile.wsl_distro().as_deref(), Some("Ubuntu 22.04"));
+        let profile = Profile::new("wsl", "WSL", r"C:\Windows\System32\wsl.exe --distribution=Debian");
+        assert_eq!(profile.wsl_distro().as_deref(), Some("Debian"));
+        let profile = Profile::new("wsl", "WSL", "wsl -- bash -d no");
+        assert_eq!(profile.wsl_distro(), None, "después de -- no hay opciones");
+        assert_eq!(
+            Profile::new("pwsh", "PowerShell", "pwsh -NoLogo").wsl_distro(),
+            None
+        );
+        assert_eq!(
+            Profile::new("wsl", "WSL", "wsl").wsl_distro(),
+            None,
+            "sin -d la distro sería la predeterminada"
+        );
+    }
 
     #[test]
     fn tokenizer_handles_windows_paths_with_spaces() {
@@ -253,6 +313,14 @@ mod tests {
             pwsh.profile.command,
             format!("{} -NoLogo", quote_program(&executable))
         );
+    }
+
+    #[test]
+    fn wsl_distro_list_filters_noise_and_duplicates() {
+        let parsed = parse_wsl_distros(
+            "Ubuntu\0\r\nWindows Subsystem for Linux\0\r\nDebian\0\r\nUbuntu\0\r\n",
+        );
+        assert_eq!(parsed, vec!["Ubuntu", "Debian"]);
     }
 
     #[test]

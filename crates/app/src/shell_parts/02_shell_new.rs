@@ -2,14 +2,16 @@ impl Shell {
     pub(crate) fn new(
         window: &mut Window,
         cx: &mut Context<'_, Self>,
-        startup: Option<PathBuf>,
+        startup: Vec<PathBuf>,
         theme_host: ThemeHost,
         keymap: Keymap,
         keymap_notes: Vec<String>,
+        #[cfg(feature = "studio")] studio_launch: Option<crate::studio::Launch>,
     ) -> Self {
         let focus = cx.focus_handle();
         let sidebar_focus = cx.focus_handle();
         let settings_focus = cx.focus_handle();
+        let settings_profile_focus = cx.focus_handle();
         let shortcuts_focus = cx.focus_handle();
         window.focus(&focus, cx);
         let session_path = match axf_config::session_path() {
@@ -69,6 +71,8 @@ impl Shell {
             palette: None,
             palette_subscription: None,
             palette_history: PaletteHistory::default(),
+            wsl_open: None,
+            project_health: HashMap::new(),
             ui_font_select: None,
             terminal_font_select: None,
             font_select_subscriptions: Vec::new(),
@@ -79,23 +83,67 @@ impl Shell {
             settings: None,
             settings_scroll: ScrollHandle::new(),
             settings_profile_editor: None,
+            settings_profile_focus,
+            settings_sliders: None,
+            settings_agent_selects: None,
             settings_shortcut_input: None,
             settings_shortcut_subscription: None,
             keystroke_interceptor: None,
             style_revision: 0,
             appearance_subscription: None,
             window_title: "Axfterm".into(),
+            startup: crate::process_start(),
+            startup_logged: false,
             save_generation: 0,
             quitting: false,
             close_hook_registered: false,
+            #[cfg(feature = "studio")]
+            studio: None,
         };
-        if let Some(path) = startup {
+        #[cfg(feature = "studio")]
+        if let Some(launch) = &studio_launch {
+            if launch.gallery_only {
+                shell.workspace = Workspace::new();
+                shell.session_path = None;
+                shell.sidebar_cursor = None;
+            }
+            match crate::studio::attach(launch, window, cx) {
+                Ok(state) => shell.studio = Some(state),
+                Err(error) => shell.set_notice(error, true, cx),
+            }
+            if let Some(fixture) = launch.fixture.as_deref()
+                && shell.studio.is_some()
+                && let Err(error) = shell.studio_workspace(fixture, window, cx)
+            {
+                shell.set_notice(error, true, cx);
+            }
+        }
+        for path in startup {
             shell.open_project_path(path, window, cx);
+        }
+        // Otras instancias reenvían sus carpetas por el pipe local (M9).
+        if let Some(receiver) = crate::single_instance::take_receiver() {
+            cx.spawn(async move |this, cx| {
+                while let Ok(paths) = receiver.recv().await {
+                    let updated = this.update_in(cx, |shell, window, cx| {
+                        for path in paths {
+                            shell.open_project_path(path, window, cx);
+                        }
+                        window.activate_window();
+                        cx.notify();
+                    });
+                    if updated.is_err() {
+                        break;
+                    }
+                }
+            })
+            .detach();
         }
         if let Some(tab) = shell.workspace.focus().tab {
             shell.pending_focus = Some(tab);
         }
         shell.restore_visible_terminals(cx);
+        shell.spawn_project_health_checks(cx);
         shell.reveal_focus();
         shell.watch_config(cx);
         shell.spawn_wsl_discovery(cx);
@@ -236,6 +284,14 @@ impl Shell {
 
     /// Reconcilia las sesiones de cada pestaña con un snapshot de procesos.
     fn apply_agent_snapshot(&mut self, snapshot: &ProcessSnapshot, cx: &mut Context<'_, Self>) {
+        #[cfg(feature = "studio")]
+        if self
+            .studio
+            .as_ref()
+            .is_some_and(|studio| studio.agents_frozen)
+        {
+            return;
+        }
         let now = SystemTime::now();
         let mut next_id = self.agents.seq;
         let mut updates: Vec<AgentTabUpdate> = Vec::new();

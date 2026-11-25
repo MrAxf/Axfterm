@@ -1,0 +1,12 @@
+{
+  "name": "app.sidebar.terminals.compact",
+  "steps": [
+    { "cmd": "theme", "args": ["Axfterm Studio Custom"] },
+    { "cmd": "variant", "args": ["dark"] },
+    { "cmd": "size", "args": ["1024x720"] },
+    { "cmd": "scale", "args": ["1.25"] },
+    { "cmd": "workspace", "args": ["demo"] },
+    { "cmd": "open", "args": ["app.sidebar.terminals"] },
+    { "cmd": "shot", "args": ["app-sidebar-terminals-compact"] }
+  ]
+}

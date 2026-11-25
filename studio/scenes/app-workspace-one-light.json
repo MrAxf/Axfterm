@@ -1,0 +1,11 @@
+{
+  "name": "app.workspace.one-light",
+  "steps": [
+    { "cmd": "theme", "args": ["One Light"] },
+    { "cmd": "variant", "args": ["light"] },
+    { "cmd": "size", "args": ["1440x900"] },
+    { "cmd": "workspace", "args": ["demo"] },
+    { "cmd": "open", "args": ["app.workspace"] },
+    { "cmd": "shot", "args": ["app-workspace-one-light"] }
+  ]
+}

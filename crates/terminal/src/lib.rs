@@ -19,14 +19,14 @@ pub mod view;
 pub use engine::{
     CellColor, CursorShape, CursorSnapshot, EngineBench, HyperlinkSpan, ModeFlags, MouseMode,
     ProgramState, ProgramStatus, ScreenFrame, SelectionPoint, SelectionSpan, SnapshotCell,
-    SnapshotRequest, TerminalEvent,
+    SnapshotRequest, TerminalEvent, effective_scrollback,
 };
 pub use ime::ImeState;
 pub use session::{ExitInfo, PtySession, PtySizeSpec, PtyWriter, SpawnSpec, TerminalSession};
 pub use snapshot::{MAX_SNAPSHOT_BYTES, SNAPSHOT_VERSION, SnapshotError, TerminalSnapshot};
 pub use view::{
-    CopySelection, PasteSelection, SendBacktab, SendTab, TERMINAL_CONTEXT, TerminalSignal,
-    TerminalStyle, TerminalView,
+    CopySelection, PasteSelection, SendBacktab, SendTab, TERMINAL_CONTEXT, TerminalOptions,
+    TerminalSignal, TerminalStyle, TerminalView,
 };
 
 /// Error de arranque o de hilo del terminal.

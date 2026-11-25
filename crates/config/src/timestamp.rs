@@ -2,8 +2,8 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Sufijo de backup para el instante actual.
-pub(crate) fn stamp() -> String {
+/// Sufijo `YYYYMMDD-HHMMSS` (UTC) para el instante actual.
+pub fn stamp() -> String {
     stamp_at(SystemTime::now())
 }
 

@@ -25,13 +25,22 @@ include!("shell_parts/14_shell_render_tab_strip.rs");
 include!("shell_parts/15_shell_render_tab.rs");
 include!("shell_parts/16_shell_new_tab_in_pane.rs");
 include!("shell_parts/17_shell_render_palette.rs");
-include!("shell_parts/18_shell_ensure_font_selects.rs");
-include!("shell_parts/19_shell_settings_add_font_sources.rs");
-include!("shell_parts/20_shell_render_settings_conflict.rs");
-include!("shell_parts/21_shell_render_profile_rows.rs");
-include!("shell_parts/22_shell_render_profile_editor_panel.rs");
+include!("shell_parts/18_shell_settings_selects.rs");
+include!("shell_parts/19_shell_render_settings_shell.rs");
+include!("shell_parts/20_shell_render_settings_appearance.rs");
+include!("shell_parts/21_shell_render_settings_profiles.rs");
+include!("shell_parts/22_shell_render_settings_profiles_shortcuts.rs");
 include!("shell_parts/23_shell_render_settings_agents.rs");
 include!("shell_parts/24_dragghost.rs");
+include!("shell_parts/26_shell_render_settings_footer.rs");
+include!("shell_parts/27_shell_settings_profiles.rs");
+include!("shell_parts/28_shell_settings_step.rs");
+include!("shell_parts/29_shell_render_settings_typography.rs");
+include!("shell_parts/30_shell_wsl.rs");
+include!("shell_parts/31_shell_wsl_projects.rs");
+include!("shell_parts/32_shell_render_wsl.rs");
+#[cfg(feature = "studio")]
+include!("shell_parts/25_studio_surface.rs");
 #[cfg(test)]
 mod tests {
     include!("shell_parts/tests/part_01.rs");

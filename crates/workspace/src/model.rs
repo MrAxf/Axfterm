@@ -9,6 +9,7 @@ include!("model_parts/01_workspaceerror.rs");
 include!("model_parts/02_workspace_new.rs");
 include!("model_parts/03_workspace_move_tab.rs");
 include!("model_parts/04_workspace_counters.rs");
+include!("model_parts/05_workspace_host.rs");
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -88,6 +89,59 @@ mod tests {
             axf_terminal::paths::normalize(&std::fs::canonicalize(&root).expect("canonicaliza"));
         assert_eq!(stored, expected);
         assert!(!stored.to_string_lossy().starts_with(r"\\?\"));
+    }
+
+    #[test]
+    fn wsl_projects_dedupe_by_host_and_root_and_remember_their_profile() {
+        let mut workspace = Workspace::new();
+        let profile = ProfileId::new("wsl-ubuntu");
+        let opened = workspace
+            .open_project_with_host(
+                "/home/juan/codigo/app/",
+                ProjectHost::wsl("Ubuntu"),
+                &profile,
+                "Ubuntu (WSL)",
+            )
+            .expect("abre WSL");
+        assert!(opened.tab.is_some());
+        let project = workspace.project(opened.project).expect("proyecto");
+        assert_eq!(project.host, ProjectHost::wsl("Ubuntu"));
+        assert_eq!(project.default_profile.as_ref(), Some(&profile));
+        assert_eq!(project.root, PathBuf::from("/home/juan/codigo/app"));
+        assert_eq!(project.name, "app");
+
+        let again = workspace
+            .open_project_with_host(
+                "/home/juan/codigo/app",
+                ProjectHost::wsl("Ubuntu"),
+                &profile,
+                "Ubuntu (WSL)",
+            )
+            .expect("reapertura");
+        assert_eq!(again.project, opened.project);
+        assert!(again.tab.is_none());
+        assert_eq!(workspace.projects().len(), 1);
+
+        let other = workspace
+            .register_project_with_host("/home/juan/codigo/app", ProjectHost::wsl("Debian"))
+            .expect("otra distro");
+        assert!(other.1);
+        assert_eq!(workspace.projects().len(), 2);
+    }
+
+    #[test]
+    fn wsl_project_rejects_relative_paths_and_empty_distros() {
+        let mut workspace = Workspace::new();
+        assert!(
+            workspace
+                .register_project_with_host("home/juan/app", ProjectHost::wsl("Ubuntu"))
+                .is_err()
+        );
+        assert!(
+            workspace
+                .register_project_with_host("/home/juan/app", ProjectHost::wsl(" "))
+                .is_err()
+        );
     }
 
     #[test]

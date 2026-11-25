@@ -4,8 +4,8 @@ use std::rc::Rc;
 
 use crate::gpui::prelude::FluentBuilder as _;
 use crate::gpui::{
-    App, ClickEvent, InteractiveElement as _, IntoElement, ParentElement, RenderOnce, SharedString,
-    StatefulInteractiveElement as _, Styled, Window, div, transparent_black,
+    App, ClickEvent, InteractiveElement as _, IntoElement, ParentElement, RenderOnce, Role,
+    SharedString, StatefulInteractiveElement as _, Styled, Window, div, transparent_black,
 };
 use crate::theme;
 
@@ -229,6 +229,14 @@ impl RenderOnce for Button {
             .bg(background)
             .text_color(foreground)
             .text_size(metrics.font_size * self.size.text_scale())
+            .role(Role::Button)
+            .aria_label(self.label.clone())
+            .when_some(self.shortcut.clone(), |this, shortcut| {
+                this.aria_keyshortcuts(shortcut)
+            })
+            .when_some(self.tooltip.clone(), |this, description| {
+                this.aria_description(description)
+            })
             .when(self.full_width, |this| this.w_full())
             .when_some(border, |this, border| this.border_1().border_color(border))
             .when(self.focused, |this| this.border_1().border_color(ui.focus))
@@ -275,6 +283,7 @@ pub struct IconButton {
     size_px: Option<crate::gpui::Pixels>,
     icon_size: Option<IconSize>,
     focused: bool,
+    aria_label: Option<SharedString>,
     on_click: Option<ClickHandler>,
 }
 
@@ -291,6 +300,7 @@ impl IconButton {
             size_px: None,
             icon_size: None,
             focused: false,
+            aria_label: None,
             on_click: None,
         }
     }
@@ -344,6 +354,12 @@ impl IconButton {
         self
     }
 
+    /// Nombre accesible; si falta, se usa el texto del tooltip.
+    pub fn aria_label(mut self, label: impl Into<SharedString>) -> Self {
+        self.aria_label = Some(label.into());
+        self
+    }
+
     /// Acción al pulsar.
     pub fn on_click(
         mut self,
@@ -359,6 +375,7 @@ impl RenderOnce for IconButton {
         let state = theme::state(cx);
         let ui = state.theme.ui;
         let metrics = state.metrics;
+        let accessibility_label = self.aria_label.clone().or_else(|| self.tooltip.clone());
         let color = match self.tone {
             Tone::Neutral => ui.text,
             tone => tone.color(ui),
@@ -387,6 +404,8 @@ impl RenderOnce for IconButton {
             .rounded(radius)
             .bg(background)
             .when_some(border, |this, border| this.border_1().border_color(border))
+            .role(Role::Button)
+            .when_some(accessibility_label, |this, label| this.aria_label(label))
             .cursor_pointer()
             .hover(move |this| this.bg(hover))
             .when(self.focused, |this| this.border_1().border_color(ui.focus))

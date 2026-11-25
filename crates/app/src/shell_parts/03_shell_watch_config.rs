@@ -189,6 +189,15 @@ impl Shell {
         self.prompt_open_project(cx);
     }
 
+    fn open_wsl_project(
+        &mut self,
+        _: &crate::OpenWslProject,
+        window: &mut Window,
+        cx: &mut Context<'_, Self>,
+    ) {
+        self.open_wsl_modal(window, cx);
+    }
+
     fn focus_sidebar(&mut self, _: &FocusSidebar, window: &mut Window, cx: &mut Context<'_, Self>) {
         if !self.workspace.sidebar().visible {
             self.workspace.sidebar_mut().visible = true;

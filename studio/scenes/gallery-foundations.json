@@ -1,0 +1,10 @@
+{
+  "name": "gallery.foundations",
+  "steps": [
+    { "cmd": "theme", "args": ["One Dark"] },
+    { "cmd": "variant", "args": ["dark"] },
+    { "cmd": "size", "args": ["1440x900"] },
+    { "cmd": "open", "args": ["gallery.foundations"] },
+    { "cmd": "shot", "args": ["gallery-foundations"] }
+  ]
+}

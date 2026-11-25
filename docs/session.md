@@ -13,8 +13,8 @@ Ambos viven en el mismo directorio de configuración:
 
 ## Qué se restaura al reabrir
 
-1. Se restauran los proyectos, el layout de paneles, las pestañas, el perfil de
-   cada una y el foco.
+1. Se restauran los proyectos, su host (`local` o WSL), el perfil de proyecto,
+   el layout de paneles, las pestañas, el perfil de cada una y el foco.
 2. **Solo arranca la pestaña activa de cada panel visible.** Las pestañas
    ocultas no crean procesos: esperan a que las actives.
 3. Al activar una pestaña se carga su historial y se arranca el perfil guardado
@@ -38,6 +38,18 @@ Un cierre forzado (Administrador de tareas, crash o corte de luz) no guarda la
 última tanda de historial. La sesión anterior sigue siendo válida, pero el
 historial puede ser el del cierre anterior.
 
+## Versión y migración
+
+`session.json` usa `version = 3` desde los proyectos WSL:
+
+- Cada proyecto guarda `host` (`{"kind":"local"}` o
+  `{"kind":"wsl","distro":"Ubuntu"}`) y, si aplica, `default_profile`.
+- Las sesiones v2 no tienen `host`: se cargan como proyectos locales y
+  `default_profile = null`. La migración no toca el archivo hasta el siguiente
+  guardado.
+- Una versión futura se rechaza sin modificar el archivo y se arranca con un
+  workspace limpio, como en la config.
+
 ## Formato y límites
 
 Cada terminal tiene su propio archivo:
@@ -53,7 +65,9 @@ scrollback/<epoch>-<terminal_id>.snap
   caracteres anchos. No se guardan enlaces, selección, posición de scroll ni
   modos de ratón.
 - Tope: **2 MiB por terminal**. Si se supera, se conservan las líneas más
-  recientes y se avisa al restaurar.
+  recientes y se avisa al restaurar. El scrollback vivo tiene su propio límite
+  configurable (0–50 000 líneas) y un tope de 32 MiB por terminal
+  (`terminal.scrollback_lines`); ambos límites se aplican por separado.
 - Escritura atómica. Un archivo a medias nunca sustituye al anterior.
 
 ## Privacidad

@@ -117,32 +117,54 @@ impl Workspace {
         self.tabs.values().any(|tab| tab.project_id == project)
     }
 
-    /// Registra una carpeta, canonicalizando, normalizando y deduplicando por
-    /// ruta.
+    /// Registra una carpeta local, canonicalizando, normalizando y
+    /// deduplicando por ruta.
     ///
     /// Devuelve `(id, added)`, donde `added` indica si el proyecto es nuevo.
     pub fn register_project(
         &mut self,
         root: impl AsRef<Path>,
     ) -> Result<(ProjectId, bool), WorkspaceError> {
+        self.register_project_with_host(root, ProjectHost::Local)
+    }
+
+    /// Registra una carpeta en el host indicado.
+    ///
+    /// Solo `Local` se resuelve contra el sistema de archivos. Un proyecto WSL
+    /// llega ya canonicalizado por la distro y el modelo solo valida la forma
+    /// POSIX y deduplica por `(host, root)` (ADR 0011).
+    pub fn register_project_with_host(
+        &mut self,
+        root: impl AsRef<Path>,
+        host: ProjectHost,
+    ) -> Result<(ProjectId, bool), WorkspaceError> {
         let requested = root.as_ref();
-        let canonical =
-            std::fs::canonicalize(requested).map_err(|error| WorkspaceError::InvalidRoot {
-                path: requested.display().to_string(),
-                message: error.to_string(),
-            })?;
-        if !canonical.is_dir() {
-            return Err(WorkspaceError::NotADirectory(canonical));
-        }
-        // `canonicalize` devuelve `\\?\C:\...` en Windows. Se guarda la forma
-        // amigable porque el root también es el CWD del PTY y PowerShell
-        // mostraría `Microsoft.PowerShell.Core\FileSystem::\\?\...`.
-        let canonical = axf_terminal::paths::normalize(&canonical);
+        let canonical = match &host {
+            ProjectHost::Local => {
+                let canonical = std::fs::canonicalize(requested).map_err(|error| {
+                    WorkspaceError::InvalidRoot {
+                        path: requested.display().to_string(),
+                        message: error.to_string(),
+                    }
+                })?;
+                if !canonical.is_dir() {
+                    return Err(WorkspaceError::NotADirectory(canonical));
+                }
+                // `canonicalize` devuelve `\\?\C:\...` en Windows. Se guarda la
+                // forma amigable porque el root también es el CWD del PTY y
+                // PowerShell mostraría el proveedor cualificado.
+                axf_terminal::paths::normalize(&canonical)
+            }
+            ProjectHost::Wsl { distro } => {
+                validate_wsl_distro(distro)?;
+                normalize_posix(requested)?
+            }
+        };
 
         if let Some(existing) = self
             .projects
             .iter()
-            .find(|project| project.root == canonical)
+            .find(|project| project.host == host && project.root == canonical)
         {
             let id = existing.id;
             self.sidebars.expanded.insert(id);
@@ -150,24 +172,45 @@ impl Workspace {
         }
 
         let id = self.ids.take_project();
-        let name = Project::default_name(&canonical);
-        self.projects.push(Project::new(id, canonical, name));
+        let name = Project::suggested_name(&host, &canonical);
+        self.projects
+            .push(Project::with_host(id, canonical, host, name));
         self.sidebars.expanded.insert(id);
         Ok((id, true))
     }
 
-    /// Abre una carpeta con la semántica de la sidebar.
-    ///
-    /// Si el proyecto no tiene pestañas, crea la primera en el panel enfocado
-    /// y lo expande. Si ya las tiene, solo registra y expande (no roba foco).
+    /// Abre una carpeta local con la semántica de la sidebar.
     pub fn open_project(
         &mut self,
         root: impl AsRef<Path>,
         profile: &ProfileId,
         title: &str,
     ) -> Result<OpenedProject, WorkspaceError> {
-        let (project, _added) = self.register_project(root)?;
+        self.open_project_with_host(root, ProjectHost::Local, profile, title)
+    }
+
+    /// Abre una carpeta con host explícito.
+    ///
+    /// Si el proyecto no tiene pestañas, crea la primera en el panel enfocado
+    /// y lo expande. Si ya las tiene, solo registra y expande (no roba foco).
+    /// En hosts no locales se recuerda el perfil para las terminales nuevas.
+    pub fn open_project_with_host(
+        &mut self,
+        root: impl AsRef<Path>,
+        host: ProjectHost,
+        profile: &ProfileId,
+        title: &str,
+    ) -> Result<OpenedProject, WorkspaceError> {
+        let (project, _added) = self.register_project_with_host(root, host.clone())?;
         self.sidebars.expanded.insert(project);
+        if host.is_remote() {
+            let remember = self
+                .project(project)
+                .is_some_and(|project| project.default_profile.is_none());
+            if remember {
+                self.set_project_default_profile(project, Some(profile.clone()));
+            }
+        }
         if self.project_has_tabs(project) {
             return Ok(OpenedProject { project, tab: None });
         }
@@ -177,6 +220,24 @@ impl Workspace {
             project,
             tab: Some(tab),
         })
+    }
+
+    /// Fija el perfil con el que se abren las terminales nuevas del proyecto.
+    ///
+    /// Devuelve `true` si cambió.
+    pub fn set_project_default_profile(
+        &mut self,
+        project: ProjectId,
+        profile: Option<ProfileId>,
+    ) -> bool {
+        let Some(project) = self.projects.iter_mut().find(|entry| entry.id == project) else {
+            return false;
+        };
+        if project.default_profile == profile {
+            return false;
+        }
+        project.default_profile = profile;
+        true
     }
 
     /// Crea una pestaña en un panel concreto y le da el foco.

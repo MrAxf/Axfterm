@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+      Name="Axfterm"
+      Manufacturer="Axfterm"
+      Version="$(var.Version)"
+      UpgradeCode="8E2F1D63-9A4B-4C7E-9F1A-2B3C4D5E6F70"
+      Scope="perUser"
+      Compressed="yes">
+
+    <MajorUpgrade DowngradeErrorMessage="Ya hay una versión más reciente de Axfterm instalada." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="AxftermIcon" SourceFile="$(var.ProjectRoot)\crates\app\assets\axfterm.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AxftermIcon" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="ProgramsFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="Axfterm" />
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="Axfterm" />
+    </StandardDirectory>
+
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      <Component Id="AxftermExe" Guid="A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5D">
+        <File Id="AxftermExe" Source="$(var.ProjectRoot)\target\release\axfterm.exe" KeyPath="yes" />
+      </Component>
+      <Component Id="AxftermDocs" Guid="E5F6A7B8-C9D0-4E1F-A2B3-4C5D6E7F8091">
+        <File Id="README" Source="$(var.ProjectRoot)\README.md" />
+        <File Id="NOTICE" Source="$(var.ProjectRoot)\NOTICE" />
+        <File Id="LICENSE_MIT" Source="$(var.ProjectRoot)\LICENSE-MIT" />
+        <File Id="LICENSE_APACHE" Source="$(var.ProjectRoot)\LICENSE-APACHE" />
+      </Component>
+    </ComponentGroup>
+
+    <Component Id="StartMenuShortcut" Directory="ApplicationProgramsFolder" Guid="B2C3D4E5-F6A7-4B8C-9D0E-1F2A3B4C5D6E">
+      <Shortcut
+          Id="AxftermStartMenu"
+          Name="Axfterm"
+          Description="Terminal workspace nativo"
+          Target="[INSTALLFOLDER]axfterm.exe"
+          WorkingDirectory="INSTALLFOLDER"
+          Icon="AxftermIcon" />
+      <RemoveFolder Id="RemoveApplicationProgramsFolder" On="uninstall" />
+      <RegistryValue Root="HKCU" Key="Software\Axfterm" Name="StartMenu" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <Component Id="AppPaths" Directory="INSTALLFOLDER" Guid="C3D4E5F6-A7B8-4C9D-8E0F-2A3B4C5D6E7F">
+      <RegistryKey Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\App Paths\axfterm.exe">
+        <RegistryValue Type="string" Value="[INSTALLFOLDER]axfterm.exe" KeyPath="yes" />
+        <RegistryValue Name="Path" Type="string" Value="[INSTALLFOLDER]" />
+      </RegistryKey>
+    </Component>
+
+    <Component Id="ExplorerIntegration" Directory="INSTALLFOLDER" Guid="D4E5F6A7-B8C9-4D0E-9F1A-3B4C5D6E7F80">
+      <RegistryKey Root="HKCU" Key="Software\Classes\Directory\shell\Axfterm">
+        <RegistryValue Type="string" Value="Abrir con Axfterm" />
+        <RegistryValue Name="Icon" Type="string" Value="[INSTALLFOLDER]axfterm.exe,0" />
+        <RegistryKey Key="command">
+          <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]axfterm.exe&quot; &quot;%1&quot;" KeyPath="yes" />
+        </RegistryKey>
+      </RegistryKey>
+      <RegistryKey Root="HKCU" Key="Software\Classes\Directory\Background\shell\Axfterm">
+        <RegistryValue Type="string" Value="Abrir con Axfterm" />
+        <RegistryValue Name="Icon" Type="string" Value="[INSTALLFOLDER]axfterm.exe,0" />
+        <RegistryKey Key="command">
+          <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]axfterm.exe&quot; &quot;%V&quot;" />
+        </RegistryKey>
+      </RegistryKey>
+    </Component>
+
+    <Feature Id="ProductFeature" Title="Axfterm" Level="1" Display="expand">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="AppPaths" />
+      <ComponentRef Id="ExplorerIntegration" />
+    </Feature>
+  </Package>
+</Wix>

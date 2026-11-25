@@ -3,7 +3,10 @@
 //! Las rutas son las claves que el `AssetSource` registrado en la aplicación
 //! entrega a GPUI. Nunca se construyen a mano en otro sitio.
 
-/// Terminal (barra de título, pestañas y sidebar).
+/// Marca de Axfterm (monocroma, tintada por el tema).
+pub const AXFTERM: &str = "brand/axfterm-mark.svg";
+
+/// Terminal (pestañas y sidebar).
 pub const TERMINAL: &str = "icons/tabler/terminal-2.svg";
 
 /// Sidebar (acción de alternarla).
@@ -140,6 +143,7 @@ pub const BRAND_COPILOT: &str = "icons/simple/githubcopilot.svg";
 
 /// Todos los iconos vendorizados, para tests y herramienta de actualización.
 pub const ALL: &[&str] = &[
+    AXFTERM,
     TERMINAL,
     SIDEBAR,
     SETTINGS,

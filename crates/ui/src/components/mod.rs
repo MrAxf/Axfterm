@@ -38,7 +38,7 @@ pub use pill::{Pill, StatusPill, TabStatus};
 pub use tab::Tab;
 pub use toast::Toast;
 pub use toggle::Toggle;
-pub use tooltip::text_tooltip;
+pub use tooltip::{TooltipBubble, text_tooltip};
 
 /// Tamaño de un control.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

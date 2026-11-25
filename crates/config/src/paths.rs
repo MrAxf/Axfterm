@@ -80,6 +80,11 @@ pub fn scrollback_dir() -> Result<PathBuf, PathError> {
     Ok(config_dir()?.join("scrollback"))
 }
 
+/// Directorio de logs y crash reports (`<config>/logs`, M9).
+pub fn logs_dir() -> Result<PathBuf, PathError> {
+    Ok(config_dir()?.join("logs"))
+}
+
 /// Crea el directorio de configuración si hace falta.
 pub fn ensure_config_dir() -> Result<PathBuf, PathError> {
     let dir = config_dir()?;
@@ -115,6 +120,7 @@ mod tests {
         assert_eq!(themes_dir().expect("themes"), base.join("themes"));
         assert_eq!(config_path().expect("config"), base.join("config.toml"));
         assert_eq!(session_path().expect("session"), base.join("session.json"));
+        assert_eq!(logs_dir().expect("logs"), base.join("logs"));
         assert_eq!(ensure_config_dir().expect("crea"), base);
         assert!(base.is_dir());
         unsafe { std::env::remove_var("AXFTERM_CONFIG_DIR") };

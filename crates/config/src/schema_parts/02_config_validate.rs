@@ -43,6 +43,15 @@ impl Config {
                 message: format!("{} está fuera del rango 1.0–2.5", self.terminal.line_height),
             });
         }
+        if self.terminal.scrollback_lines > MAX_SCROLLBACK_LINES {
+            return Err(ConfigError::Field {
+                field: "terminal.scrollback_lines".into(),
+                message: format!(
+                    "{} supera el máximo de {MAX_SCROLLBACK_LINES} líneas",
+                    self.terminal.scrollback_lines
+                ),
+            });
+        }
         if self.fonts.sources.len() > 16 {
             return Err(ConfigError::Field {
                 field: "fonts.sources".into(),

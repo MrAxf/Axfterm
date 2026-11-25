@@ -9,8 +9,10 @@
 pub(crate) const QUIT: &str = "ctrl-q";
 /// Alternar la sidebar.
 pub(crate) const TOGGLE_SIDEBAR: &str = "ctrl-b";
-/// Abrir una carpeta como proyecto.
+/// Abrir una carpeta local como proyecto.
 pub(crate) const OPEN_PROJECT: &str = "ctrl-shift-o";
+/// Abrir un proyecto alojado en WSL.
+pub(crate) const OPEN_WSL_PROJECT: &str = "ctrl-alt-shift-o";
 /// Crear una terminal con el perfil por defecto.
 pub(crate) const NEW_TAB: &str = "ctrl-shift-t";
 /// Cerrar la pestaña enfocada.

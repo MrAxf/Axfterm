@@ -107,6 +107,39 @@ impl Profile {
             })
             .unwrap_or_default()
     }
+
+    /// Distro WSL que arranca este perfil, si es un comando `wsl`.
+    ///
+    /// Solo se consideran opciones antes de `--`: lo que venga después es la
+    /// línea de comandos de Linux y no debe confundirse con `wsl.exe`.
+    pub fn wsl_distro(&self) -> Option<String> {
+        let line = self.command_line().ok()?;
+        wsl_distro_from(&line.program, &line.args)
+    }
+}
+
+/// Extrae la distro de una línea ya tokenizada de `wsl.exe`.
+///
+/// `program` puede ser `wsl`, `wsl.exe` o una ruta absoluta. `-d` y
+/// `--distribution` aceptan el valor como token siguiente o con `=`.
+pub fn wsl_distro_from(program: &str, args: &[String]) -> Option<String> {
+    let stem = Path::new(program).file_stem()?.to_str()?;
+    if !stem.eq_ignore_ascii_case("wsl") {
+        return None;
+    }
+    let mut arguments = args.iter();
+    while let Some(argument) = arguments.next() {
+        if argument == "--" {
+            break;
+        }
+        if argument == "-d" || argument == "--distribution" {
+            return arguments.next().filter(|value| !value.is_empty()).cloned();
+        }
+        if let Some(value) = argument.strip_prefix("--distribution=") {
+            return (!value.is_empty()).then(|| value.to_owned());
+        }
+    }
+    None
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CommandLine {

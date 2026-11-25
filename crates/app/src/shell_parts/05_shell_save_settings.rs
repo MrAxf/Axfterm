@@ -25,6 +25,18 @@ impl Shell {
             cx.notify();
             return;
         }
+        if self.settings.as_ref().is_some_and(|settings| {
+            settings.pending_defaults || settings.pending_delete.is_some()
+        }) {
+            if let Some(settings) = &mut self.settings {
+                settings.set_notice(
+                    "Resuelve la confirmación abierta antes de guardar.".into(),
+                    true,
+                );
+            }
+            cx.notify();
+            return;
+        }
         let Some(path) = self.theme_host.config_path.clone() else {
             if let Some(settings) = &mut self.settings {
                 settings.set_notice("No se pudo resolver config.toml.".into(), true);
@@ -60,7 +72,15 @@ impl Shell {
         }
         let base = settings.base.clone();
         let draft = settings.draft.clone();
-        match axf_config::write_config(&path, &base, &draft) {
+        let baseline = settings.baseline.clone().unwrap_or_default();
+        // La sobrescritura explícita del conflicto es la única vía que ignora
+        // el contenido esperado; el resto compite de forma optimista.
+        let result = if settings.overwrite {
+            axf_config::write_config(&path, &base, &draft)
+        } else {
+            axf_config::write_config_checked(&path, &baseline, &base, &draft)
+        };
+        match result {
             Ok(written) => {
                 let messages = self.theme_host.commit_settings(draft.clone(), cx);
                 if let Some(settings) = &mut self.settings {
@@ -79,7 +99,22 @@ impl Shell {
                 cx.notify();
             }
             Err(error) => {
+                let conflict = matches!(error, axf_config::ConfigError::Conflict { .. });
                 if let Some(settings) = &mut self.settings {
+                    if conflict {
+                        // La carrera se detectó dentro de la escritura: se
+                        // ofrece la misma decisión que un cambio externo.
+                        settings.conflict = Some(crate::settings::Conflict {
+                            source: axf_config::read_config_text(&path)
+                                .ok()
+                                .flatten()
+                                .unwrap_or_default(),
+                            summary: "config.toml cambió justo antes de guardar. \
+                                      Recarga para descartar el borrador o confirma \
+                                      la sobrescritura."
+                                .into(),
+                        });
+                    }
                     settings.set_errors(vec![error.to_string()]);
                     settings.set_notice(error.to_string(), true);
                 }
@@ -290,6 +325,8 @@ impl Shell {
         window: &mut Window,
         cx: &mut Context<'_, Self>,
     ) {
+        // CLI y Explorer pueden pasar un archivo: el proyecto es su carpeta.
+        let path = crate::single_instance::project_folder(path);
         let Some((profile, title)) = self.default_profile() else {
             self.set_notice(
                 "No hay un perfil por defecto válido en config.toml.",
@@ -338,15 +375,12 @@ impl Shell {
             self.prompt_open_project(cx);
             return;
         };
-        let requested =
-            profile.unwrap_or_else(|| self.theme_host.settings.terminal.default_profile.clone());
-        let Some(title) = self.profile_title(&requested) else {
-            self.set_notice(
-                format!("El perfil `{requested}` no existe en config.toml."),
-                true,
-                cx,
-            );
-            return;
+        let (requested, title) = match self.resolve_project_profile(project, profile) {
+            Ok(profile) => profile,
+            Err(error) => {
+                self.set_notice(error, true, cx);
+                return;
+            }
         };
         let pane = self.workspace.focus().pane;
         match self.workspace.new_tab(pane, project, &requested, &title) {

@@ -32,6 +32,7 @@ mod tests {
         assert_eq!(config.schema_version, CONFIG_SCHEMA_VERSION);
         assert_eq!(config.ui.theme, "One Dark");
         assert_eq!(config.terminal.font_size, 13.0);
+        assert_eq!(config.terminal.scrollback_lines, 10_000);
         assert!(!config.profiles.is_empty());
         assert!(
             config
@@ -231,6 +232,13 @@ command = "cmd /Q"
         let error = parse_str(source, "config.toml").expect_err("fuera de rango");
         match error {
             ConfigError::Field { field, .. } => assert_eq!(field, "ui.font_size"),
+            other => panic!("error inesperado: {other}"),
+        }
+
+        let source = "schema_version = 2\n[terminal]\nscrollback_lines = 60000\n";
+        let error = parse_str(source, "config.toml").expect_err("scrollback fuera de rango");
+        match error {
+            ConfigError::Field { field, .. } => assert_eq!(field, "terminal.scrollback_lines"),
             other => panic!("error inesperado: {other}"),
         }
     }

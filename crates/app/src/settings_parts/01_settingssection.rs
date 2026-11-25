@@ -1,52 +1,40 @@
 use crate::keymap::Keymap;
 use axf_config::{Appearance, Config, ConfigError, Profile, ProfileId};
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum SettingsSection {
     Appearance,
-    Terminal,
     Profiles,
-    Fonts,
     Shortcuts,
     Agents,
-    Advanced,
 }
 impl SettingsSection {
-    /// Orden de navegación y de `Ctrl+1..7`.
+    /// Orden de navegación y de `Ctrl+Tab`.
     pub(crate) const ALL: &'static [Self] = &[
         Self::Appearance,
-        Self::Terminal,
         Self::Profiles,
-        Self::Fonts,
         Self::Shortcuts,
         Self::Agents,
-        Self::Advanced,
     ];
 
     /// Etiqueta de la barra lateral.
     pub(crate) fn label(self) -> &'static str {
         match self {
             Self::Appearance => "Apariencia",
-            Self::Terminal => "Terminal",
             Self::Profiles => "Perfiles",
-            Self::Fonts => "Fuentes",
             Self::Shortcuts => "Atajos",
             Self::Agents => "Agentes",
-            Self::Advanced => "Avanzado",
         }
     }
 
     /// Frase de ayuda de la cabecera.
     pub(crate) fn description(self) -> &'static str {
         match self {
-            Self::Appearance => "Tema, variante clara u oscura y escala de la interfaz.",
-            Self::Terminal => "Fuente monoespaciada y métricas de la terminal.",
+            Self::Appearance => "Tema, tipografía y escala de la aplicación y la terminal.",
             Self::Profiles => "Qué programas se pueden abrir como terminal.",
-            Self::Fonts => "Archivos y carpetas con fuentes adicionales.",
             Self::Shortcuts => "Atajos de la aplicación y conflictos con la terminal.",
             Self::Agents => "Detección local de opencode y Copilot.",
-            Self::Advanced => "Rutas, versión de la configuración y valores por defecto.",
         }
     }
 
@@ -54,12 +42,9 @@ impl SettingsSection {
     pub(crate) fn icon(self) -> &'static str {
         match self {
             Self::Appearance => axf_ui::icons::PALETTE,
-            Self::Terminal => axf_ui::icons::TERMINAL,
             Self::Profiles => axf_ui::icons::USER,
-            Self::Fonts => axf_ui::icons::TYPOGRAPHY,
             Self::Shortcuts => axf_ui::icons::KEYBOARD,
             Self::Agents => axf_ui::icons::BRAND_OPENCODE,
-            Self::Advanced => axf_ui::icons::SETTINGS,
         }
     }
 
@@ -126,8 +111,6 @@ pub(crate) struct SettingsState {
     pub(crate) conflict: Option<Conflict>,
     /// El usuario pidió guardar sobre un cambio externo.
     pub(crate) overwrite: bool,
-    pub(crate) profile_cursor: usize,
-    pub(crate) shortcut_cursor: usize,
     pub(crate) shortcut_query: String,
     /// Acción esperando la siguiente pulsación de tecla.
     pub(crate) capturing: Option<String>,

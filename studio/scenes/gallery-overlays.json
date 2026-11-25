@@ -1,0 +1,11 @@
+{
+  "name": "gallery.overlays",
+  "steps": [
+    { "cmd": "theme", "args": ["One Dark"] },
+    { "cmd": "variant", "args": ["dark"] },
+    { "cmd": "size", "args": ["1440x900"] },
+    { "cmd": "open", "args": ["gallery.overlays"] },
+    { "cmd": "modal", "args": ["open"] },
+    { "cmd": "shot", "args": ["gallery-overlays"] }
+  ]
+}

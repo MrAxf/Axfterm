@@ -10,68 +10,84 @@ impl Shell {
         let no_projects = self.workspace.projects().is_empty();
         let empty = groups.is_empty();
         let at_limit = self.workspace.tab_count() >= MAX_TABS;
+        let show_shortcut = width >= f32::from(metrics.sidebar_actions_compact_width());
         let mut new_terminal = Button::new("sidebar-new-terminal", "Nueva terminal")
             .icon(icons::PLUS)
             .secondary()
             .full_width()
             .disabled(at_limit)
+            .tooltip(if at_limit {
+                "Límite de 32 terminales; cierra una pestaña.".to_owned()
+            } else {
+                format!("Nueva terminal ({})", keys::format_chord(keys::NEW_TAB))
+            })
             .on_click(cx.listener(|shell, _, window, cx| {
                 shell.new_tab_for(None, None, window, cx);
             }));
-        if at_limit {
-            new_terminal = new_terminal.tooltip("Límite de 32 terminales; cierra una pestaña.");
-        }
-        if width >= f32::from(metrics.sidebar_actions_compact_width()) {
+        if show_shortcut {
             new_terminal = new_terminal.shortcut(keys::format_chord(keys::NEW_TAB));
         }
-        let open_project = IconButton::new("sidebar-open-project", icons::FOLDER_OPEN)
-            .size(ControlSize::Md)
-            .icon_size(IconSize::Md)
-            .secondary()
-            .tooltip(format!(
-                "Abrir proyecto… ({})",
-                keys::format_chord(keys::OPEN_PROJECT)
-            ))
-            .on_click(cx.listener(|shell, _, _, cx| {
-                shell.prompt_open_project(cx);
-            }));
+        let open_project_this = cx.entity().downgrade();
+        let open_menu = move |menu: PopupMenu, _: &mut Window, _: &mut Context<'_, PopupMenu>| {
+            let local = open_project_this.clone();
+            let wsl = open_project_this.clone();
+            menu.item(
+                PopupMenuItem::new("Carpeta local…").on_click(move |_, _, cx| {
+                    if let Some(this) = local.upgrade() {
+                        let _ = this.update(cx, |shell, cx| shell.prompt_open_project(cx));
+                    }
+                }),
+            )
+            .item(
+                PopupMenuItem::new("Proyecto en WSL…").on_click(move |_, window, cx| {
+                    if let Some(this) = wsl.upgrade() {
+                        let _ = this.update(cx, |shell, cx| {
+                            shell.open_wsl_modal(window, cx);
+                        });
+                    }
+                }),
+            )
+        };
+        let open_project = div()
+            .flex()
+            .items_center()
+            .child(
+                IconButton::new("sidebar-open-project", icons::FOLDER_OPEN)
+                    .size(ControlSize::Md)
+                    .icon_size(IconSize::Md)
+                    .secondary()
+                    .tooltip(format!(
+                        "Abrir carpeta… ({})",
+                        keys::format_chord(keys::OPEN_PROJECT)
+                    ))
+                    .on_click(cx.listener(|shell, _, _, cx| {
+                        shell.prompt_open_project(cx);
+                    })),
+            )
+            .child(
+                KitButton::new("sidebar-open-project-menu")
+                    .dropdown_caret(true)
+                    .secondary()
+                    .tooltip("Más formas de abrir un proyecto")
+                    .accessibility_label("Más formas de abrir un proyecto")
+                    .dropdown_menu_with_anchor(Anchor::BottomRight, open_menu),
+            );
         let actions = div()
             .flex()
             .items_center()
             .gap(metrics.spacing_sm())
             .child(div().flex_1().min_w_0().child(new_terminal))
             .child(open_project);
-        let search = div()
-            .id("sidebar-search")
-            .flex()
-            .items_center()
-            .gap(metrics.spacing_sm())
-            .h(metrics.control_height_md())
-            .px(metrics.spacing_sm())
-            .rounded(metrics.radius_md())
-            .border_1()
-            .border_color(ui.border)
-            .bg(ui.surface_raised.opacity(0.5))
-            .cursor_pointer()
-            .hover(move |this| this.bg(ui.surface_raised))
-            .tooltip(text_tooltip(format!(
-                "Buscar pestañas, paneles y proyectos ({})",
-                keys::format_chord(keys::SEARCH_PALETTE)
-            )))
+        let search = Button::new("sidebar-search", "Buscar…")
+            .small()
+            .variant(ButtonVariant::Outline)
+            .icon(icons::SEARCH)
+            .full_width()
+            .shortcut(keys::format_chord(keys::SEARCH_PALETTE))
+            .tooltip("Buscar pestañas, paneles y proyectos")
             .on_click(cx.listener(|shell, _, window, cx| {
                 shell.open_palette(PaletteMode::Search, window, cx);
-            }))
-            .child(Icon::new(icons::SEARCH).size(IconSize::Sm).color(ui.muted))
-            .child(
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .overflow_hidden()
-                    .whitespace_nowrap()
-                    .text_ellipsis()
-                    .text_size(metrics.font_size * 0.75)
-                    .child("Buscar pestañas, paneles y proyectos…"),
-            );
+            }));
         let sections = div()
             .flex()
             .items_center()
@@ -95,7 +111,9 @@ impl Shell {
         for group in &groups {
             blocks.push(self.render_sidebar_project(group, cursor, sidebar_focused, cx));
         }
-        let sidebar_empty = empty.then(|| self.render_sidebar_empty(no_projects, cx));
+        let sidebar_empty = (empty
+            && (!no_projects || self.sidebar_section == SidebarSection::Agents))
+            .then(|| self.render_sidebar_empty(cx));
         let list = div()
             .flex()
             .flex_col()
@@ -181,24 +199,11 @@ impl Shell {
         segment.into_any_element()
     }
 
-    fn render_sidebar_empty(&self, no_projects: bool, cx: &mut Context<'_, Self>) -> AnyElement {
+    fn render_sidebar_empty(&self, cx: &mut Context<'_, Self>) -> AnyElement {
         let state = theme::state(cx);
         let ui = state.theme.ui;
         let metrics = state.metrics;
-        let (icon, title, detail) = if no_projects {
-            (
-                icons::FOLDER,
-                "Sin proyectos",
-                "Abre una carpeta para agrupar sus terminales.",
-            )
-        } else {
-            (
-                icons::PLAYER_PLAY,
-                "Sin agentes activos",
-                "Las terminales con opencode o Copilot aparecerán aquí.",
-            )
-        };
-        let mut empty = div()
+        div()
             .flex()
             .flex_col()
             .items_center()
@@ -207,26 +212,19 @@ impl Shell {
             .py(metrics.spacing_xl())
             .text_size(metrics.font_size * 0.75)
             .text_color(ui.muted)
-            .child(Icon::new(icon).size(IconSize::Lg).color(ui.muted))
+            .child(Icon::new(icons::PLAYER_PLAY).size(IconSize::Lg).color(ui.muted))
             .child(
                 div()
                     .text_size(metrics.font_size * 0.8125)
                     .text_color(ui.text)
-                    .child(title),
+                    .child("Sin agentes activos"),
             )
-            .child(div().text_center().child(detail));
-        if no_projects {
-            empty = empty.child(
-                Button::new("sidebar-empty-open", "Abrir proyecto…")
-                    .small()
-                    .primary()
-                    .icon(icons::FOLDER_OPEN)
-                    .on_click(cx.listener(|shell, _, _, cx| {
-                        shell.prompt_open_project(cx);
-                    })),
-            );
-        }
-        empty.into_any_element()
+            .child(
+                div()
+                    .text_center()
+                    .child("Las terminales con opencode o Copilot aparecerán aquí."),
+            )
+            .into_any_element()
     }
 
     fn render_sidebar_project(
@@ -243,7 +241,7 @@ impl Shell {
             return div().into_any_element();
         };
         let project_id = project.id;
-        let missing = !project.root.is_dir();
+        let missing = self.project_missing(project_id);
         let selected = matches!(cursor, Some(SidebarRow::Project(id)) if id == project_id);
         let can_collapse = self.sidebar_section == SidebarSection::All;
         let expanded = self.workspace.expanded_projects().contains(&project_id);
@@ -288,7 +286,7 @@ impl Shell {
             .border_color(transparent_black())
             .cursor_pointer()
             .text_color(if missing { ui.danger } else { ui.muted })
-            .tooltip(text_tooltip(project.root.display().to_string()))
+            .tooltip(text_tooltip(project.display_root()))
             .child(
                 div()
                     .w(metrics.sidebar_icon_lane())
@@ -309,6 +307,17 @@ impl Shell {
                     .font_weight(FontWeight::SEMIBOLD)
                     .child(project.name.clone()),
             )
+            .when(project.host.is_remote(), |this| {
+                this.child(
+                    div()
+                        .px(metrics.spacing_xs())
+                        .rounded(metrics.radius_full())
+                        .bg(ui.surface_raised)
+                        .text_size(metrics.font_size * 0.625)
+                        .text_color(ui.subtle)
+                        .child("WSL"),
+                )
+            })
             .when_some(collapsed_glyph, |this, glyph| this.child(glyph))
             .child(
                 div()

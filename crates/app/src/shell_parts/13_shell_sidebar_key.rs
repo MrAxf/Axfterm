@@ -214,13 +214,13 @@ impl Shell {
             );
             return;
         }
-        let cwd = self.terminal_cwd(tab, cx);
+        let target = self.terminal_target(tab, cx);
         match self.workspace.duplicate_tab(tab) {
             Ok(new_tab) => {
-                self.spawn_terminal_with_cwd(
+                self.spawn_terminal_with_target(
                     new_tab.tab,
                     new_tab.terminal,
-                    cwd,
+                    target,
                     SpawnOptions {
                         restore: None,
                         focus: true,

@@ -24,8 +24,8 @@ números y con el comportamiento esperado al alcanzar cada límite.
   - ARM64, macOS y Linux no se empaquetan en v0.1; el código se mantiene
     portable tras `cfg`, pero no se prueba en release.
 - **Una ventana y un proceso.** Una segunda instancia reenvía la carpeta pedida
-  a la existente y sale (M8). No hay pestañas en ventanas separadas.
-- DPI 100/150/200 y teclados ES/CJK son requisito de release (M8).
+  a la existente y sale (M9). No hay pestañas en ventanas separadas.
+- DPI 100/150/200 y teclados ES/CJK son requisito de release (M9).
 
 ### Límites operativos
 
@@ -43,9 +43,9 @@ números y con el comportamiento esperado al alcanzar cada límite.
 | `session.json` | 4 MiB | Backup + workspace limpio |
 | Escaneo de agentes | Cada 1,5 s, solo subárbol del PTY | Sin terminales no se escanea; nunca bloquea la UI |
 | Frame de UI | < 8 ms a 80×24; < 16 ms a 200×50 | Presupuesto de CPU de prepaint+paint, no FPS |
-| Arranque | p95 < 300 ms hasta primer frame (release, caliente, workspace vacío) | Se mide en M8; si no se cumple, se investiga antes de release |
-| RAM en reposo | < 150 MB con una terminal | Se mide en M8; incluye cachés de fuente |
-| Logs | Opt-in, rotación acotada (M8) | Sin telemetría ni envío de red |
+| Arranque | p95 < 300 ms hasta primer frame (release, caliente, workspace vacío) | Se mide en M9; si no se cumple, se investiga antes de release |
+| RAM en reposo | < 150 MB con una terminal | Se mide en M9; incluye cachés de fuente |
+| Logs | Opt-in, rotación acotada (M9) | Sin telemetría ni envío de red |
 
 - El tope de 32 MiB por terminal existe porque el coste de una celda depende del
   ancho: 50 000 líneas a 200 columnas no caben en el presupuesto de memoria.
@@ -96,7 +96,7 @@ Cada punto vive además en `.memory/milestones/99-futuro/tasks.md`:
 
 ### Revisión
 
-Estos límites se revisan al cerrar v0.1 con las mediciones de M8. Cambiarlos
+Estos límites se revisan al cerrar v0.1 con las mediciones de M9. Cambiarlos
 requiere un ADR nuevo que cite la medición que lo justifica; no se editan a
 mitad de milestone.
 
@@ -117,7 +117,7 @@ mitad de milestone.
   del ancho; debe explicarse en la documentación.
 - El pegado de más de 1 MiB se rechaza, lo que puede sorprender al pegar logs;
   Mitigación: aviso con tamaño y sugerencia de usar un archivo.
-- Los objetivos de arranque/RAM son aspiraciones hasta M8; si no se cumplen, el
+- Los objetivos de arranque/RAM son aspiraciones hasta M9; si no se cumplen, el
   release se retrasa, no se bajan los números sin ADR.
 
 ## Alternativas
@@ -135,6 +135,6 @@ mitad de milestone.
 
 - `AGENTS.md` — restricciones de producto y "Fuera de alcance v0.1".
 - `.memory/milestones/99-futuro/tasks.md` — tareas post-v0.1.
-- `.memory/milestones/08-persistencia-release/tasks.md` — límites y mediciones.
+- `.memory/milestones/09-persistencia-release/tasks.md` — límites y mediciones.
 - ADR 0001 — rendimiento medido de PTY/VT.
 - ADR 0004 — recuperación ante archivos por encima del límite.

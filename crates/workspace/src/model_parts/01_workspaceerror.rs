@@ -1,6 +1,6 @@
 use crate::ids::IdCounters;
 use crate::layout::{Branch, PaneTree, SplitAxis};
-use crate::project::{Project, SidebarState};
+use crate::project::{Project, ProjectHost, SidebarState};
 use crate::tab::{Focus, Pane, Tab};
 use crate::{PaneId, ProjectId, TabId, TerminalId};
 use axf_agents::AgentSession;
@@ -31,6 +31,12 @@ pub enum WorkspaceError {
     /// La ruta existe pero no es una carpeta.
     #[error("la ruta no es una carpeta: {0}")]
     NotADirectory(PathBuf),
+    /// Host o ruta remota inválida.
+    #[error("proyecto remoto inválido: {message}")]
+    InvalidHost {
+        /// Motivo accionable.
+        message: String,
+    },
     /// Varias pestañas intentarían usar la misma terminal.
     #[error("la terminal {0} ya pertenece a otra pestaña")]
     DuplicateTerminal(TerminalId),

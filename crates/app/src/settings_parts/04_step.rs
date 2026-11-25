@@ -1,17 +1,15 @@
-fn step(value: f32, delta: f32, increment: f32, min: f32, max: f32) -> f32 {
-    let stepped = (value + delta * increment).clamp(min, max);
-    let snapped = (stepped / increment).round() * increment;
+fn snap(value: f32, increment: f32, min: f32, max: f32) -> f32 {
+    let clamped = value.clamp(min, max);
+    let snapped = (clamped / increment).round() * increment;
     // Redondeo decimal para que 1.0500001 sea 1.05 y la validación y la UI
     // muestren el mismo número.
     (snapped * 1000.0).round() / 1000.0
 }
+fn step(value: f32, delta: f32, increment: f32, min: f32, max: f32) -> f32 {
+    snap(value + delta * increment, increment, min, max)
+}
 fn normalized_command(command: &str) -> String {
     command.trim().to_ascii_lowercase()
-}
-fn relative_source(path: &Path, config_dir: &Path) -> PathBuf {
-    path.strip_prefix(config_dir)
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|_| path.to_path_buf())
 }
 fn slugify(text: &str) -> String {
     let mut slug = String::new();
@@ -92,6 +90,7 @@ fn set_unbind(table: &mut toml::Table, action_id: &str, enabled: bool) {
 #[cfg(test)]
 mod tests {
     use axf_config::{AgentsConfig, Profile};
+    use std::path::PathBuf;
 
     use super::*;
 
@@ -117,24 +116,25 @@ mod tests {
     fn sections_cycle_in_order() {
         assert_eq!(
             SettingsSection::Appearance.next(1),
-            SettingsSection::Terminal
+            SettingsSection::Profiles
         );
-        assert_eq!(
-            SettingsSection::Appearance.next(-1),
-            SettingsSection::Advanced
-        );
-        assert_eq!(SettingsSection::ALL.len(), 7);
+        assert_eq!(SettingsSection::Appearance.next(-1), SettingsSection::Agents);
+        assert_eq!(SettingsSection::ALL.len(), 4);
     }
 
     #[test]
-    fn numeric_steps_clamp_and_snap() {
+    fn numeric_values_clamp_and_snap() {
         let mut state = state();
-        state.step_ui_font_size(100.0);
+        state.set_ui_font_size(100.0);
         assert_eq!(state.draft.ui.font_size, 24.0);
-        state.step_ui_scale(-100.0);
+        state.set_ui_scale(-100.0);
         assert_eq!(state.draft.ui.scale, 0.8);
-        state.step_line_height(1.0);
-        assert_eq!(state.draft.terminal.line_height, 1.05);
+        state.set_ui_scale(1.234);
+        assert_eq!(state.draft.ui.scale, 1.25);
+        state.set_terminal_font_size(100.0);
+        assert_eq!(state.draft.terminal.font_size, 32.0);
+        state.set_line_height(1.0);
+        assert_eq!(state.draft.terminal.line_height, 1.0);
         state.step_scan_interval(-99.0);
         assert_eq!(state.draft.agents.scan_interval_ms, 1000);
     }
@@ -142,10 +142,13 @@ mod tests {
     #[test]
     fn add_duplicate_and_delete_follow_profile_rules() {
         let mut state = state();
-        let id = state.add_profile();
+        let profile = state.new_profile();
+        let id = profile.id.clone();
+        assert_eq!(state.profiles().len(), 2);
+        state.insert_profile(profile).expect("inserta");
         assert_eq!(state.profiles().len(), 3);
         assert_eq!(
-            state.selected_profile().map(|profile| &profile.id),
+            state.profiles().last().map(|profile| &profile.id),
             Some(&id)
         );
 
@@ -173,6 +176,15 @@ mod tests {
                 .all(|profile| profile.id != ProfileId::new("a"))
         );
         let _ = copy;
+    }
+
+    #[test]
+    fn a_duplicate_profile_id_is_rejected() {
+        let mut state = state();
+        let error = state
+            .insert_profile(Profile::new("a", "Otra", "cmd"))
+            .expect_err("el id ya existe");
+        assert!(error.contains("ya existe"));
     }
 
     #[test]
@@ -273,20 +285,15 @@ mod tests {
     }
 
     #[test]
-    fn preferred_profile_cycles_through_none_and_profiles() {
+    fn preferred_profile_can_be_set_and_cleared() {
         let mut state = state();
         assert_eq!(state.preferred_profile("opencode"), None);
-        state.cycle_preferred_profile("opencode", 1);
-        assert_eq!(
-            state.preferred_profile("opencode"),
-            Some(&ProfileId::new("a"))
-        );
-        state.cycle_preferred_profile("opencode", 1);
+        state.set_preferred_profile("opencode", Some(ProfileId::new("b")));
         assert_eq!(
             state.preferred_profile("opencode"),
             Some(&ProfileId::new("b"))
         );
-        state.cycle_preferred_profile("opencode", 1);
+        state.set_preferred_profile("opencode", None);
         assert_eq!(state.preferred_profile("opencode"), None);
     }
 
@@ -308,15 +315,20 @@ mod tests {
     }
 
     #[test]
-    fn restore_defaults_keeps_profiles_and_a_valid_default() {
+    fn restore_defaults_keeps_profiles_fonts_and_a_valid_default() {
         let mut state = state();
         state.set_theme("Monokai", true);
         state.draft.ui.font_size = 20.0;
+        state.draft.fonts.sources = vec![std::path::PathBuf::from("fonts")];
         state.restore_defaults();
         assert_eq!(state.draft.profiles, base().profiles);
         assert_eq!(state.draft.ui.theme, "One Dark");
         assert_eq!(state.draft.appearance, Appearance::System);
         assert_eq!(state.draft.ui.font_size, 14.0);
+        assert_eq!(
+            state.draft.fonts.sources,
+            vec![std::path::PathBuf::from("fonts")]
+        );
         assert!(state.validate().is_empty());
     }
 
@@ -359,6 +371,21 @@ mod tests {
     }
 
     #[test]
+    fn saved_notice_is_hidden_after_a_new_edit() {
+        let mut state = state();
+        state.set_notice("Error anterior".into(), true);
+        state.commit_saved("config".into());
+        assert_eq!(
+            state.visible_notice().map(|(text, _)| text.as_str()),
+            Some("Configuración guardada.")
+        );
+        let larger = state.draft.ui.font_size + 1.0;
+        state.set_ui_font_size(larger);
+        assert!(state.is_dirty());
+        assert!(state.visible_notice().is_none());
+    }
+
+    #[test]
     fn invalid_external_file_keeps_the_draft_and_explains() {
         let mut state = state();
         let outcome = state.external_change(
@@ -374,16 +401,64 @@ mod tests {
     }
 
     #[test]
-    fn font_sources_are_stored_relative_to_config() {
+    fn settings_manual_gate_changes_survive_config_reload() {
         let mut state = state();
-        let config_dir = PathBuf::from("C:/config");
-        assert!(state.add_font_source(&config_dir.join("fonts").join("nerd.ttf"), &config_dir));
+        state.set_theme("Monokai", true);
+        state.set_ui_font(Some("Segoe UI".into()));
+        state.set_terminal_font(Some("Cascadia Mono".into()));
+        state
+            .update_profile(
+                &ProfileId::new("a"),
+                "Shell de prueba".into(),
+                "cmd /Q".into(),
+                None,
+            )
+            .expect("actualiza perfil");
+        state
+            .set_default_profile(&ProfileId::new("b"))
+            .expect("cambia perfil predeterminado");
+        state
+            .set_binding("tab.new", "ctrl-alt-shift-n")
+            .expect("cambia atajo");
+        state.set_agents_enabled(false);
+        state.step_scan_interval(3.0);
+        state.set_preferred_profile("opencode", Some(ProfileId::new("b")));
+        state.draft.fonts.sources = vec![PathBuf::from("fonts")];
+
+        assert!(state.validate().is_empty());
+        let dir = std::env::temp_dir().join(format!(
+            "axfterm-settings-roundtrip-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|duration| duration.as_nanos())
+                .unwrap_or(0)
+        ));
+        std::fs::create_dir_all(&dir).expect("crea directorio temporal");
+        let path = dir.join("config.toml");
+        axf_config::write_config(&path, &state.base, &state.draft).expect("guarda borrador");
+        let text = std::fs::read_to_string(&path).expect("lee config guardada");
+        let reloaded = axf_config::parse_str(&text, "config.toml").expect("recarga config");
+
+        assert_eq!(reloaded.ui.theme, "Monokai");
+        assert_eq!(reloaded.ui.font_family.as_deref(), Some("Segoe UI"));
         assert_eq!(
-            state.draft.fonts.sources,
-            vec![PathBuf::from("fonts").join("nerd.ttf")]
+            reloaded.terminal.font_family.as_deref(),
+            Some("Cascadia Mono")
         );
-        assert!(!state.add_font_source(&config_dir.join("fonts").join("nerd.ttf"), &config_dir));
-        state.remove_font_source(0);
-        assert!(state.draft.fonts.sources.is_empty());
+        assert_eq!(reloaded.profiles[0].name, "Shell de prueba");
+        assert_eq!(reloaded.terminal.default_profile, ProfileId::new("b"));
+        assert_eq!(reloaded.fonts.sources, vec![PathBuf::from("fonts")]);
+        assert_eq!(reloaded.agents.scan_interval_ms, 1800);
+        assert!(!reloaded.agents.enabled);
+        assert_eq!(
+            reloaded.agents.preferred_profiles.get("opencode"),
+            Some(&ProfileId::new("b"))
+        );
+        assert_eq!(
+            crate::keymap::Keymap::resolve(&reloaded.keymap).chords_for("tab.new"),
+            Some("Ctrl+Alt+Shift+N".into())
+        );
+        std::fs::remove_dir_all(dir).expect("limpia directorio temporal");
     }
 }

@@ -1,3 +1,5 @@
+const SAVED_NOTICE: &str = "Configuración guardada.";
+
 impl SettingsState {
     /// Quita todos los atajos de una acción.
     pub(crate) fn unbind_action(&mut self, action_id: &str) -> Result<(), String> {
@@ -31,10 +33,6 @@ impl SettingsState {
     /// Empieza a capturar la siguiente tecla para una acción.
     pub(crate) fn begin_capture(&mut self, action_id: &str) {
         self.capturing = Some(action_id.to_owned());
-        self.notice = Some((
-            "Pulsa la combinación nueva; Esc cancela y Supr quita el atajo.".into(),
-            false,
-        ));
     }
 
     /// Cancela la captura.
@@ -45,11 +43,16 @@ impl SettingsState {
 
     // --- Avanzado ------------------------------------------------------
 
-    /// Restaura los valores por defecto conservando los perfiles del usuario.
+    /// Restaura los valores por defecto conservando perfiles y fuentes extra.
+    ///
+    /// `[fonts].sources` ya no se edita desde el panel; borrarlo aquí perdería
+    /// una configuración que el usuario no ve.
     pub(crate) fn restore_defaults(&mut self) {
         let profiles = self.draft.profiles.clone();
+        let fonts = self.draft.fonts.clone();
         let mut next = Config {
             profiles,
+            fonts,
             keymap: toml::Table::new(),
             ..Config::default()
         };
@@ -62,7 +65,6 @@ impl SettingsState {
             next.terminal.default_profile = first.id.clone();
         }
         self.draft = next;
-        self.profile_cursor = 0;
         self.pending_defaults = false;
         self.notice = Some((
             "Valores por defecto restaurados en el borrador; guarda para aplicarlos.".into(),
@@ -91,6 +93,13 @@ impl SettingsState {
     /// Aviso para la cabecera o el pie del panel.
     pub(crate) fn set_notice(&mut self, text: String, error: bool) {
         self.notice = Some((text, error));
+    }
+
+    /// La confirmación del último guardado no describe un borrador modificado.
+    pub(crate) fn visible_notice(&self) -> Option<&(String, bool)> {
+        self.notice
+            .as_ref()
+            .filter(|(text, _)| !self.is_dirty() || text != SAVED_NOTICE)
     }
 
     /// Texto que se muestra en el conflicto.
@@ -167,7 +176,7 @@ impl SettingsState {
         self.conflict = None;
         self.overwrite = false;
         self.errors.clear();
-        self.notice = Some(("Configuración guardada.".into(), false));
+        self.notice = Some((SAVED_NOTICE.into(), false));
     }
 
     fn adopt(&mut self, config: Config, source: Option<String>) {
@@ -177,6 +186,5 @@ impl SettingsState {
         self.conflict = None;
         self.overwrite = false;
         self.errors.clear();
-        self.profile_cursor = 0;
     }
 }

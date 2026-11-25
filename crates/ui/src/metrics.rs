@@ -68,13 +68,29 @@ mod tests {
         assert_eq!(small.sidebar_tab_height(), px(36.0));
         assert_eq!(small.sidebar_tab_icon(), px(18.0));
         assert_eq!(small.sidebar_icon_lane(), px(21.0));
-        assert_eq!(small.sidebar_actions_compact_width(), px(192.0));
+        assert_eq!(small.sidebar_actions_compact_width(), px(252.0));
 
         let large = UiMetrics::scaled(18.0, 1.0, 1.0);
         assert!(large.sidebar_tab_height() > small.sidebar_tab_height());
         assert!(large.sidebar_tab_icon() > small.sidebar_tab_icon());
         assert!(large.sidebar_icon_lane() > small.sidebar_icon_lane());
         assert!(large.sidebar_actions_compact_width() > small.sidebar_actions_compact_width());
+    }
+
+    #[test]
+    fn theme_cards_use_available_width_and_shrink_to_fit() {
+        let metrics = UiMetrics::scaled(14.0, 1.0, 1.0);
+        let wide = px(640.0);
+        let wide_card = metrics.settings_theme_card_width(wide);
+        assert!(wide_card * 2.0 + metrics.spacing_sm() <= wide);
+        assert!(wide_card >= px(300.0));
+
+        let compact = px(420.0);
+        let compact_card = metrics.settings_theme_card_width(compact);
+        assert!(compact_card * 2.0 + metrics.spacing_sm() <= compact);
+
+        let narrow = px(120.0);
+        assert_eq!(metrics.settings_theme_card_width(narrow), narrow);
     }
 
     #[test]

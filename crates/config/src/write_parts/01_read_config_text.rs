@@ -11,8 +11,37 @@ pub fn read_config_text(path: &Path) -> Result<Option<String>, ConfigError> {
 pub fn write_config(path: &Path, base: &Config, draft: &Config) -> Result<String, ConfigError> {
     draft.validate()?;
     let source = read_config_text(path)?;
+    write_document(path, source.as_deref(), base, draft)
+}
+
+/// Escribe solo si el archivo sigue siendo exactamente `expected`.
+///
+/// Cierra la carrera entre la comprobación del borrador y la escritura: si el
+/// archivo cambió en ese intervalo, no se toca.
+pub fn write_config_checked(
+    path: &Path,
+    expected: &str,
+    base: &Config,
+    draft: &Config,
+) -> Result<String, ConfigError> {
+    draft.validate()?;
+    let source = read_config_text(path)?;
+    if source.as_deref().unwrap_or_default() != expected {
+        return Err(ConfigError::Conflict {
+            path: path.display().to_string(),
+        });
+    }
+    write_document(path, source.as_deref(), base, draft)
+}
+
+fn write_document(
+    path: &Path,
+    source: Option<&str>,
+    base: &Config,
+    draft: &Config,
+) -> Result<String, ConfigError> {
     let label = path.display().to_string();
-    let mut document = match source.as_deref() {
+    let mut document = match source {
         Some(source) => source
             .parse::<DocumentMut>()
             .map_err(|error| ConfigError::Field {
@@ -91,6 +120,11 @@ fn apply_section_scalars(document: &mut DocumentMut, base: &Config, draft: &Conf
             table,
             "line_height",
             Value::from(f64::from(draft.terminal.line_height)),
+        );
+        set_value(
+            table,
+            "scrollback_lines",
+            Value::from(i64::from(draft.terminal.scrollback_lines)),
         );
     }
     // El perfil por defecto debe existir siempre y coincidir con el borrador,

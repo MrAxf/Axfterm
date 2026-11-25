@@ -45,6 +45,12 @@ toml_edit = "0.25"
 notify = "=8.2.1"
 # Logs de diagnóstico sin bloquear ni usar red.
 tracing = "0.1"
+# Subscriber de logs opt-in; sin red y con formato a archivo (ADR 0004/M9).
+tracing-subscriber = { version = "=0.3.23", default-features = false, features = [
+    "fmt",
+    "registry",
+    "std",
+] }
 
 # Motor de terminal (verificado en M0): Apache-2.0, MSRV 1.85.
 alacritty_terminal = "=0.26.0"
@@ -57,10 +63,17 @@ sysinfo = "=0.40.4"
 windows-sys = { version = "=0.61.2", features = [
     "Win32_Foundation",
     "Win32_Graphics_Gdi",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_System_Pipes",
+    "Win32_System_Threading",
     "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",
 ] }
 png = "=0.18.1"
+# Embeber icono y metadatos de Windows en el .exe (MIT; usa rc.exe del SDK).
+winresource = { version = "=0.1.34", default-features = false }
 
 # Crates internos.
 axf_ui = { path = "crates/ui" }

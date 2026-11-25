@@ -1,5 +1,12 @@
 # Progreso — M5 Agentes y sidebar
 
+## 2026-11-23 — Rediseño de selección en curso
+
+- La terminal activa usa el fondo de selección del tema y peso tipográfico,
+  sin indicador lateral añadido. El cursor de teclado conserva su borde de
+  foco independiente y los estados de agente mantienen icono y texto.
+- Falta comprobar la apariencia y el foco en una ventana real actualizada.
+
 ## 2026-11-22 — Ajuste de UI y 1 sesión por terminal
 
 - Reducido a 1 sesión de agente activa por terminal en la reconciliación y en

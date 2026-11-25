@@ -44,6 +44,23 @@ duplicado, orden, icono y borrado protegido, además de «Detectar terminales» 
 vista previa y fusión sin duplicados. El `id` no cambia al renombrar y el perfil
 en uso por una pestaña conserva su configuración. Ver `docs/settings.md`.
 
+## Perfil del proyecto y WSL
+
+Cada proyecto puede fijar su perfil de terminal. Un proyecto local lo deja
+vacío y usa `[terminal] default_profile`; un proyecto WSL siempre guarda el
+perfil elegido al abrirlo. Las terminales nuevas, splits, duplicados y el botón
+`+` del proyecto usan ese perfil, nunca el global.
+
+Un perfil es compatible con un proyecto WSL si su ejecutable es `wsl` o
+`wsl.exe` y sus argumentos fijan la misma distro con `-d` o `--distribution`.
+Axfterm añade `--cd <ruta>` antes de `--`, `-e` o `--exec`; el comando del perfil
+no necesita escribir la carpeta. Si el perfil apunta a otra distro o no es WSL,
+la pestaña muestra un error y no arranca otro shell.
+
+La detección escribe un perfil `wsl-<slug>` por distro. Si instalas una distro
+después del primer arranque, usa «Detectar terminales» para añadir su perfil.
+Ver `docs/wsl.md`.
+
 ## Línea de comandos
 
 `command` se tokeniza sin shell:
@@ -77,7 +94,7 @@ Linux y macOS:
 Windows:
 
 - `pwsh`, `powershell`, `cmd`, `nu` y Git Bash.
-- `wsl -l -q` en segundo plano, con timeout de 1,5 s y salida UTF-16 o UTF-8.
+- `wsl -l -q` en segundo plano, con timeout de 2,5 s y salida UTF-16 o UTF-8.
   Cada distro se convierte en un perfil `wsl-<slug>` con
   `wsl -d "<distro>"`.
 
@@ -107,13 +124,15 @@ fallback Tabler es siempre visible.
 
 - Cada pestaña guarda `profile_id`. Moverla entre paneles, duplicarla o
   reiniciarla conserva el perfil.
-- `session.json` usa `version = 2`. La migración v1 → v2 rellena el perfil por
-  defecto en cada pestaña; `auto_title` conserva el nombre automático para que
-  quitar un rename vuelva al nombre del perfil.
+- `session.json` usa `version = 3`. La migración v1 → v3 rellena el perfil por
+  defecto en cada pestaña y marca los proyectos como locales; `auto_title`
+  conserva el nombre automático para que quitar un rename vuelva al nombre del
+  perfil.
 - Una pestaña restaurada cuyo perfil ya no existe queda terminada y ofrece
   «Usar perfil predeterminado» o cerrar. No se arranca otro shell por sorpresa.
 - Al recargar `config.toml`, las pestañas nuevas usan los perfiles nuevos; las
   abiertas conservan su proceso y su `SpawnSpec`. Un `default_profile` inválido
   conserva la última configuración válida y muestra el campo con error.
 - El menú del panel («⋯») lista «Nueva terminal» y un submenú «Con perfil» con
-  icono, nombre y el predeterminado marcado.
+  icono, nombre y el predeterminado marcado. En un proyecto WSL el submenú se
+  oculta: sus terminales usan siempre el perfil fijado por el proyecto.

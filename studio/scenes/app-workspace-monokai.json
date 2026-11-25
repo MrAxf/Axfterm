@@ -1,0 +1,11 @@
+{
+  "name": "app.workspace.monokai",
+  "steps": [
+    { "cmd": "theme", "args": ["Monokai"] },
+    { "cmd": "variant", "args": ["dark"] },
+    { "cmd": "size", "args": ["1440x900"] },
+    { "cmd": "workspace", "args": ["demo"] },
+    { "cmd": "open", "args": ["app.workspace"] },
+    { "cmd": "shot", "args": ["app-workspace-monokai"] }
+  ]
+}

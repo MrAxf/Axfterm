@@ -1,14 +1,16 @@
-use crate::font_select::{FontList, FontValue, font_list};
+use crate::font_select::{FontList, FontValue, font_actual_label, font_list};
 use crate::history::HistoryStore;
 use crate::keymap::Keymap;
 use crate::palette::{
     self, PaletteHistory, PaletteIcon, PaletteItem, PaletteKind, PaletteMode, PaletteState,
     PaletteTarget,
 };
+use crate::profile_select::{ProfileList, ProfileValue, profile_list};
 use crate::settings::{
     DetectState, ExternalOutcome, PendingDelete, SettingsSection, SettingsState,
 };
 use crate::theme_host::{ApplyReport, ThemeHost};
+use crate::wsl_open::WslOpenState;
 use crate::{
     AgentNextAttention, ClosePane, CloseTab, DuplicateTab, ExportTheme, FocusNextPane,
     FocusPreviousPane, FocusSidebar, ImportTheme, MoveTabNextPane, NewTab, NextTab, NextTheme,
@@ -30,19 +32,22 @@ use axf_terminal::{
     ProgramState, ProgramStatus, TerminalSignal, TerminalSnapshot, TerminalStyle, TerminalView,
 };
 use axf_ui::components::{
-    Button, ControlSize, EmptyState, Icon, IconButton, IconSize, Kbd, Modal, ProfileIcon,
-    ProfileIconSource, Tab as TabView, TabStatus, TextField, Toast, text_tooltip,
+    Button, ButtonVariant, ControlSize, EmptyState, Icon, IconButton, IconSize, Kbd, Modal,
+    ProfileIcon, ProfileIconSource, Tab as TabView, TabStatus, TextField, Toast, text_tooltip,
 };
+use axf_ui::fonts::{MONO_PREFERRED, UI_PREFERRED};
 use axf_ui::gpui::base::FocusTrapElement as _;
 use axf_ui::gpui::component::button::{
-    Button as KitButton, ButtonVariants as _, Toggle as KitToggle, ToggleGroup,
+    Button as KitButton, ButtonVariants as _, DropdownButton, Toggle as KitToggle, ToggleGroup,
 };
 use axf_ui::gpui::component::input::{InputEvent, InputState};
 use axf_ui::gpui::component::menu::{
     ContextMenuExt as _, DropdownMenu as _, PopupMenu, PopupMenuItem,
 };
+use axf_ui::gpui::component::radio::RadioGroup;
 use axf_ui::gpui::component::scroll::ScrollableElement as _;
 use axf_ui::gpui::component::select::{Select, SelectEvent, SelectState};
+use axf_ui::gpui::component::slider::{Slider, SliderEvent, SliderState};
 use axf_ui::gpui::component::switch::Switch;
 use axf_ui::gpui::component::{
     ActiveTheme, Disableable as _, ElementExt as _, Sizable as _, WindowExt as _,
@@ -51,18 +56,19 @@ use axf_ui::gpui::prelude::FluentBuilder as _;
 #[cfg(target_os = "windows")]
 use axf_ui::gpui::svg;
 use axf_ui::gpui::{
-    AnyElement, AppContext, Bounds, ClickEvent, Context, Div, ElementId, Entity, FocusHandle,
-    Focusable, FontWeight, InteractiveElement, IntoElement, KeyDownEvent, Keystroke, MouseButton,
-    ParentElement, Pixels, Point, Render, ScrollDelta, ScrollEvent, ScrollHandle, SharedString,
-    Stateful, StatefulInteractiveElement as _, Styled, Subscription, Window, WindowControlArea,
-    div, point, px, relative, transparent_black,
+    Anchor, AnyElement, App, AppContext, Bounds, ClickEvent, Context, Div, ElementId, Entity,
+    FocusHandle, Focusable, FontWeight, InteractiveElement, IntoElement, KeyDownEvent, Keystroke,
+    MouseButton,
+    ParentElement, Pixels, Point, Render, Role, ScrollDelta, ScrollEvent, ScrollHandle,
+    SharedString, Stateful, StatefulInteractiveElement as _, Styled, Subscription, Window,
+    WindowControlArea, div, point, px, relative, transparent_black,
 };
 use axf_ui::icons;
 use axf_ui::metrics::UiMetrics;
 use axf_ui::theme;
 use axf_workspace::{
-    Branch, PaneId, PaneTree, ProjectId, SessionFile, SidebarSection, SplitAxis, TabId, TerminalId,
-    Workspace,
+    Branch, PaneId, PaneTree, ProjectHost, ProjectId, SessionFile, SidebarSection, SplitAxis, TabId,
+    TerminalId, Workspace,
 };
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -71,7 +77,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime};
 const MAX_TABS: usize = 32;
-const APP_NAME: &str = "AxfTerm";
+const APP_NAME: &str = "Axfterm";
 const MAX_NOTICES: usize = 3;
 const NOTICE_COOLDOWN: Duration = Duration::from_secs(10);
 const OUTPUT_QUIET: Duration = Duration::from_millis(2_500);
@@ -169,10 +175,36 @@ fn context_path(root: &std::path::Path, cwd: &std::path::Path) -> Option<String>
     cwd.file_name()
         .map(|name| format!("…{}{}", std::path::MAIN_SEPARATOR, name.to_string_lossy()))
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum ProjectHealth {
+    /// Comprobación en curso.
+    Checking,
+    /// Distro y carpeta disponibles.
+    Ready,
+    /// Distro o carpeta no disponible, con motivo.
+    Missing(String),
+}
+
+impl ProjectHealth {
+    fn missing(&self) -> Option<&str> {
+        match self {
+            Self::Missing(reason) => Some(reason),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 enum PendingConfirm {
     ClosePane(PaneId),
     RemoveProject(ProjectId),
+}
+
+/// Destino de arranque de una terminal: host y ruta en su dialecto.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct SpawnTarget {
+    host: ProjectHost,
+    path: PathBuf,
 }
 struct TerminalEntry {
     view: Entity<TerminalView>,
@@ -325,19 +357,52 @@ struct AgentUiState {
     /// Cooldown de avisos por clave.
     notice_cooldowns: HashMap<String, Instant>,
 }
+/// Modo del modal de perfil.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum ProfileEditorMode {
+    /// Perfil que aún no está en el borrador.
+    New(ProfileId),
+    /// Perfil existente que se actualiza en el sitio.
+    Edit(ProfileId),
+}
+
+impl ProfileEditorMode {
+    fn id(&self) -> &ProfileId {
+        match self {
+            Self::New(id) | Self::Edit(id) => id,
+        }
+    }
+}
+
 struct ProfileEditor {
-    id: ProfileId,
+    mode: ProfileEditorMode,
     name: Entity<InputState>,
     command: Entity<InputState>,
     icon: Option<PathBuf>,
     error: Option<String>,
 }
+
+/// Sliders numéricos del panel; viven mientras dura el borrador.
+struct SettingsSliders {
+    ui_font_size: Entity<SliderState>,
+    ui_scale: Entity<SliderState>,
+    terminal_font_size: Entity<SliderState>,
+    line_height: Entity<SliderState>,
+    scrollback_lines: Entity<SliderState>,
+    _subscriptions: Vec<Subscription>,
+}
+
+/// Selectores de perfil preferido por agente.
+struct AgentProfileSelects {
+    /// Ids y nombres con los que se construyeron las listas.
+    profile_signature: Vec<(ProfileId, String)>,
+    opencode: Entity<SelectState<ProfileList>>,
+    copilot: Entity<SelectState<ProfileList>>,
+    _subscriptions: Vec<Subscription>,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum StepField {
-    UiFontSize,
-    UiScale,
-    TerminalFontSize,
-    LineHeight,
     ScanInterval,
 }
 pub(crate) struct Shell {
@@ -368,6 +433,8 @@ pub(crate) struct Shell {
     palette: Option<PaletteState>,
     palette_subscription: Option<Subscription>,
     palette_history: PaletteHistory,
+    wsl_open: Option<WslOpenState>,
+    project_health: HashMap<ProjectId, ProjectHealth>,
     ui_font_select: Option<Entity<SelectState<FontList>>>,
     terminal_font_select: Option<Entity<SelectState<FontList>>>,
     font_select_subscriptions: Vec<Subscription>,
@@ -378,13 +445,20 @@ pub(crate) struct Shell {
     settings: Option<SettingsState>,
     settings_scroll: ScrollHandle,
     settings_profile_editor: Option<ProfileEditor>,
+    settings_profile_focus: FocusHandle,
+    settings_sliders: Option<SettingsSliders>,
+    settings_agent_selects: Option<AgentProfileSelects>,
     settings_shortcut_input: Option<Entity<InputState>>,
     settings_shortcut_subscription: Option<Subscription>,
     keystroke_interceptor: Option<Subscription>,
     style_revision: u64,
     appearance_subscription: Option<Subscription>,
     window_title: String,
+    startup: Instant,
+    startup_logged: bool,
     save_generation: u64,
     quitting: bool,
     close_hook_registered: bool,
+    #[cfg(feature = "studio")]
+    pub(crate) studio: Option<crate::studio::StudioState>,
 }

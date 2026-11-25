@@ -1,0 +1,12 @@
+{
+  "name": "app.settings.appearance.custom",
+  "steps": [
+    { "cmd": "theme", "args": ["Axfterm Studio Custom"] },
+    { "cmd": "variant", "args": ["dark"] },
+    { "cmd": "size", "args": ["1440x900"] },
+    { "cmd": "scale", "args": ["1"] },
+    { "cmd": "workspace", "args": ["demo"] },
+    { "cmd": "open", "args": ["app.settings.appearance"] },
+    { "cmd": "shot", "args": ["app-settings-appearance-custom"] }
+  ]
+}

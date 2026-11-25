@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use axf_terminal::{
     CellColor, CursorShape, EngineBench, MouseMode, ProgramState, ScreenFrame, SelectionPoint,
-    SnapshotCell, SnapshotError, TerminalEvent, TerminalSnapshot,
+    SnapshotCell, SnapshotError, TerminalEvent, TerminalSnapshot, effective_scrollback,
 };
 
 fn cell(frame: &ScreenFrame, row: usize, col: usize) -> SnapshotCell {
@@ -37,6 +37,18 @@ fn program_statuses(frame: &ScreenFrame) -> Vec<axf_terminal::ProgramStatus> {
             _ => None,
         })
         .collect()
+}
+
+#[test]
+fn scrollback_never_exceeds_the_memory_budget() {
+    // El ancho encoge el número de líneas efectivas; nunca supera lo pedido.
+    let narrow = effective_scrollback(50_000, 80);
+    let wide = effective_scrollback(50_000, 200);
+    assert!(narrow > 0);
+    assert!(narrow <= 50_000);
+    assert!(wide < narrow);
+    assert_eq!(effective_scrollback(0, 200), 0);
+    assert_eq!(effective_scrollback(10_000, 0), 0);
 }
 
 #[test]

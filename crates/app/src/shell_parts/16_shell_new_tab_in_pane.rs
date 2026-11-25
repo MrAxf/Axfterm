@@ -26,15 +26,12 @@ impl Shell {
             self.prompt_open_project(cx);
             return;
         };
-        let requested =
-            profile.unwrap_or_else(|| self.theme_host.settings.terminal.default_profile.clone());
-        let Some(title) = self.profile_title(&requested) else {
-            self.set_notice(
-                format!("El perfil `{requested}` no existe en config.toml."),
-                true,
-                cx,
-            );
-            return;
+        let (requested, title) = match self.resolve_project_profile(project, profile) {
+            Ok(profile) => profile,
+            Err(error) => {
+                self.set_notice(error, true, cx);
+                return;
+            }
         };
         match self.workspace.new_tab(pane, project, &requested, &title) {
             Ok(new_tab) => {
@@ -78,13 +75,12 @@ impl Shell {
                 return;
             }
         };
-        let Some((profile, title)) = self.default_profile() else {
-            self.set_notice(
-                "No hay un perfil por defecto válido en config.toml.",
-                true,
-                cx,
-            );
-            return;
+        let (profile, title) = match self.resolve_project_profile(project, None) {
+            Ok(profile) => profile,
+            Err(error) => {
+                self.set_notice(error, true, cx);
+                return;
+            }
         };
         match self.workspace.new_tab(new_pane, project, &profile, &title) {
             Ok(new_tab) => {
@@ -215,10 +211,7 @@ impl Shell {
             )
             .into_any_element();
         }
-        let missing = self
-            .workspace
-            .project(model_tab.project_id)
-            .is_some_and(|project| !project.root.is_dir());
+        let missing = self.project_missing(model_tab.project_id);
         if !missing {
             return EmptyState::new(
                 icons::RESTART,
@@ -249,11 +242,10 @@ impl Shell {
             )
             .into_any_element();
         }
-        EmptyState::new(
-            icons::ALERT_TRIANGLE,
-            title,
-            "La carpeta del proyecto no existe.",
-        )
+        let detail = self
+            .project_missing_message(model_tab.project_id)
+            .unwrap_or_else(|| "La carpeta del proyecto no existe.".into());
+        EmptyState::new(icons::ALERT_TRIANGLE, title, detail)
         .action(
             div()
                 .flex()

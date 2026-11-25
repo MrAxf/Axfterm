@@ -175,6 +175,33 @@ command = "cmd /Q"
     }
 
     #[test]
+    fn checked_write_refuses_a_file_that_changed_since_the_snapshot() {
+        let (dir, base) = prepare("checked-conflict");
+        let path = dir.join("config.toml");
+        let mut external = BASE.to_owned();
+        external.push_str("\n# cambio externo\n");
+        std::fs::write(&path, &external).expect("cambio externo");
+        let mut draft = base.clone();
+        draft.ui.font_size = 16.0;
+        let error =
+            write_config_checked(&path, BASE, &base, &draft).expect_err("debe rechazar la carrera");
+        assert!(matches!(error, ConfigError::Conflict { .. }));
+        assert_eq!(std::fs::read_to_string(&path).expect("lee"), external);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn checked_write_accepts_the_expected_content() {
+        let (dir, base) = prepare("checked-ok");
+        let path = dir.join("config.toml");
+        let mut draft = base.clone();
+        draft.ui.font_size = 16.0;
+        let written = write_config_checked(&path, BASE, &base, &draft).expect("escribe");
+        assert!(written.contains("font_size = 16.0"));
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
     fn invalid_draft_is_rejected_and_leaves_the_file_untouched() {
         let (dir, base) = prepare("invalid");
         let path = dir.join("config.toml");

@@ -2,6 +2,11 @@
 
 ## Superficie
 
+- [x] Rediseño de Apariencia: galería UI/ANSI, selección por teclado y tema
+      actual visible; revisión con Studio en claro/oscuro, ventana compacta,
+      escala 1,25 y tema personalizado completada. Workspace revisado en One
+      Dark, Cobalt2, Monokai y One Light. Recorrido de foco y preview de tema
+      validados con eventos reales de teclado en Studio.
 - [x] Acción `OpenSettings` registrada y contexto `Settings` en el dispatch
 - [x] Overlay con navegación por secciones: Apariencia, Terminal, Perfiles,
       Fuentes, Atajos, Agentes y Avanzado
@@ -59,5 +64,7 @@
 - [x] Conflicto externo y recarga sin perder trabajo del usuario
 - [x] Atajos: duplicados, reservadas y `unbind` desde el panel
 - [x] Sección Agentes: validación, escritura y recarga sin duplicar el escaneo
-- [ ] Gate: cambiar tema, fuente, perfil, atajo y agente desde el panel y
-      reiniciar
+- [x] Round-trip combinado de apariencia, fuentes, perfil, atajo y agente
+- [x] Preview de tema seleccionado por teclado y descarte con restauración
+- [ ] Gate manual restante: conflicto externo, operaciones UI de perfiles/
+      atajos/agentes y persistencia real tras reiniciar

@@ -4,6 +4,8 @@ pub mod assets;
 pub mod brand;
 pub mod components;
 pub mod fonts;
+#[cfg(feature = "gallery")]
+pub mod gallery;
 pub mod icons;
 pub mod metrics;
 pub mod profile_icon;

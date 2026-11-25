@@ -57,6 +57,7 @@ fn run_tui(program: &str, args: &[&str], quit: &[u8], require_exit: bool) {
             cell_width: 8,
             cell_height: 16,
             restore: None,
+            scrollback: 10_000,
         },
     )
     .expect("parser");

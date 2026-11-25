@@ -32,6 +32,50 @@ mod tests {
     }
 
     #[test]
+    fn empty_query_places_quit_after_other_commands_even_with_history() {
+        let items = [
+            command_item("app.quit"),
+            command_item("project.open"),
+            command_item("tab.new"),
+        ];
+        let mut rows = vec![row(0, 100), row(1, 0), row(2, 0)];
+        sort_rows(&mut rows, &items, "  ");
+        assert_eq!(
+            rows.iter().map(|row| row.item).collect::<Vec<_>>(),
+            [1, 2, 0]
+        );
+    }
+
+    #[test]
+    fn searched_quit_command_uses_normal_relevance() {
+        let items = [command_item("app.quit"), command_item("project.open")];
+        let mut rows = vec![row(0, 100), row(1, 0)];
+        sort_rows(&mut rows, &items, "salir");
+        assert_eq!(rows[0].item, 0);
+    }
+
+    fn command_item(id: &'static str) -> PaletteItem {
+        PaletteItem {
+            id: id.into(),
+            label: id.into(),
+            detail: None,
+            search: String::new(),
+            kind: PaletteKind::Command,
+            icon: PaletteIcon::Svg(""),
+            shortcut: None,
+            target: PaletteTarget::Command(id),
+        }
+    }
+
+    fn row(item: usize, score: i32) -> PaletteRow {
+        PaletteRow {
+            item,
+            score,
+            indices: Vec::new(),
+        }
+    }
+
+    #[test]
     fn commands_mode_only_takes_registry_commands() {
         assert!(PaletteMode::Commands.includes(PaletteKind::Command));
         for kind in [

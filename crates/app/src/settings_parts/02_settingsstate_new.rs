@@ -10,8 +10,6 @@ impl SettingsState {
             notice: None,
             conflict: None,
             overwrite: false,
-            profile_cursor: 0,
-            shortcut_cursor: 0,
             shortcut_query: String::new(),
             capturing: None,
             detect: DetectState::Idle,
@@ -25,7 +23,7 @@ impl SettingsState {
         self.draft != self.base
     }
 
-    /// Cambia de sección y reinicia los cursores dependientes.
+    /// Cambia de sección y limpia estados transitorios.
     pub(crate) fn set_section(&mut self, section: SettingsSection) {
         if self.section == section {
             return;
@@ -35,12 +33,6 @@ impl SettingsState {
         self.capturing = None;
         self.pending_delete = None;
         self.pending_defaults = false;
-        if section != SettingsSection::Profiles {
-            self.profile_cursor = 0;
-        }
-        if section != SettingsSection::Shortcuts {
-            self.shortcut_cursor = 0;
-        }
     }
 
     /// Mueve la sección `delta` posiciones.
@@ -76,24 +68,29 @@ impl SettingsState {
     }
 
     /// Tamaño base de la UI (11–24, paso 1).
-    pub(crate) fn step_ui_font_size(&mut self, delta: f32) {
-        self.draft.ui.font_size = step(self.draft.ui.font_size, delta, 1.0, 11.0, 24.0);
+    pub(crate) fn set_ui_font_size(&mut self, value: f32) {
+        self.draft.ui.font_size = snap(value, 1.0, 11.0, 24.0);
     }
 
     /// Escala de la UI (0.8–2.0, paso 0.05).
-    pub(crate) fn step_ui_scale(&mut self, delta: f32) {
-        self.draft.ui.scale = step(self.draft.ui.scale, delta, 0.05, 0.8, 2.0);
+    pub(crate) fn set_ui_scale(&mut self, value: f32) {
+        self.draft.ui.scale = snap(value, 0.05, 0.8, 2.0);
     }
 
     /// Tamaño de la terminal (8–32, paso 1).
-    pub(crate) fn step_terminal_font_size(&mut self, delta: f32) {
-        self.draft.terminal.font_size = step(self.draft.terminal.font_size, delta, 1.0, 8.0, 32.0);
+    pub(crate) fn set_terminal_font_size(&mut self, value: f32) {
+        self.draft.terminal.font_size = snap(value, 1.0, 8.0, 32.0);
     }
 
     /// Altura de línea (1.0–2.5, paso 0.05).
-    pub(crate) fn step_line_height(&mut self, delta: f32) {
-        self.draft.terminal.line_height =
-            step(self.draft.terminal.line_height, delta, 0.05, 1.0, 2.5);
+    pub(crate) fn set_line_height(&mut self, value: f32) {
+        self.draft.terminal.line_height = snap(value, 0.05, 1.0, 2.5);
+    }
+
+    /// Historial por terminal (0–50000 líneas, paso 1000).
+    pub(crate) fn set_scrollback_lines(&mut self, value: f32) {
+        self.draft.terminal.scrollback_lines =
+            value.clamp(0.0, axf_config::MAX_SCROLLBACK_LINES as f32) as u32;
     }
 
     // --- Perfiles ------------------------------------------------------
@@ -103,21 +100,26 @@ impl SettingsState {
         &self.draft.profiles
     }
 
-    /// Perfil actualmente seleccionado en la lista.
-    pub(crate) fn selected_profile(&self) -> Option<&Profile> {
-        self.draft.profiles.get(self.profile_cursor)
-    }
-
-    /// Añade un perfil vacío con id único y lo selecciona.
-    pub(crate) fn add_profile(&mut self) -> ProfileId {
+    /// Borrador de perfil nuevo con id único; solo entra en la config al aplicar.
+    pub(crate) fn new_profile(&self) -> Profile {
         let id = self.unique_profile_id("perfil");
         let name = format!("Perfil {}", self.draft.profiles.len() + 1);
         let command = axf_config::fallback_profile().command;
-        self.draft
+        Profile::new(id, name, command)
+    }
+
+    /// Añade al final un perfil ya validado, sin repetir ids.
+    pub(crate) fn insert_profile(&mut self, profile: Profile) -> Result<(), String> {
+        if self
+            .draft
             .profiles
-            .push(Profile::new(id.clone(), name, command));
-        self.profile_cursor = self.draft.profiles.len() - 1;
-        id
+            .iter()
+            .any(|existing| existing.id == profile.id)
+        {
+            return Err(format!("El perfil `{}` ya existe.", profile.id));
+        }
+        self.draft.profiles.push(profile);
+        Ok(())
     }
 
     /// Aplica los campos editados a un perfil, sin cambiar su id.
@@ -158,7 +160,6 @@ impl SettingsState {
         copy.id = new_id.clone();
         copy.name = format!("{} (copia)", copy.name);
         self.draft.profiles.push(copy);
-        self.profile_cursor = self.draft.profiles.len() - 1;
         Ok(new_id)
     }
 
@@ -186,7 +187,6 @@ impl SettingsState {
             .agents
             .preferred_profiles
             .retain(|_, profile| profile != id);
-        self.profile_cursor = self.profile_cursor.min(self.draft.profiles.len() - 1);
         Ok(())
     }
 
@@ -205,7 +205,6 @@ impl SettingsState {
             return false;
         }
         self.draft.profiles.swap(index, target as usize);
-        self.profile_cursor = target as usize;
         true
     }
 
@@ -271,28 +270,6 @@ impl SettingsState {
         ProfileId::new(format!("{base}-{}", self.draft.profiles.len() + 1))
     }
 
-    // --- Fuentes -------------------------------------------------------
-
-    /// Añade un origen de fuentes deduplicado; devuelve `false` si ya estaba.
-    pub(crate) fn add_font_source(&mut self, path: &Path, config_dir: &Path) -> bool {
-        let stored = relative_source(path, config_dir);
-        if self.draft.fonts.sources.contains(&stored) {
-            return false;
-        }
-        if self.draft.fonts.sources.len() >= 16 {
-            return false;
-        }
-        self.draft.fonts.sources.push(stored);
-        true
-    }
-
-    /// Quita un origen por índice.
-    pub(crate) fn remove_font_source(&mut self, index: usize) {
-        if index < self.draft.fonts.sources.len() {
-            self.draft.fonts.sources.remove(index);
-        }
-    }
-
     // --- Agentes -------------------------------------------------------
 
     /// Activa o desactiva la detección.
@@ -326,29 +303,14 @@ impl SettingsState {
         self.draft.agents.notify_attention = enabled;
     }
 
-    /// Agentes con perfil preferido editable.
-    pub(crate) const AGENT_KEYS: &'static [&'static str] = &["opencode", "copilot"];
-
     /// Perfil preferido de un agente.
     pub(crate) fn preferred_profile(&self, agent: &str) -> Option<&ProfileId> {
         self.draft.agents.preferred_profiles.get(agent)
     }
 
-    /// Cicla el perfil preferido entre «ninguno» y los perfiles actuales.
-    pub(crate) fn cycle_preferred_profile(&mut self, agent: &str, delta: isize) {
-        let mut options: Vec<Option<ProfileId>> = vec![None];
-        options.extend(
-            self.draft
-                .profiles
-                .iter()
-                .map(|profile| Some(profile.id.clone())),
-        );
-        let current = options
-            .iter()
-            .position(|option| option.as_ref() == self.preferred_profile(agent))
-            .unwrap_or(0) as isize;
-        let next = (current + delta).rem_euclid(options.len() as isize) as usize;
-        match options.swap_remove(next) {
+    /// Fija el perfil preferido de un agente; `None` usa el predeterminado.
+    pub(crate) fn set_preferred_profile(&mut self, agent: &str, profile: Option<ProfileId>) {
+        match profile {
             Some(id) => {
                 self.draft
                     .agents

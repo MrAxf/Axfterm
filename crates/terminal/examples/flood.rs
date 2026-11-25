@@ -46,6 +46,7 @@ fn main() {
             cell_width: 8,
             cell_height: 16,
             restore: None,
+            scrollback: 10_000,
         },
     )
     .expect("el parser arranca");

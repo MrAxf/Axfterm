@@ -7,8 +7,19 @@ use crate::gpui::{
 use crate::theme;
 
 /// Burbuja de tooltip.
-struct TooltipBubble {
+///
+/// Es pública para que la galería del sistema de diseño pueda mostrarla sin
+/// depender de un hover real.
+#[derive(Clone, Debug)]
+pub struct TooltipBubble {
     text: SharedString,
+}
+
+impl TooltipBubble {
+    /// Crea una burbuja con el texto dado.
+    pub fn new(text: impl Into<SharedString>) -> Self {
+        Self { text: text.into() }
+    }
 }
 
 impl Render for TooltipBubble {
@@ -36,6 +47,6 @@ pub fn text_tooltip(
     let text = text.into();
     move |_window, cx| {
         let text = text.clone();
-        cx.new(|_| TooltipBubble { text }).into()
+        cx.new(|_| TooltipBubble::new(text)).into()
     }
 }

@@ -58,7 +58,8 @@ MIT/Apache-2.0. Mantener `NOTICE` actualizado.
 
 Decisiones estructurales registradas en `.memory/adr/`: 0001 motor VT/PTY,
 0002 GPUI encapsulado, 0003 workspace y proyectos, 0004 config y versionado,
-0005 límites de v0.1, 0006 perfiles de terminal, 0007 panel de ajustes.
+0005 límites de v0.1, 0006 perfiles de terminal, 0007 panel de ajustes y
+0011 proyectos WSL y hosts de proyecto.
 
 ### Crates
 
@@ -87,7 +88,7 @@ no conoce terminal. **Solo `crates/ui` declara `gpui-kit`**; el resto, incluido
 WindowState { projects: Vec<Project>, layout: PaneTree,
               tabs: HashMap<TabId, Tab>, panes: HashMap<PaneId, Pane>,
               focus: Focus, sidebars: SidebarState }
-Project     { id, root, name }
+Project     { id, root, host, default_profile, name }
 SidebarState { visible, width, expanded: Set<ProjectId>, filter }
 PaneTree    = Split { axis, ratio, first, second } | Leaf(PaneId)
 Pane        { tabs: Vec<TabId>, active: Option<TabId> }
@@ -103,8 +104,11 @@ Focus       { pane: PaneId, tab: Option<TabId> }
   `profile_id`. `default_profile` debe existir; el estado "cero perfiles" no es
   válido.
 - El orden de `projects` es el orden de la sidebar.
-- `Project` es solo una clasificación de la sidebar: carpeta raíz registrada,
-  sin layout ni terminales propios.
+- `Project` es solo una clasificación de la sidebar: host, carpeta raíz,
+  perfil de proyecto y nombre; sin layout ni terminales propios.
+- `ProjectHost` es `Local` o `Wsl { distro }`. `root` se interpreta en el
+  dialecto del host y solo `Local` se pasa a `std::fs`; un proyecto WSL usa una
+  ruta POSIX y fija su perfil en `default_profile` (ADR 0011).
 - Un panel puede mezclar pestañas de proyectos distintos. Una pestaña pertenece
   a un panel y a un proyecto, y puede moverse a otro panel sin recrear el PTY ni
   cambiar de proyecto.
@@ -137,7 +141,8 @@ Focus       { pane: PaneId, tab: Option<TabId> }
 
 ### Teclado
 
-- Contextos GPUI: `Workspace`, `Terminal`, `Palette`, `Sidebar` y `Settings`.
+- Contextos GPUI: `Workspace`, `Terminal`, `Palette`, `Sidebar`, `Settings` y
+  `WslProject`.
 - Orden de dispatch: overlay/paleta/panel de ajustes -> keybinding del contexto
   -> terminal -> IME.
 - Los atajos de app exigen modificador. `Ctrl+C/D/Z`, Tab, Esc y flechas quedan
@@ -199,8 +204,9 @@ Focus       { pane: PaneId, tab: Option<TabId> }
 - Config y sesión llevan versión de esquema (`schema_version` / `version`) con
   migraciones encadenadas; una versión futura se rechaza con error, no se
   degrada. Escribir siempre es atómico (temporal + rename).
-- Config v2 incluye los perfiles; sesión v2 incluye el `profile_id` de cada
-  pestaña. Las migraciones v1 → v2 se conservan y se prueban en actualización.
+- Config v2 incluye los perfiles; sesión v3 incluye el host y el perfil de cada
+  proyecto, además del `profile_id` de cada pestaña. Las migraciones v1 → v3 se
+  conservan y se prueban en actualización.
 - Sesión: `session.json` junto a la config, con versión y migraciones.
 - Historial de terminal: un archivo ANSI por terminal en `scrollback/`, con
   `epoch` por ejecución, checksum y tope de 2 MiB (ADR 0008). Se guarda en cierre
@@ -211,9 +217,15 @@ Focus       { pane: PaneId, tab: Option<TabId> }
   se pide decisión; nunca se pisa en silencio. No hay almacén paralelo.
 - Si config o sesión están corruptas: backup fechado, aviso y arranque con
   defaults. Un error de hot reload conserva la última config válida.
+- Logs normales opt-in con `AXFTERM_LOG` en `<config>/logs/axfterm.log`
+  (rotación 2 MiB). Crash reports locales acotados a 10; nunca se envían.
 - Hot reload de config con errores accionables, sin panics. Las escrituras del
   propio panel no se aplican dos veces.
 - Límites de terminales, perfiles, scrollback, pegado e iconos: ADR 0005.
+  `terminal.scrollback_lines` (0–50 000) se recorta por el tope de 32 MiB por
+  terminal según el ancho; el slider afecta a terminales nuevas.
+- Instancia única: la segunda instancia reenvía sus carpetas por un named pipe
+  local (sin red) y sale. El MSI registra «Abrir con Axfterm» en Explorer.
 
 ## Convenciones de código
 
@@ -228,6 +240,20 @@ Focus       { pane: PaneId, tab: Option<TabId> }
 - Los comandos se registran una sola vez en el registro de acciones y de ahí
   salen keybinds, menús, paleta y documentación.
 - Tests junto al módulo; fixtures en `tests/fixtures/`.
+
+## Herramientas de desarrollo
+
+- `scripts/package.ps1` compila release y genera el zip portable y el MSI
+  per-user en `dist/`, con hashes. WiX se ejecuta como herramienta local de
+  dotnet (`.config/dotnet-tools.json`). Ver `docs/release.md`.
+- `scripts/make-icon.ps1` regenera `crates/app/assets/axfterm.ico` desde la
+  marca vectorial; no requiere herramientas externas.
+- `scripts/studio.ps1` (feature Cargo `studio`) navega la app, abre la galería
+  del sistema de diseño y captura PNGs en `target/studio`. Nunca se activa en
+  release y usa un perfil aislado. Ver `docs/studio.md`.
+- `scripts/devtools.ps1` es el cliente JSONL del servidor local de Studio.
+- La galería reutilizable vive en `crates/ui/src/gallery/` y se abre con
+  `cargo run -p axf_ui --features gallery --example gallery`.
 
 ## Calidad
 
@@ -277,13 +303,14 @@ y un Cargo directo o un proceso huérfano puede coincidir con el wrapper.
 
 SSH/remoto, plugins de terceros, contenedores y puertos, split dentro de una
 pestaña, ligaduras, kitty graphics/sixel, búsqueda en scrollback, daemon de
-sesiones, worktrees por proyecto, auto-update y empaquetado macOS/Linux. También
-quedan fuera: ventana única sin pestañas desacoplables, perfiles por proyecto,
-variables de entorno por perfil, extracción nativa de iconos en macOS/Linux,
-shell integration (OSC 133), ARM64 y sincronización de config/temas. Los números
-y el comportamiento al alcanzar un límite están en ADR 0005. El panel de ajustes
-sí entra en v0.1 (M7): la config sigue siendo el archivo y el panel escribe en
-él.
+sesiones, worktrees por proyecto, auto-update y empaquetado macOS/Linux. Los
+proyectos en WSL sí entran en v0.1 (M8, ADR 0011), pero SSH, Docker y Podman no.
+También quedan fuera: ventana única sin pestañas desacoplables, perfiles por
+proyecto, variables de entorno por perfil, extracción nativa de iconos en
+macOS/Linux, shell integration (OSC 133), ARM64 y sincronización de
+config/temas. Los números y el comportamiento al alcanzar un límite están en
+ADR 0005. El panel de ajustes sí entra en v0.1 (M7): la config sigue siendo el
+archivo y el panel escribe en él.
 
 ## Riesgos conocidos
 
@@ -303,6 +330,10 @@ sí entra en v0.1 (M7): la config sigue siendo el archivo y el panel escribe en
 - **Agentes con OSC 7501 y fallback de procesos**: los CLIs antiguos no reportan
   estado y pueden aparecer falsos positivos en el matcher; el estado debe ser
   explicable, medible y permitir override manual.
+- **Proyectos WSL y `--cd`**: depende de la versión de WSL y de que el perfil
+  apunte a la distro correcta. WSL consume una barra invertida al reenviar argv
+  (`\0` de `find -printf` necesita `\\0`); validar en Windows 10/11 y WSL1/WSL2.
+  Los agentes dentro de WSL dependen de OSC 7501 porque `sysinfo` no ve Linux.
 - **Historial persistido**: contiene el texto que se mostró en la terminal,
   incluidos posibles secretos, y solo se guarda en cierre ordenado. Se almacena
   bajo el perfil del usuario, sin cifrar ni sincronizar (ADR 0008).

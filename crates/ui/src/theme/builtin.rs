@@ -142,4 +142,26 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn builtin_selected_text_remains_readable_on_ui_surfaces() {
+        for entry in BUILTIN_THEMES {
+            let theme = builtin(entry.name).expect("built-in parsea");
+            let text = Rgb::from(theme.ui.text);
+            let selection = Rgb::from(theme.ui.selection);
+            for surface in [
+                theme.ui.background,
+                theme.ui.surface,
+                theme.ui.surface_raised,
+            ] {
+                let selected = selection.over(Rgb::from(surface));
+                assert!(
+                    text.contrast(selected) >= 4.5,
+                    "{}: texto seleccionado {:.2}",
+                    entry.name,
+                    text.contrast(selected)
+                );
+            }
+        }
+    }
 }

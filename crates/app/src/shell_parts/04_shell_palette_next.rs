@@ -297,7 +297,10 @@ impl Shell {
         ));
         self.settings_scroll = ScrollHandle::new();
         self.settings_profile_editor = None;
+        self.settings_agent_selects = None;
         self.ensure_font_selects(window, cx);
+        self.ensure_settings_sliders(cx);
+        self.ensure_agent_profile_selects(window, cx);
         self.ensure_shortcut_input(window, cx);
         window.focus(&self.settings_focus, cx);
         cx.notify();
@@ -324,6 +327,27 @@ impl Shell {
         }
         if self.settings_profile_editor.is_some() {
             self.settings_profile_editor = None;
+            window.focus(&self.settings_focus, cx);
+            cx.notify();
+            return;
+        }
+        if let Some(settings) = &self.settings
+            && settings.pending_delete.is_some()
+        {
+            if let Some(settings) = &mut self.settings {
+                settings.pending_delete = None;
+            }
+            window.focus(&self.settings_focus, cx);
+            cx.notify();
+            return;
+        }
+        if let Some(settings) = &self.settings
+            && settings.pending_defaults
+        {
+            if let Some(settings) = &mut self.settings {
+                settings.pending_defaults = false;
+            }
+            window.focus(&self.settings_focus, cx);
             cx.notify();
             return;
         }
@@ -371,6 +395,8 @@ impl Shell {
         self.font_select_subscriptions.clear();
         self.ui_font_select = None;
         self.terminal_font_select = None;
+        self.settings_sliders = None;
+        self.settings_agent_selects = None;
         let messages = self.theme_host.clear_preview(cx);
         if !messages.is_empty() {
             tracing::debug!("preview de ajustes descartada: {}", messages.join(" "));

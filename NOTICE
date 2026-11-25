@@ -16,6 +16,7 @@ Crates de Rust
 - thiserror (MIT OR Apache-2.0) — errores tipados en los bordes de los crates.
 - serde / serde_json (MIT OR Apache-2.0) — IDs y `session.json` del workspace.
 - tracing (MIT) — logs de diagnóstico sin red.
+- tracing-subscriber (MIT) — subscriber opt-in de logs a archivo.
 - sysinfo (MIT) — árbol de procesos.
 - toml (MIT OR Apache-2.0) — parseo de configuración.
 - toml_edit (MIT OR Apache-2.0) — migración y escritura de config conservando
@@ -23,6 +24,8 @@ Crates de Rust
 - notify (MIT OR Apache-2.0) — hot reload de configuración.
 - windows-sys (MIT OR Apache-2.0) — icono del ejecutable (shell/GDI) en Windows.
 - png (MIT OR Apache-2.0) — codificación PNG con alpha de los iconos extraídos.
+- winresource (MIT) — icono y metadatos de Windows embebidos en el `.exe`
+  (solo build-dependency; usa el `rc.exe` del Windows SDK).
 
 Las versiones exactas se fijan en el `Cargo.lock` versionado. Cada dependencia
 conserva su propio texto de licencia en el paquete de origen; al empaquetar una
@@ -44,6 +47,10 @@ Assets
   Vendorizado en `crates/ui/assets/icons/simple/` (`rust.svg`, `opencode.svg`,
   `githubcopilot.svg`; rama `develop`, descargados el 2026-11-21). Los colores
   de marca viven en `crates/ui/src/brand.rs`.
+- Marca de Axfterm (`crates/ui/assets/brand/axfterm-mark.svg` y
+  `axfterm-logo.svg`) y su icono `.ico`: obra propia del proyecto, bajo la misma
+  licencia dual que el código. Los SVG son la fuente; el `.ico` se reproduce con
+  `scripts/make-icon.ps1`.
 - Temas built-in de Axfterm (`One Dark`, `One Light`, `Monokai`,
   `Monokai Light`, `Cobalt2`, `Cobalt2 Light`): paletas originales inspiradas en
   esquemas conocidos, sin código ni assets de terceros.

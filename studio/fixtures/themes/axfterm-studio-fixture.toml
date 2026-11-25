@@ -1,0 +1,35 @@
+# Axfterm Studio fixture
+[meta]
+name = "Axfterm Studio Custom"
+family = "Studio"
+variant = "dark"
+
+[ui]
+background = "#22242b"
+surface = "#272a32"
+surface_raised = "#30343e"
+border = "#474d59"
+border_strong = "#596170"
+text = "#e0e3ea"
+muted = "#a0a6b0"
+subtle = "#7d8490"
+accent = "#d29bff"
+danger = "#ff7b88"
+warning = "#ffc36b"
+success = "#87d993"
+info = "#78c8e6"
+selection = "#d29bff30"
+focus = "#d29bff"
+
+[terminal]
+foreground = "#e0e3ea"
+background = "#22242b"
+cursor = "#d29bff"
+selection = "#d29bff60"
+dim_foreground = "#7d8490"
+ansi = [
+  "#22242b", "#ff7b88", "#87d993", "#ffc36b",
+  "#78c8e6", "#d29bff", "#72d5c7", "#e0e3ea",
+  "#7d8490", "#ff8f9a", "#9ae4a5", "#ffd184",
+  "#8bd5f0", "#dfb4ff", "#8ce1d5", "#ffffff",
+]

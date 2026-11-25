@@ -123,13 +123,13 @@ schema_version = 1
   archivo original.
 - No se restauran procesos muertos: la pestaña se marca como terminada.
 - El esquema de datos es el de ADR 0003; el formato exacto y las migraciones
-  v1→vN se implementan en M2/M8.
+  v1→vN se implementan en M2/M9.
 
 ### Seguridad y privacidad
 
 - Sin telemetría, red ni secretos en la config. Las variables de entorno del
   shell se heredan, no se serializan salvo que el usuario las escriba.
-- Los logs son opt-in (M8) y viven fuera de `config.toml`.
+- Los logs son opt-in (M9) y viven fuera de `config.toml`.
 
 ## Consecuencias
 
@@ -165,7 +165,7 @@ schema_version = 1
 ## Referencias
 
 - `AGENTS.md` — persistencia, hot reload y convenciones.
-- `.memory/milestones/08-persistencia-release/tasks.md` — migraciones y
+- `.memory/milestones/09-persistencia-release/tasks.md` — migraciones y
   recuperación.
 - ADR 0003 — esquema de la sesión.
 - ADR 0005 — límites de tamaño y comportamiento al alcanzarlos.

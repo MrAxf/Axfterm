@@ -151,4 +151,37 @@ mod tests {
         assert_eq!(empty.score, 0);
         assert!(empty.indices.is_empty());
     }
+
+    /// Benchmark manual: `cargo test -p axfterm --release fuzzy_bench -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "benchmark manual de release"]
+    #[expect(
+        clippy::print_stdout,
+        reason = "el bench imprime su medición como entregable"
+    )]
+    fn fuzzy_bench() {
+        let items: Vec<String> = (0..2_000)
+            .map(|index| format!("Proyecto {index} · terminal workspace · abrir carpeta"))
+            .collect();
+        let queries = ["pro", "term", "abrir", "workspace", "p3"];
+        let started = std::time::Instant::now();
+        let mut matches = 0usize;
+        for _ in 0..200 {
+            for query in queries {
+                for item in &items {
+                    if score(query, item).is_some() {
+                        matches += 1;
+                    }
+                }
+            }
+        }
+        let elapsed = started.elapsed();
+        println!(
+            "fuzzy: {} comparaciones en {:.2} ms ({:.2} µs/comparación), {} matches",
+            200 * queries.len() * items.len(),
+            elapsed.as_secs_f64() * 1e3,
+            elapsed.as_secs_f64() * 1e6 / (200 * queries.len() * items.len()) as f64,
+            matches
+        );
+    }
 }

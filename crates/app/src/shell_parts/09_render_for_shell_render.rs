@@ -1,5 +1,18 @@
 impl Render for Shell {
     fn render(&mut self, window: &mut Window, cx: &mut Context<'_, Self>) -> impl IntoElement {
+        if !self.startup_logged {
+            self.startup_logged = true;
+            tracing::info!(
+                "primer frame en {} ms",
+                self.startup.elapsed().as_millis()
+            );
+        }
+        #[cfg(feature = "studio")]
+        if let Some(studio) = self.studio.as_ref()
+            && studio.is_gallery()
+        {
+            return crate::studio::render_gallery(studio, window, cx).into_any_element();
+        }
         if self
             .theme_host
             .sync_display_scale(window.scale_factor(), cx)
@@ -102,6 +115,10 @@ impl Render for Shell {
             .palette
             .is_some()
             .then(|| self.render_palette(window, cx));
+        let wsl = self
+            .wsl_open
+            .is_some()
+            .then(|| self.render_wsl_open(window, cx));
         div()
             .relative()
             .flex()
@@ -114,6 +131,7 @@ impl Render for Shell {
             .on_action(cx.listener(Self::quit))
             .on_action(cx.listener(Self::toggle_sidebar))
             .on_action(cx.listener(Self::open_project))
+            .on_action(cx.listener(Self::open_wsl_project))
             .on_action(cx.listener(Self::new_tab))
             .on_action(cx.listener(Self::close_tab))
             .on_action(cx.listener(Self::next_tab))
@@ -180,5 +198,7 @@ impl Render for Shell {
             .children(settings)
             .children(shortcuts)
             .children(palette)
+            .children(wsl)
+            .into_any_element()
     }
 }

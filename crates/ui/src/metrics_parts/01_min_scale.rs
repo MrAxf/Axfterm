@@ -127,6 +127,14 @@ impl UiMetrics {
         px(self.unit() * 28.0)
     }
 
+    /// Ancho de las muestras de temas, hasta dos por fila si hay espacio.
+    pub fn settings_theme_card_width(self, available: Pixels) -> Pixels {
+        ((available - self.spacing_sm()) / 2.0)
+            .max(self.font_size * 12.0)
+            .min(self.font_size * 22.0)
+            .min(available.max(px(0.0)))
+    }
+
     /// Ancho de la paleta de comandos y búsqueda.
     pub fn palette_width(self) -> Pixels {
         px(self.unit() * 46.0)
@@ -201,8 +209,11 @@ impl UiMetrics {
     }
 
     /// Ancho mínimo para mostrar el atajo dentro del botón de nueva terminal.
+    ///
+    /// La fila de acciones incluye el botón de carpeta y su menú, así que el
+    /// atajo solo cabe cuando la sidebar deja sitio para el texto completo.
     pub fn sidebar_actions_compact_width(self) -> Pixels {
-        px(self.unit() * 16.0)
+        px(self.unit() * 21.0)
     }
 
     /// Altura de la barra de título propia.

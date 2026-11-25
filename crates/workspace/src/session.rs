@@ -70,7 +70,7 @@ mod tests {
     }
 
     #[test]
-    fn v1_session_migrates_to_v2_with_the_default_profile() {
+    fn v1_session_migrates_with_the_default_profile() {
         let (workspace, root) = sample_workspace("migrate-v1");
         let path = root.join("session.json");
         save_session(&path, &SessionFile::current(workspace)).expect("guarda");
@@ -101,6 +101,60 @@ mod tests {
             assert_eq!(tab.profile_id, default);
             assert!(!tab.auto_title.is_empty());
         }
+    }
+
+    #[test]
+    fn v2_session_loads_projects_as_local() {
+        let (workspace, root) = sample_workspace("migrate-v2");
+        let path = root.join("session.json");
+        save_session(&path, &SessionFile::current(workspace)).expect("guarda");
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&path).expect("lee")).expect("json");
+        value["version"] = serde_json::json!(2);
+        if let Some(projects) = value["workspace"]["projects"].as_array_mut() {
+            for project in projects {
+                if let Some(object) = project.as_object_mut() {
+                    object.remove("host");
+                    object.remove("default_profile");
+                }
+            }
+        }
+        std::fs::write(&path, serde_json::to_vec_pretty(&value).expect("json")).expect("escribe");
+
+        let loaded = load_session(&path, &profile())
+            .expect("carga")
+            .expect("existe");
+        assert_eq!(loaded.version, SESSION_VERSION);
+        for project in loaded.workspace.projects() {
+            assert_eq!(project.host, crate::ProjectHost::Local);
+            assert!(project.default_profile.is_none());
+        }
+    }
+
+    #[test]
+    fn wsl_project_round_trips_with_host_and_profile() {
+        let root = temp_dir("wsl-roundtrip");
+        let mut workspace = Workspace::new();
+        let opened = workspace
+            .open_project_with_host(
+                "/home/juan/codigo/app",
+                crate::ProjectHost::wsl("Ubuntu"),
+                &ProfileId::new("wsl-ubuntu"),
+                "Ubuntu (WSL)",
+            )
+            .expect("proyecto WSL");
+        let path = root.join("session.json");
+        save_session(&path, &SessionFile::current(workspace)).expect("guarda");
+        let loaded = load_session(&path, &profile())
+            .expect("carga")
+            .expect("existe");
+        let project = loaded.workspace.project(opened.project).expect("proyecto");
+        assert_eq!(project.host, crate::ProjectHost::wsl("Ubuntu"));
+        assert_eq!(
+            project.default_profile.as_ref().map(ProfileId::as_str),
+            Some("wsl-ubuntu")
+        );
+        assert_eq!(project.root.to_string_lossy(), "/home/juan/codigo/app");
     }
 
     #[test]

@@ -21,6 +21,7 @@ macro_rules! own_assets {
 // Pipeline de SVG embebido: una sola tabla es la fuente de verdad. Los assets
 // se vendorizan con `scripts/update-icons.ps1`.
 own_assets! {
+    icons::AXFTERM => "../assets/brand/axfterm-mark.svg",
     icons::TERMINAL => "../assets/icons/tabler/terminal-2.svg",
     icons::SIDEBAR => "../assets/icons/tabler/layout-sidebar.svg",
     icons::SETTINGS => "../assets/icons/tabler/settings.svg",
@@ -123,9 +124,18 @@ mod tests {
 
     #[test]
     fn lists_vendored_icons_under_their_prefix() {
-        let paths = Assets.list("icons/").expect("listado de iconos propios");
+        let icons = Assets.list("icons/").expect("listado de iconos propios");
+        let brand = Assets.list("brand/").expect("listado de la marca");
         for path in icons::ALL {
-            assert!(paths.iter().any(|listed| listed == path), "no lista {path}");
+            let listed = if path.starts_with("brand/") {
+                &brand
+            } else {
+                &icons
+            };
+            assert!(
+                listed.iter().any(|candidate| candidate == path),
+                "no lista {path}"
+            );
         }
     }
 

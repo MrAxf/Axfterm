@@ -22,6 +22,7 @@ Todos los atajos se pueden cambiar en la sección `[keymap]` de
 | Acción | Atajo | Id |
 | --- | --- | --- |
 | Abrir una carpeta como proyecto | `ctrl-shift-o` | `project.open` |
+| Abrir un proyecto en WSL | `ctrl-alt-shift-o` | `project.open_wsl` |
 
 ## Paneles
 

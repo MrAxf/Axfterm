@@ -30,6 +30,8 @@ Cada ADR usa MADR-lite en español:
 | [0007](0007-panel-ajustes.md) | Panel de ajustes y escritura de config | Aceptado | 2026-11-22 |
 | [0008](0008-restauracion-historial.md) | Restauración perezosa del historial de terminal | Aceptado | 2026-11-22 |
 | [0009](0009-agentes-deteccion-estado.md) | Detección y estado de agentes con OSC 7501 y árbol de procesos | Aceptado | 2026-11-22 |
+| [0010](0010-panel-ajustes-reorganizacion.md) | Reorganización del panel de ajustes: cuatro secciones, tipografía en Apariencia y acciones en el pie | Aceptado | 2026-11-24 |
+| [0011](0011-proyectos-wsl.md) | Proyectos WSL y hosts de proyecto | Aceptado | 2026-11-24 |
 
 ## Cuándo escribir uno
 

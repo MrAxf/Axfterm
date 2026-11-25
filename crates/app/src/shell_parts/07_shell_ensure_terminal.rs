@@ -48,16 +48,15 @@ impl Shell {
                     }
                 };
                 let title = shell.tab_title(tab, cx);
-                let cwd = shell
+                let target = shell
                     .workspace
                     .tab(tab)
-                    .and_then(|tab| shell.workspace.project(tab.project_id))
-                    .map(|project| project.root.clone());
+                    .and_then(|tab| shell.project_target(tab.project_id));
                 let focus = shell.workspace.focus().tab == Some(tab);
-                shell.spawn_terminal_with_cwd(
+                shell.spawn_terminal_with_target(
                     tab,
                     terminal,
-                    cwd,
+                    target,
                     SpawnOptions { restore, focus },
                     window,
                     cx,
@@ -91,11 +90,11 @@ impl Shell {
         .detach();
     }
 
-    fn spawn_terminal_with_cwd(
+    fn spawn_terminal_with_target(
         &mut self,
         tab: TabId,
         terminal: TerminalId,
-        cwd: Option<PathBuf>,
+        target: Option<SpawnTarget>,
         options: SpawnOptions,
         window: &mut Window,
         cx: &mut Context<'_, Self>,
@@ -104,16 +103,20 @@ impl Shell {
         if self.terminals.contains_key(&terminal) {
             return;
         }
-        let Some(cwd) = cwd else {
+        let Some(target) = target else {
             self.set_notice("No se pudo resolver la carpeta del proyecto.", true, cx);
             return;
         };
-        if !cwd.is_dir() {
-            self.set_notice(
-                format!("La carpeta del proyecto no existe: {}", cwd.display()),
-                true,
-                cx,
-            );
+        if target.host.is_remote()
+            && let Some(project) = self.workspace.tab(tab).map(|tab| tab.project_id)
+            && let Some(message) = self.project_missing_message(project)
+        {
+            self.spawn_errors.insert(terminal, message.clone());
+            self.set_notice(message, true, cx);
+            if focus {
+                self.pending_focus = Some(tab);
+            }
+            cx.notify();
             return;
         }
         let Some(profile_id) = self.workspace.tab(tab).map(|tab| tab.profile_id.clone()) else {
@@ -132,10 +135,86 @@ impl Shell {
                 return;
             }
         };
+        let mut spec = prepared.spec;
+        let cwd = match &target.host {
+            ProjectHost::Local => {
+                if !target.path.is_dir() {
+                    let error = format!(
+                        "La carpeta del proyecto no existe: {}",
+                        target.path.display()
+                    );
+                    self.spawn_errors.insert(terminal, error.clone());
+                    self.set_notice(error, true, cx);
+                    if focus {
+                        self.pending_focus = Some(tab);
+                    }
+                    cx.notify();
+                    return;
+                }
+                target.path.clone()
+            }
+            ProjectHost::Wsl { distro } => {
+                let profile_name = self
+                    .theme_host
+                    .profile_name(&profile_id)
+                    .unwrap_or_else(|| profile_id.to_string());
+                if !crate::wsl::is_wsl_program(&spec.program) {
+                    let error = format!(
+                        "El perfil `{profile_name}` no arranca en WSL. \
+                         Elige un perfil con `wsl -d \"{distro}\"`."
+                    );
+                    self.spawn_errors.insert(terminal, error.clone());
+                    self.set_notice(error, true, cx);
+                    if focus {
+                        self.pending_focus = Some(tab);
+                    }
+                    cx.notify();
+                    return;
+                }
+                if prepared.wsl_distro.as_deref() != Some(distro.as_str()) {
+                    let detail = prepared.wsl_distro.as_deref().unwrap_or("la distro predeterminada");
+                    let error = format!(
+                        "El perfil `{profile_name}` arranca en {detail}, pero el proyecto \
+                         vive en `{distro}`. Revisa el perfil en config.toml."
+                    );
+                    self.spawn_errors.insert(terminal, error.clone());
+                    self.set_notice(error, true, cx);
+                    if focus {
+                        self.pending_focus = Some(tab);
+                    }
+                    cx.notify();
+                    return;
+                }
+                let path = target.path.to_string_lossy().into_owned();
+                crate::wsl::inject_cd(&mut spec.args, &path);
+                PathBuf::new()
+            }
+        };
         self.spawn_errors.remove(&terminal);
         let style = terminal_style(cx);
-        let view =
-            cx.new(|cx| TerminalView::new(window, cx, style, cwd, &prepared.spec, restore, focus));
+        #[cfg(feature = "studio")]
+        let spec = {
+            let demo_fixture = self
+                .studio
+                .as_ref()
+                .is_some_and(|studio| studio.fixture.as_deref() == Some("demo"));
+            studio_spawn_spec(spec, demo_fixture)
+        };
+        let scrollback = self.theme_host.settings.terminal.scrollback_lines as usize;
+        let view = cx.new(|cx| {
+            TerminalView::new(
+                window,
+                cx,
+                style,
+                cwd,
+                &spec,
+                axf_terminal::TerminalOptions {
+                    restore,
+                    scrollback,
+                    focus,
+                },
+            )
+        });
         let terminal_for_meta = terminal;
         let subscription = cx.observe(&view, move |shell, _, cx| {
             shell.sync_terminal_meta(cx);
@@ -225,16 +304,21 @@ impl Shell {
         )
     }
 
-    fn terminal_cwd(&self, tab: TabId, cx: &mut Context<'_, Self>) -> Option<PathBuf> {
+    /// Destino con cwd vivo para local; para WSL siempre la ruta del proyecto.
+    fn terminal_target(&self, tab: TabId, cx: &mut Context<'_, Self>) -> Option<SpawnTarget> {
         let model_tab = self.workspace.tab(tab)?;
-        if let Some(entry) = self.terminals.get(&model_tab.terminal_id)
+        let project = self.workspace.project(model_tab.project_id)?;
+        let mut target = SpawnTarget {
+            host: project.host.clone(),
+            path: project.root.clone(),
+        };
+        if target.host == ProjectHost::Local
+            && let Some(entry) = self.terminals.get(&model_tab.terminal_id)
             && let Some(cwd) = entry.view.read(cx).cwd()
         {
-            return Some(cwd.clone());
+            target.path = cwd.clone();
         }
-        self.workspace
-            .project(model_tab.project_id)
-            .map(|project| project.root.clone())
+        Some(target)
     }
 
     fn pane_has_live_processes(&self, pane: PaneId, cx: &mut Context<'_, Self>) -> bool {

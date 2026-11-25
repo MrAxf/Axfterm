@@ -1,0 +1,10 @@
+{
+  "name": "gallery.themes",
+  "steps": [
+    { "cmd": "theme", "args": ["One Dark"] },
+    { "cmd": "variant", "args": ["dark"] },
+    { "cmd": "size", "args": ["1440x900"] },
+    { "cmd": "open", "args": ["gallery.themes"] },
+    { "cmd": "shot", "args": ["gallery-themes"] }
+  ]
+}

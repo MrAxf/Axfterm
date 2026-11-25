@@ -19,8 +19,22 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::thread;
 const SCROLLBACK_LINES: usize = 10_000;
+const MAX_SCROLLBACK_BYTES: usize = 32 * 1024 * 1024;
 const BATCH_LIMIT: usize = 256 * 1024;
 const OSC_LIMIT: usize = 8 * 1024;
+
+/// Líneas de historial efectivas para `cols` columnas, respetando el tope de
+/// 32 MiB por terminal (ADR 0005). El resto de la memoria del motor (grid,
+/// parser, cachés de render) no entra en este cálculo.
+pub fn effective_scrollback(requested: usize, cols: usize) -> usize {
+    if requested == 0 || cols == 0 {
+        return 0;
+    }
+    let per_line = cols
+        .saturating_mul(std::mem::size_of::<Cell>())
+        .max(1);
+    requested.min(MAX_SCROLLBACK_BYTES / per_line)
+}
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TerminalEvent {
     /// Título de ventana pedido por la aplicación (`OSC 0/2`).
@@ -408,6 +422,8 @@ pub struct ParserSetup {
     pub cell_height: u16,
     /// Buffer previo que se reproduce antes de leer el PTY.
     pub restore: Option<TerminalSnapshot>,
+    /// Líneas de historial pedidas por la configuración.
+    pub scrollback: usize,
 }
 struct TerminalCore {
     term: Term<Listener>,
@@ -416,4 +432,5 @@ struct TerminalCore {
     events: Rc<RefCell<Vec<TerminalEvent>>>,
     metrics: Arc<Mutex<WindowMetrics>>,
     writer: PtyWriter,
+    requested_scrollback: usize,
 }
