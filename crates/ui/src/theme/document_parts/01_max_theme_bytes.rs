@@ -54,6 +54,16 @@ pub struct UiTokens {
     pub surface: Hsla,
     /// Superficie elevada (popovers, tarjetas).
     pub surface_raised: Hsla,
+    /// Superficie de hover para filas, botones y menús.
+    pub surface_hover: Hsla,
+    /// Superficie pulsada o seleccionada.
+    pub surface_active: Hsla,
+    /// Acento de hover para acciones primarias.
+    pub accent_hover: Hsla,
+    /// Acento pulsado para acciones primarias.
+    pub accent_active: Hsla,
+    /// Pista del switch apagado.
+    pub switch_off: Hsla,
     /// Borde normal.
     pub border: Hsla,
     /// Borde de énfasis (separadores, scrollbar).
@@ -99,6 +109,11 @@ impl UiTokens {
             background: color,
             surface: color,
             surface_raised: color,
+            surface_hover: color,
+            surface_active: color,
+            accent_hover: color,
+            accent_active: color,
+            switch_off: color,
             border: color,
             border_strong: color,
             text: color,
@@ -160,6 +175,8 @@ impl Theme {
         let danger = Rgb::rgb(0xe0, 0x6c, 0x75);
         let warning = Rgb::rgb(0xe5, 0xc0, 0x7b);
         let success = Rgb::rgb(0x98, 0xc3, 0x79);
+        let muted = Rgb::rgb(0x7d, 0x85, 0x94);
+        let raised = surface.lighten(0.06);
         let ansi = [
             0x001e_2127,
             0x00e0_6c75,
@@ -188,11 +205,16 @@ impl Theme {
             ui: UiTokens {
                 background: background.to_hsla(),
                 surface: surface.to_hsla(),
-                surface_raised: surface.lighten(0.06).to_hsla(),
+                surface_raised: raised.to_hsla(),
+                surface_hover: raised.mix(text, 0.06).to_hsla(),
+                surface_active: raised.mix(text, 0.12).to_hsla(),
+                accent_hover: accent.mix(text, 0.10).to_hsla(),
+                accent_active: accent.mix(text, 0.18).to_hsla(),
+                switch_off: muted.mix(surface, 0.45).to_hsla(),
                 border: Rgb::rgb(0x3a, 0x3f, 0x4b).to_hsla(),
                 border_strong: Rgb::rgb(0x4b, 0x52, 0x60).to_hsla(),
                 text: text.to_hsla(),
-                muted: Rgb::rgb(0x7d, 0x85, 0x94).to_hsla(),
+                muted: muted.to_hsla(),
                 subtle: Rgb::rgb(0x5c, 0x63, 0x70).to_hsla(),
                 accent: accent.to_hsla(),
                 accent_text: accent.readable_text().to_hsla(),
@@ -261,6 +283,21 @@ pub struct ThemeUiDocument {
     /// Superficie elevada.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub surface_raised: Option<String>,
+    /// Superficie de hover.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub surface_hover: Option<String>,
+    /// Superficie pulsada.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub surface_active: Option<String>,
+    /// Acento de hover.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accent_hover: Option<String>,
+    /// Acento pulsado.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accent_active: Option<String>,
+    /// Pista del switch apagado.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub switch_off: Option<String>,
     /// Borde.
     pub border: String,
     /// Borde fuerte.
@@ -327,6 +364,11 @@ impl ThemeDocument {
                 background: hex(ui.background),
                 surface: hex(ui.surface),
                 surface_raised: Some(hex(ui.surface_raised)),
+                surface_hover: Some(hex(ui.surface_hover)),
+                surface_active: Some(hex(ui.surface_active)),
+                accent_hover: Some(hex(ui.accent_hover)),
+                accent_active: Some(hex(ui.accent_active)),
+                switch_off: Some(hex(ui.switch_off)),
                 border: hex(ui.border),
                 border_strong: Some(hex(ui.border_strong)),
                 text: hex(ui.text),

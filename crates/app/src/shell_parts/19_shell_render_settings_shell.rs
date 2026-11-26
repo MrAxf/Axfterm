@@ -41,7 +41,8 @@ impl Shell {
             .cursor_pointer()
             .when(selected, |this| this.bg(ui.selection))
             .when(!selected, |this| {
-                this.hover(move |this| this.bg(ui.surface_raised.opacity(0.6)))
+                this.hover(move |this| this.bg(ui.surface_hover))
+                    .active(move |this| this.bg(ui.surface_active))
             })
             .on_click(cx.listener(move |shell, _, _, cx| {
                 if let Some(settings) = &mut shell.settings {

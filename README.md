@@ -26,10 +26,10 @@ Copilot) con su estado en la misma vista.
 
 Requisitos: Windows 10 1809 o superior / Windows 11, x64.
 
-- **MSI**: `Axfterm-0.2.0-win-x64.msi` instala por usuario en
+- **MSI**: `Axfterm-0.3.0-win-x64.msi` instala por usuario en
   `%LOCALAPPDATA%\Programs\Axfterm`, con acceso directo en el menú Inicio,
   `App Paths` y «Abrir con Axfterm» en carpetas.
-- **Zip portable**: descomprime `Axfterm-0.2.0-win-x64.zip` y ejecuta
+- **Zip portable**: descomprime `Axfterm-0.3.0-win-x64.zip` y ejecuta
   `axfterm.exe`. No requiere instalación.
 
 También puedes lanzar una carpeta desde la terminal:

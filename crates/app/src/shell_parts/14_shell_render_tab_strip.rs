@@ -169,23 +169,22 @@ impl Shell {
                 div()
                     .flex()
                     .items_center()
-                    .gap(metrics.spacing_xs())
                     .flex_shrink_0()
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                     .child(
-                        IconButton::new(format!("tabs-new-{}", pane_id.get()), icons::PLUS)
+                        SplitButton::new(format!("pane-menu-{}", pane_id.get()))
                             .size(ControlSize::Sm)
-                            .icon_size(IconSize::Custom(metrics.tab_icon()))
-                            .tooltip("Nueva terminal")
-                            .on_click(cx.listener(move |shell, _, window, cx| {
-                                shell.new_tab_in_pane(pane_id, window, cx);
-                            })),
-                    )
-                    .child(
-                        KitButton::new(("pane-menu", pane_id.get()))
-                            .small()
                             .ghost()
-                            .dropdown_caret(true)
+                            .menu_accessibility_label("Menú del panel")
+                            .button(
+                                KitButton::new(("pane-new", pane_id.get()))
+                                    .icon(KitIcon::default().path(icons::PLUS))
+                                    .accessibility_label("Nueva terminal")
+                                    .tooltip("Nueva terminal")
+                                    .on_click(cx.listener(move |shell, _, window, cx| {
+                                        shell.new_tab_in_pane(pane_id, window, cx);
+                                    })),
+                            )
                             .dropdown_menu(move |menu, window, cx| {
                                 let this = pane_menu_this.clone();
                                 let profile_menu = {

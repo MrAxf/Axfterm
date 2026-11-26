@@ -7,14 +7,18 @@
 pub mod button;
 pub mod empty;
 pub mod icon;
+pub mod icon_button;
 pub mod input;
 pub mod kbd;
 pub mod menu;
 pub mod modal;
 pub mod pill;
+pub mod segmented;
+pub mod select;
+pub mod split;
+pub mod switch;
 pub mod tab;
 pub mod toast;
-pub mod toggle;
 pub mod tooltip;
 
 use crate::gpui::{App, ClickEvent, Hsla, Pixels, Window};
@@ -24,34 +28,37 @@ use crate::theme::UiTokens;
 /// Callback de una acción de componente.
 pub type ClickHandler = std::rc::Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
 
-/// Callback de un toggle con el nuevo valor.
-pub type ToggleHandler = std::rc::Rc<dyn Fn(&bool, &mut Window, &mut App)>;
-
-pub use button::{Button, ButtonVariant, IconButton};
+pub use button::{Button, ButtonVariant};
 pub use empty::EmptyState;
 pub use icon::{Icon, IconSize, ProfileIcon, ProfileIconSource};
+pub use icon_button::IconButton;
 pub use input::TextField;
 pub use kbd::Kbd;
 pub use menu::{Menu, MenuItem};
 pub use modal::Modal;
 pub use pill::{Pill, StatusPill, TabStatus};
+pub use segmented::{SegmentOption, SegmentedControl};
+pub use select::SelectField;
+pub use split::SplitButton;
+pub use switch::SwitchField;
 pub use tab::Tab;
 pub use toast::Toast;
-pub use toggle::Toggle;
 pub use tooltip::{TooltipBubble, text_tooltip};
 
 /// Tamaño de un control.
+///
+/// La escala es deliberadamente pequeña y se deriva del tamaño base de la
+/// fuente. Los valores coinciden con `Size::{XSmall, Small, Medium}` de
+/// gpui-kit para que un control propio y uno proyectado nunca midan distinto.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ControlSize {
-    /// Chip o icon-button compacto.
+    /// Chip, kbd o icon-button compacto.
     Xs,
-    /// Botón pequeño.
-    Sm,
-    /// Botón por defecto.
+    /// Botón, campo o selector por defecto.
     #[default]
+    Sm,
+    /// Acción principal de página.
     Md,
-    /// Botón grande.
-    Lg,
 }
 
 impl ControlSize {
@@ -61,27 +68,23 @@ impl ControlSize {
             Self::Xs => metrics.control_height_xs(),
             Self::Sm => metrics.control_height_sm(),
             Self::Md => metrics.control_height_md(),
-            Self::Lg => metrics.control_height_lg(),
         }
     }
 
     /// Icono adecuado al tamaño.
-    pub fn icon_size(self) -> IconSize {
+    pub fn icon(self, metrics: UiMetrics) -> Pixels {
         match self {
-            Self::Xs => IconSize::Xs,
-            Self::Sm => IconSize::Sm,
-            Self::Md => IconSize::Md,
-            Self::Lg => IconSize::Lg,
+            Self::Xs => metrics.control_icon_xs(),
+            Self::Sm => metrics.control_icon_sm(),
+            Self::Md => metrics.control_icon_md(),
         }
     }
 
     /// Multiplicador del tamaño de fuente base.
     pub fn text_scale(self) -> f32 {
         match self {
-            Self::Xs => 0.6875,
-            Self::Sm => 0.75,
-            Self::Md => 0.8125,
-            Self::Lg => 0.875,
+            Self::Xs => 0.75,
+            Self::Sm | Self::Md => 0.875,
         }
     }
 
@@ -90,10 +93,32 @@ impl ControlSize {
         match self {
             Self::Xs => metrics.spacing_xs(),
             Self::Sm => metrics.spacing_sm(),
-            Self::Md => metrics.spacing_md(),
-            Self::Lg => metrics.spacing_lg(),
+            Self::Md => metrics.control_padding_md(),
         }
     }
+
+    /// Separación entre icono y etiqueta, alineada con gpui-kit.
+    pub fn icon_gap(self, metrics: UiMetrics) -> Pixels {
+        match self {
+            Self::Xs | Self::Sm => metrics.control_icon_gap_sm(),
+            Self::Md => metrics.control_icon_gap_md(),
+        }
+    }
+
+    /// Tamaño equivalente en gpui-kit.
+    pub fn kit_size(self) -> crate::gpui::component::Size {
+        use crate::gpui::component::Size;
+        match self {
+            Self::Xs => Size::XSmall,
+            Self::Sm => Size::Small,
+            Self::Md => Size::Medium,
+        }
+    }
+}
+
+/// Añade el cursor de mano a un control proyectado de gpui-kit.
+pub fn with_hand<T: crate::gpui::Styled>(element: T) -> T {
+    element.cursor_pointer()
 }
 
 /// Tono semántico de un control o píldora.
@@ -136,6 +161,24 @@ impl Tone {
             Self::Warning => ui.warning_text,
             Self::Success => ui.success_text,
             Self::Info => ui.info_text,
+        }
+    }
+
+    /// Superficie de hover para un relleno con este tono.
+    pub fn hover(self, ui: UiTokens) -> Hsla {
+        match self {
+            Self::Neutral => ui.surface_hover,
+            Self::Accent => ui.accent_hover,
+            tone => tone.color(ui).blend(ui.text.opacity(0.10)),
+        }
+    }
+
+    /// Superficie pulsada para un relleno con este tono.
+    pub fn active(self, ui: UiTokens) -> Hsla {
+        match self {
+            Self::Neutral => ui.surface_active,
+            Self::Accent => ui.accent_active,
+            tone => tone.color(ui).blend(ui.text.opacity(0.18)),
         }
     }
 }

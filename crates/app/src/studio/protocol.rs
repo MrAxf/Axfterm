@@ -169,6 +169,8 @@ pub(super) struct ShotInfo {
     pub logical_height: f32,
     /// Escala del display usada.
     pub scale: f32,
+    /// Escala global de la UI usada.
+    pub ui_scale: f32,
 }
 
 /// Superficies que entiende `open`.

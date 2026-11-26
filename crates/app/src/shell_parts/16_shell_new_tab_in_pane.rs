@@ -104,6 +104,8 @@ impl Shell {
                 .action(
                     div()
                         .flex()
+                        .flex_wrap()
+                        .items_center()
                         .gap(metrics.spacing_sm())
                         .child(
                             Button::new(format!("spawn-retry-{}", tab.get()), "Reintentar")
@@ -144,7 +146,11 @@ impl Shell {
             if let Some(error) = entry.view.read(cx).error().map(str::to_owned) {
                 return EmptyState::new(icons::ALERT_TRIANGLE, title, error)
                     .action(
-                        div().flex().gap(metrics.spacing_sm()).child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(metrics.spacing_sm())
+                            .child(
                             Button::new(format!("terminal-retry-{}", tab.get()), "Reintentar")
                                 .small()
                                 .primary()
@@ -174,6 +180,8 @@ impl Shell {
             .action(
                 div()
                     .flex()
+                    .flex_wrap()
+                    .items_center()
                     .gap(metrics.spacing_sm())
                     .child(
                         Button::new(
@@ -221,6 +229,8 @@ impl Shell {
             .action(
                 div()
                     .flex()
+                    .flex_wrap()
+                    .items_center()
                     .gap(metrics.spacing_sm())
                     .child(
                         Button::new(format!("restore-now-{}", tab.get()), "Restaurar ahora")
@@ -249,6 +259,8 @@ impl Shell {
         .action(
             div()
                 .flex()
+                .flex_wrap()
+                .items_center()
                 .gap(metrics.spacing_sm())
                 .child(
                     Button::new(

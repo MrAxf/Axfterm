@@ -434,6 +434,8 @@ impl Shell {
         .action(
             div()
                 .flex()
+                .flex_wrap()
+                .items_center()
                 .gap(metrics.spacing_sm())
                 .child(
                     Button::new(format!("empty-new-{}", pane.get()), "Nueva terminal")

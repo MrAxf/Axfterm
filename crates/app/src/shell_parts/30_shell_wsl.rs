@@ -3,7 +3,6 @@ use crate::wsl_open::{
     NameList, WslProfileChoice, expand_posix, join_posix, name_list, parent_posix,
 };
 use axf_ui::gpui::component::IndexPath;
-use axf_ui::gpui::component::input::Input;
 use axf_ui::gpui::component::list::{List, ListEvent};
 
 impl Shell {

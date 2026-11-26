@@ -11,7 +11,9 @@ impl Shell {
         let ui = theme::state(cx).theme.ui;
         let sidebar = self.workspace.sidebar();
         let sidebar_visible = sidebar.visible;
-        let sidebar_width = sidebar.width;
+        let sidebar_width = metrics
+            .sidebar_width(sidebar.width)
+            .min(window.viewport_size().width * 0.45);
         let title_label = self.workspace.focus().tab.and_then(|tab_id| {
             let project_id = self.workspace.tab(tab_id)?.project_id;
             let project = self.workspace.project(project_id)?;
@@ -20,7 +22,7 @@ impl Shell {
         });
         let title = title_bar_title_geometry(
             window.viewport_size().width,
-            px(sidebar_width),
+            sidebar_width,
             window_controls_width(metrics),
             metrics.titlebar_title_max(),
             metrics.titlebar_padding(),
@@ -90,7 +92,7 @@ impl Shell {
             .h_full()
             .flex_shrink_0()
             .px(metrics.titlebar_padding())
-            .w(px(sidebar_width))
+            .w(sidebar_width)
             .child(brand)
             .child(settings)
             .child(toggle);
@@ -166,10 +168,15 @@ impl Shell {
             .action(
                 div()
                     .flex()
+                    .flex_wrap()
+                    .items_center()
+                    .justify_center()
                     .gap(metrics.spacing_sm())
                     .child(
-                        DropdownButton::new("onboarding-open")
+                        SplitButton::new("onboarding-open")
+                            .size(ControlSize::Md)
                             .primary()
+                            .menu_accessibility_label("Más formas de abrir un proyecto")
                             .button(
                                 KitButton::new("onboarding-open-local")
                                     .label("Abrir carpeta…")
@@ -207,17 +214,19 @@ impl Shell {
                                         ),
                                     )
                                 },
-                            )
-                            .menu_accessibility_label("Más formas de abrir un proyecto"),
+                            ),
                     )
                     .when(!empty_project, |this| {
-                        this.child(
-                            Button::new("onboarding-new", "Nueva terminal")
-                                .icon(icons::PLUS)
+                        this.child(with_hand(
+                            KitButton::new("onboarding-new")
+                                .with_size(ControlSize::Md.kit_size())
+                                .secondary()
+                                .icon(KitIcon::default().path(icons::PLUS))
+                                .label("Nueva terminal")
                                 .on_click(cx.listener(|shell, _, window, cx| {
                                     shell.new_tab_for(None, None, window, cx);
                                 })),
-                        )
+                        ))
                     }),
             )
             .into_any_element()
@@ -273,7 +282,10 @@ impl Shell {
                     })
                     .bg(cx.theme().border)
                     .hover(|this| this.bg(cx.theme().primary))
-                    .cursor_pointer()
+                    .map(|this| match axis {
+                        SplitAxis::Horizontal => this.cursor_col_resize(),
+                        SplitAxis::Vertical => this.cursor_row_resize(),
+                    })
                     .on_drag(
                         SplitDrag {
                             path: divider_path.clone(),

@@ -2,12 +2,11 @@
 
 use super::helpers::{card, note, section};
 use super::section_root;
-use crate::components::{ControlSize, TextField};
+use crate::components::{
+    ControlSize, SegmentedControl, SelectField, SwitchField, TextField, with_hand,
+};
+use crate::gpui::component::Disableable as _;
 use crate::gpui::component::button::{Button as KitButton, ButtonVariants as _};
-use crate::gpui::component::radio::{Radio, RadioGroup};
-use crate::gpui::component::select::Select;
-use crate::gpui::component::switch::Switch;
-use crate::gpui::component::{Disableable as _, Sizable as _};
 use crate::gpui::{Context, IntoElement, ParentElement, Styled, Window, div, px};
 use crate::icons;
 use crate::theme;
@@ -66,27 +65,29 @@ pub(super) fn render(
         .flex_wrap()
         .items_center()
         .gap(metrics.spacing_md())
-        .child(
+        .child(with_hand(
             KitButton::new("gallery-kit-primary")
                 .primary()
                 .label("Primary"),
-        )
-        .child(
+        ))
+        .child(with_hand(
             KitButton::new("gallery-kit-secondary")
                 .secondary()
                 .label("Secondary"),
-        )
-        .child(KitButton::new("gallery-kit-ghost").ghost().label("Ghost"))
-        .child(
+        ))
+        .child(with_hand(
+            KitButton::new("gallery-kit-ghost").ghost().label("Ghost"),
+        ))
+        .child(with_hand(
             KitButton::new("gallery-kit-danger")
                 .danger()
                 .label("Danger"),
-        )
-        .child(
+        ))
+        .child(with_hand(
             KitButton::new("gallery-kit-disabled")
                 .disabled(true)
                 .label("Disabled"),
-        );
+        ));
 
     let switches = div()
         .flex()
@@ -94,17 +95,17 @@ pub(super) fn render(
         .items_center()
         .gap(metrics.spacing_lg())
         .child(
-            Switch::new("gallery-switch-on")
+            SwitchField::new("gallery-switch-on")
                 .checked(true)
                 .label("Encendido"),
         )
         .child(
-            Switch::new("gallery-switch-off")
+            SwitchField::new("gallery-switch-off")
                 .checked(false)
                 .label("Apagado"),
         )
         .child(
-            Switch::new("gallery-switch-disabled")
+            SwitchField::new("gallery-switch-disabled")
                 .disabled(true)
                 .label("Deshabilitado"),
         );
@@ -125,16 +126,28 @@ pub(super) fn render(
                         .text_color(ui.subtle)
                         .child("Select"),
                 )
-                .child(Select::new(&gallery.select).small()),
+                .child(
+                    SelectField::new(&gallery.select)
+                        .size(ControlSize::Sm)
+                        .accessibility_label("Select"),
+                ),
         )
         .child(
-            RadioGroup::new("gallery-radio")
-                .selected_index(Some(0))
-                .children([
-                    Radio::new("gallery-radio-dark").label("Oscuro"),
-                    Radio::new("gallery-radio-light").label("Claro"),
-                    Radio::new("gallery-radio-system").label("Sistema"),
-                ]),
+            div()
+                .flex()
+                .flex_col()
+                .gap(metrics.spacing_xs())
+                .child(
+                    div()
+                        .text_size(metrics.font_size * 0.625)
+                        .text_color(ui.subtle)
+                        .child("Segmentado"),
+                )
+                .child(
+                    SegmentedControl::new("gallery-segmented")
+                        .options(["Oscuro", "Claro", "Sistema"])
+                        .selected(0),
+                ),
         );
 
     let focus_note = div()
@@ -160,8 +173,8 @@ pub(super) fn render(
         )
         .child(section("TextField", fields, cx))
         .child(section("Botones de gpui-kit", kit, cx))
-        .child(section("Switches de gpui-kit", switches, cx))
-        .child(section("Select y radios de gpui-kit", selectors, cx))
+        .child(section("Switches", switches, cx))
+        .child(section("Select y segmentado", selectors, cx))
         .child(card("Foco", focus_note, cx))
         .child(note(
             "Input, Select y TextField comparten el tema proyectado desde axf_ui.",

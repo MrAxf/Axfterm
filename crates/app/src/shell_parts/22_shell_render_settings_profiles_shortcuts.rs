@@ -66,7 +66,7 @@ impl Shell {
                             .flex()
                             .items_center()
                             .justify_center()
-                            .size(metrics.control_height_lg())
+                            .size(metrics.control_height_md())
                             .rounded(metrics.radius_md())
                             .bg(ui.surface_raised)
                             .child(Icon::new(icons::USER).size(IconSize::Md).color(ui.muted)),
@@ -88,7 +88,7 @@ impl Shell {
                                     }),
                             ),
                     )
-                    .child(
+                    .child(with_hand(
                         KitButton::new("settings-profile-icon")
                             .small()
                             .ghost()
@@ -96,8 +96,8 @@ impl Shell {
                             .on_click(cx.listener(|shell, _, window, cx| {
                                 shell.settings_choose_icon(window, cx);
                             })),
-                    )
-                    .child(
+                    ))
+                    .child(with_hand(
                         KitButton::new("settings-profile-icon-clear")
                             .small()
                             .ghost()
@@ -108,7 +108,7 @@ impl Shell {
                                 }
                                 cx.notify();
                             })),
-                    ),
+                    )),
             )
             .child(
                 div()
@@ -123,7 +123,7 @@ impl Shell {
                     )
                     .child(
                         TextField::new(name_input)
-                            .size(ControlSize::Md)
+                            .size(ControlSize::Sm)
                             .aria_label("Nombre"),
                     ),
             )
@@ -140,7 +140,7 @@ impl Shell {
                     )
                     .child(
                         TextField::new(command_input)
-                            .size(ControlSize::Md)
+                            .size(ControlSize::Sm)
                             .aria_label("Comando"),
                     ),
             )
@@ -177,7 +177,7 @@ impl Shell {
                             )
                             .child(
                                 TextField::new(opencode_input)
-                                    .size(ControlSize::Md)
+                                    .size(ControlSize::Sm)
                                     .aria_label("Comando de OpenCode"),
                             ),
                     )
@@ -194,7 +194,7 @@ impl Shell {
                             )
                             .child(
                                 TextField::new(copilot_input)
-                                    .size(ControlSize::Md)
+                                    .size(ControlSize::Sm)
                                     .aria_label("Comando de Copilot"),
                             ),
                     ),
@@ -211,7 +211,7 @@ impl Shell {
             .flex()
             .justify_end()
             .gap(metrics.spacing_sm())
-            .child(
+            .child(with_hand(
                 KitButton::new("settings-profile-cancel")
                     .small()
                     .ghost()
@@ -220,8 +220,8 @@ impl Shell {
                         shell.close_profile_editor(cx);
                         window.focus(&shell.settings_focus, cx);
                     })),
-            )
-            .child(
+            ))
+            .child(with_hand(
                 KitButton::new("settings-profile-apply")
                     .small()
                     .primary()
@@ -229,7 +229,7 @@ impl Shell {
                     .on_click(cx.listener(|shell, _, _, cx| {
                         shell.apply_profile_editor(cx);
                     })),
-            );
+            ));
         Some(
             Modal::new("settings-profile-modal", title)
                 .description("Los cambios se aplican al seleccionar Aplicar.")
@@ -327,7 +327,7 @@ impl Shell {
                                     .child("Sin atajo")
                                     .into_any_element(),
                             })
-                            .child(
+                            .child(with_hand(
                                 KitButton::new((
                                     ElementId::from("settings-shortcut-edit"),
                                     action_id,
@@ -335,13 +335,13 @@ impl Shell {
                                 .small()
                                 .ghost()
                                 .label("Editar")
-                                    .on_click(cx.listener(move |shell, _, _, cx| {
-                                        if let Some(settings) = &mut shell.settings {
-                                            settings.begin_capture(action_id);
-                                        }
-                                        cx.notify();
-                                    })),
-                            ),
+                                .on_click(cx.listener(move |shell, _, _, cx| {
+                                    if let Some(settings) = &mut shell.settings {
+                                        settings.begin_capture(action_id);
+                                    }
+                                    cx.notify();
+                                })),
+                            )),
                     );
                 list = list.child(row);
             }
@@ -354,7 +354,7 @@ impl Shell {
             .when_some(input, |this, input| {
                 this.child(
                     TextField::new(input)
-                        .size(ControlSize::Md)
+                        .size(ControlSize::Sm)
                         .prefix_icon(icons::SEARCH)
                         .cleanable(true)
                         .aria_label("Filtrar atajos"),
@@ -412,7 +412,7 @@ impl Shell {
                         "Pulsa la combinación para «{label}»; Esc cancela y Supr la quita."
                     )),
             )
-            .child(
+            .child(with_hand(
                 KitButton::new("settings-shortcut-unbind")
                     .small()
                     .danger()
@@ -425,8 +425,8 @@ impl Shell {
                         }
                         cx.notify();
                     })),
-            )
-            .child(
+            ))
+            .child(with_hand(
                 KitButton::new("settings-shortcut-reset")
                     .small()
                     .ghost()
@@ -439,8 +439,8 @@ impl Shell {
                         }
                         cx.notify();
                     })),
-            )
-            .child(
+            ))
+            .child(with_hand(
                 KitButton::new("settings-shortcut-cancel")
                     .small()
                     .ghost()
@@ -451,7 +451,7 @@ impl Shell {
                         }
                         cx.notify();
                     })),
-            )
+            ))
             .into_any_element()
     }
 }

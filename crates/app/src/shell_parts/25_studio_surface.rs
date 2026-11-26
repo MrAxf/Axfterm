@@ -338,6 +338,7 @@ impl Shell {
                 }
             }
             "demo" => self.studio_seed_demo(window, cx)?,
+            "projects" => self.studio_seed_projects(cx)?,
             other => return Err(format!("fixture desconocida: {other}")),
         }
         self.restore_visible_terminals(cx);
@@ -437,6 +438,7 @@ impl Shell {
         cx.notify();
         Ok(())
     }
+
 
     /// Número de proyectos, pestañas y paneles.
     pub(crate) fn studio_workspace_counts(&self) -> (usize, usize, usize) {

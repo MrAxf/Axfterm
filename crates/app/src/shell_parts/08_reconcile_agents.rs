@@ -368,7 +368,7 @@ fn window_control(
                 // oscuros.
                 this.bg(ui.danger.opacity(0.2))
             } else {
-                this.bg(ui.surface_raised)
+                this.bg(ui.surface_hover)
             }
         })
         .child(

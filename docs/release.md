@@ -2,7 +2,7 @@
 
 ## Versión y canal
 
-- Versión actual: **0.2.0**.
+- Versión actual: **0.3.0**.
 - Canal: **estable local**. No hay auto-update ni canal beta separado en v0.1.
 - El número de versión vive en `Cargo.toml` (`[workspace.package].version`) y se
   propaga al MSI, al zip, a `FileVersion`/`ProductVersion` del `.exe` y a los

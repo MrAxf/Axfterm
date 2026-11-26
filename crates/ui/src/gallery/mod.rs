@@ -278,10 +278,11 @@ impl Gallery {
                 .text_size(metrics.font_size * 0.8125)
                 .text_color(if active { ui.text } else { ui.muted })
                 .when(active, |this| {
-                    this.bg(ui.surface_raised).text_color(ui.text)
+                    this.bg(ui.surface_active).text_color(ui.text)
                 })
                 .when(!active, |this| {
-                    this.hover(move |this| this.bg(ui.surface_raised))
+                    this.hover(move |this| this.bg(ui.surface_hover))
+                        .active(move |this| this.bg(ui.surface_active))
                 })
                 .on_click(cx.listener(move |gallery, _, _, cx| {
                     gallery.select(*section, cx);

@@ -9,8 +9,10 @@ pwsh scripts/studio.ps1 -All -Hidden
 ```
 
 Compila `axfterm` con `--features studio`, arranca una instancia aislada y
-Reproduce las escenas de `studio/scenes/` (36 en v0.1). Las capturas quedan en
-`target/studio/shots/` y el índice en `target/studio/manifest.json`.
+Reproduce las escenas de `studio/scenes/` (38 en v0.2). Las capturas quedan en
+`target/studio/shots/` y el índice en `target/studio/manifest.json`. Cada escena
+parte de escala 1,0; el manifiesto guarda el DPI (`scale`) y la escala de UI
+(`ui_scale`) de cada captura.
 
 ## Aislamiento
 
@@ -21,6 +23,8 @@ Reproduce las escenas de `studio/scenes/` (36 en v0.1). Las capturas quedan en
 - El fixture `demo` crea tres proyectos en `target/studio/projects` (atlas,
   orbit y lumen), un split y agentes sintéticos. Los agentes reales se pausan
   mientras el fixture está activo.
+- El fixture `projects` registra dos proyectos sin terminales; sirve para
+  revisar la bienvenida con «Abrir carpeta» y «Nueva terminal» en la misma fila.
 - Studio copia un tema personalizado fixture desde `studio/fixtures/themes/`
   para capturar también la Apariencia con una paleta no integrada.
 - El modo `-Hidden` coloca la ventana fuera del escritorio para no tapar el
@@ -96,7 +100,7 @@ Captura:
 | `action <id>` | ejecuta una acción segura del registro |
 | `theme <nombre>` | cambia el tema |
 | `variant dark\|light` | fuerza la variante |
-| `scale <0.8..2.0>` | escala global de la UI |
+| `scale <0.8..2.0>` | escala global de la UI; cada escena arranca en 1,0 |
 | `size <ancho>x<alto>` | redimensiona la ventana |
 | `focus shell\|sidebar\|settings\|palette\|terminal` | mueve el foco |
 | `key <tecla>` | envía una pulsación permitida a la ventana enfocada |
@@ -118,6 +122,7 @@ de cierre.
 
 ```text
 app.onboarding
+app.onboarding.project       # fixture projects: dos acciones
 app.workspace
 app.settings.appearance | profiles | profiles.editor | shortcuts | shortcuts.capture | agents
 app.palette.commands
@@ -149,7 +154,7 @@ Secciones:
 - **Fundaciones**: tokens UI, ANSI 16, tipografía, espaciados, radios, alturas,
   iconos y colores de marca.
 - **Acciones**: botones en todas las variantes, tonos y tamaños; icon buttons,
-  toggles y atajos.
+  switches y atajos.
 - **Entradas**: `TextField`, `Input`, botones, switches, `Select` y radios de
   gpui-kit.
 - **Navegación**: pestañas, menú, sidebar, fila de paleta y fila de ajustes.

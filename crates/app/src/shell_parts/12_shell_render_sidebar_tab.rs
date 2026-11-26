@@ -246,8 +246,7 @@ impl Shell {
                 .group_hover(hover_group, |this| this.opacity(1.0))
                 .child(
                     IconButton::new(format!("sidebar-close-{}", tab.get()), icons::CLOSE)
-                        .size(ControlSize::Xs)
-                        .icon_size(IconSize::Sm)
+                        .size(ControlSize::Sm)
                         .tooltip("Cerrar terminal")
                         .on_click(cx.listener(move |shell, _, _, cx| {
                             cx.stop_propagation();
@@ -265,7 +264,9 @@ impl Shell {
                 .border_color(ui.focus);
         }
         if !focused && !(selected && sidebar_focused) {
-            row = row.hover(move |this| this.bg(ui.surface_raised.opacity(0.55)));
+            row = row
+                .hover(move |this| this.bg(ui.surface_hover))
+                .active(move |this| this.bg(ui.surface_active));
         }
         let has_agent = aggregate.is_some();
         let row = row

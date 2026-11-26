@@ -3,17 +3,22 @@ impl Shell {
         let state = theme::state(cx);
         let ui = state.theme.ui;
         let metrics = state.metrics;
-        let width = self.workspace.sidebar().width;
+        let width = metrics
+            .sidebar_width(self.workspace.sidebar().width)
+            .min(window.viewport_size().width * 0.45);
         let cursor = self.sidebar_cursor;
         let sidebar_focused = self.sidebar_focus.is_focused(window);
         let groups = sidebar_view(&self.workspace, self.sidebar_section);
         let no_projects = self.workspace.projects().is_empty();
         let empty = groups.is_empty();
         let at_limit = self.workspace.tab_count() >= MAX_TABS;
-        let show_shortcut = width >= f32::from(metrics.sidebar_actions_compact_width());
+        let show_shortcut = f32::from(width) >= f32::from(metrics.sidebar_actions_compact_width());
         let mut new_terminal = Button::new("sidebar-new-terminal", "Nueva terminal")
             .icon(icons::PLUS)
             .secondary()
+            .size(ControlSize::Md)
+            .align_start()
+            .padding_x(metrics.spacing_sm())
             .full_width()
             .disabled(at_limit)
             .tooltip(if at_limit {
@@ -48,14 +53,14 @@ impl Shell {
                 }),
             )
         };
-        let open_project = div()
-            .flex()
-            .items_center()
-            .child(
-                IconButton::new("sidebar-open-project", icons::FOLDER_OPEN)
-                    .size(ControlSize::Md)
-                    .icon_size(IconSize::Md)
-                    .secondary()
+        let open_project = SplitButton::new("sidebar-open-project")
+            .size(ControlSize::Md)
+            .secondary()
+            .menu_accessibility_label("Más formas de abrir un proyecto")
+            .button(
+                KitButton::new("sidebar-open-project-local")
+                    .icon(KitIcon::default().path(icons::FOLDER_OPEN))
+                    .accessibility_label("Abrir carpeta")
                     .tooltip(format!(
                         "Abrir carpeta… ({})",
                         keys::format_chord(keys::OPEN_PROJECT)
@@ -64,14 +69,7 @@ impl Shell {
                         shell.prompt_open_project(cx);
                     })),
             )
-            .child(
-                KitButton::new("sidebar-open-project-menu")
-                    .dropdown_caret(true)
-                    .secondary()
-                    .tooltip("Más formas de abrir un proyecto")
-                    .accessibility_label("Más formas de abrir un proyecto")
-                    .dropdown_menu_with_anchor(Anchor::BottomRight, open_menu),
-            );
+            .dropdown_menu_with_anchor(Anchor::BottomRight, open_menu);
         let actions = div()
             .flex()
             .items_center()
@@ -91,14 +89,30 @@ impl Shell {
         let sections = div()
             .flex()
             .items_center()
-            .h(metrics.control_height_md())
             .p(metrics.hairline())
             .rounded(metrics.radius_md())
             .border_1()
             .border_color(ui.border)
             .bg(ui.background)
-            .child(self.render_sidebar_section_segment(0, "Todas", SidebarSection::All, cx))
-            .child(self.render_sidebar_section_segment(1, "Agentes", SidebarSection::Agents, cx));
+            .child(
+                SegmentedControl::new("sidebar-section")
+                    .options(["Todas", "Agentes"])
+                    .selected(if self.sidebar_section == SidebarSection::Agents {
+                        1
+                    } else {
+                        0
+                    })
+                    .size(ControlSize::Sm)
+                    .full_width()
+                    .on_select(cx.listener(|shell, index: &usize, _, cx| {
+                        let section = if *index == 1 {
+                            SidebarSection::Agents
+                        } else {
+                            SidebarSection::All
+                        };
+                        shell.set_sidebar_section(section, cx);
+                    })),
+            );
         let top = div()
             .flex()
             .flex_col()
@@ -144,7 +158,7 @@ impl Shell {
             .flex()
             .flex_col()
             .h_full()
-            .w(px(width))
+            .w(width)
             .flex_shrink_0()
             .border_r_1()
             .border_color(ui.border)
@@ -157,51 +171,6 @@ impl Shell {
             .child(list_section)
             .child(self.render_sidebar_footer(cx))
             .into_any_element()
-    }
-
-    fn render_sidebar_section_segment(
-        &self,
-        index: usize,
-        label: &'static str,
-        section: SidebarSection,
-        cx: &mut Context<'_, Self>,
-    ) -> AnyElement {
-        let state = theme::state(cx);
-        let ui = state.theme.ui;
-        let metrics = state.metrics;
-        let selected = self.sidebar_section == section;
-        let radius = metrics.radius_sm();
-        let tooltip = (section == SidebarSection::Agents).then(|| {
-            format!(
-                "Sesiones de agente ({})",
-                keys::format_chord(keys::TOGGLE_SIDEBAR_AGENTS)
-            )
-        });
-        let mut segment = div()
-            .id(("sidebar-section", index))
-            .flex()
-            .flex_1()
-            .items_center()
-            .justify_center()
-            .h_full()
-            .cursor_pointer()
-            .text_size(metrics.font_size * 0.75)
-            .text_color(if selected { ui.text } else { ui.muted })
-            .when(selected, |this| this.bg(ui.surface_raised))
-            .when(!selected, move |this| {
-                this.hover(move |this| this.text_color(ui.text))
-            })
-            .when_some(tooltip, |this, tooltip| this.tooltip(text_tooltip(tooltip)))
-            .on_click(cx.listener(move |shell, _, _, cx| {
-                shell.set_sidebar_section(section, cx);
-            }))
-            .child(label);
-        if index == 0 {
-            segment = segment.rounded_tl(radius).rounded_bl(radius);
-        } else {
-            segment = segment.rounded_tr(radius).rounded_br(radius);
-        }
-        segment.into_any_element()
     }
 
     fn render_sidebar_empty(&self, cx: &mut Context<'_, Self>) -> AnyElement {
@@ -339,7 +308,6 @@ impl Shell {
             .child(
                 IconButton::new(format!("project-new-{}", project_id.get()), icons::PLUS)
                     .size(ControlSize::Sm)
-                    .icon_size(IconSize::Sm)
                     .tooltip("Nueva terminal")
                     .on_click(cx.listener(move |shell, _, window, cx| {
                         cx.stop_propagation();
@@ -349,7 +317,9 @@ impl Shell {
         if selected && sidebar_focused {
             header = header.bg(ui.surface_raised).border_color(ui.focus);
         } else {
-            header = header.hover(move |this| this.bg(ui.surface_raised.opacity(0.55)));
+            header = header
+                .hover(move |this| this.bg(ui.surface_hover))
+                .active(move |this| this.bg(ui.surface_active));
         }
         let header = header
             .on_drag_move::<axf_ui::gpui::ExternalPaths>(cx.listener(

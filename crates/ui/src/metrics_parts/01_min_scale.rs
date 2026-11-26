@@ -98,12 +98,41 @@ impl UiMetrics {
 
     /// Altura de un control medio.
     pub fn control_height_md(self) -> Pixels {
-        px(self.unit() * 1.75)
+        px(self.unit() * 2.0)
     }
 
-    /// Altura de un control grande.
-    pub fn control_height_lg(self) -> Pixels {
-        px(self.unit() * 2.0)
+    /// Icono de un control extrapequeño.
+    pub fn control_icon_xs(self) -> Pixels {
+        px(self.unit() * 0.75)
+    }
+
+    /// Icono de un control pequeño.
+    pub fn control_icon_sm(self) -> Pixels {
+        px(self.unit() * 0.875)
+    }
+
+    /// Icono de un control medio.
+    pub fn control_icon_md(self) -> Pixels {
+        px(self.unit() * 1.0)
+    }
+
+    /// Padding horizontal de un control medio.
+    ///
+    /// A diferencia de `spacing_md`, este valor sigue la escala de gpui-kit
+    /// (`px_2p5`) para que un `ControlSize::Md` propio y un `Size::Medium`
+    /// proyectado midan exactamente lo mismo.
+    pub fn control_padding_md(self) -> Pixels {
+        px(self.unit() * 0.625)
+    }
+
+    /// Separación icono‑texto de un control compacto.
+    pub fn control_icon_gap_sm(self) -> Pixels {
+        px(self.unit() * 0.25)
+    }
+
+    /// Separación icono‑texto de una acción principal.
+    pub fn control_icon_gap_md(self) -> Pixels {
+        px(self.unit() * 0.5)
     }
 
     /// Altura de la tab strip.
@@ -153,7 +182,7 @@ impl UiMetrics {
                 px(0.0)
             };
         let header =
-            self.spacing_sm() * 2.0 + self.control_height_md() + self.spacing_sm() + toolbar;
+            self.spacing_sm() * 2.0 + self.control_height_sm() + self.spacing_sm() + toolbar;
         let list_wrapper = self.spacing_sm() * 2.0;
         let footer = self.spacing_xs() * 2.0 + self.control_height_xs();
         let reserved =
@@ -201,6 +230,15 @@ impl UiMetrics {
         px(self.unit() * 1.75)
     }
 
+    /// Ancho visual de la sidebar a partir del valor guardado en sesión.
+    ///
+    /// La sesión conserva el ancho en la base histórica de 14 px; la UI lo
+    /// proyecta con el tamaño de fuente activo para que la sidebar crezca en
+    /// `rem` al cambiar la escala.
+    pub fn sidebar_width(self, stored: f32) -> Pixels {
+        px(stored * self.unit() / 14.0)
+    }
+
     /// Altura de una tarjeta de terminal en la sidebar.
     pub fn sidebar_tab_height(self) -> Pixels {
         px(self.unit() * 3.0)
@@ -218,10 +256,11 @@ impl UiMetrics {
 
     /// Ancho mínimo para mostrar el atajo dentro del botón de nueva terminal.
     ///
-    /// La fila de acciones incluye el botón de carpeta y su menú, así que el
-    /// atajo solo cabe cuando la sidebar deja sitio para el texto completo.
+    /// La fila de acciones incluye el botón de carpeta y su menú, y la etiqueta
+    /// creció con la escala de controles: el atajo solo cabe cuando la sidebar
+    /// deja sitio para el texto completo. Por debajo queda en el tooltip.
     pub fn sidebar_actions_compact_width(self) -> Pixels {
-        px(self.unit() * 21.0)
+        px(self.unit() * 24.0)
     }
 
     /// Altura de la barra de título propia.

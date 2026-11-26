@@ -4,13 +4,15 @@ impl Shell {
         let config_path = self.theme_host.config_path.clone();
         let themes_dir = self.theme_host.themes_dir.clone();
         let this = cx.entity().downgrade();
-        KitButton::new("settings-more")
-            .small()
-            .ghost()
-            .label("Más")
-            .tooltip("Abrir archivos de configuración y restaurar valores")
-            .dropdown_caret(true)
-            .dropdown_menu(move |menu, _, _| {
+        with_hand(
+            KitButton::new("settings-more")
+                .small()
+                .ghost()
+                .label("Más")
+                .tooltip("Abrir archivos de configuración y restaurar valores")
+                .dropdown_caret(true),
+        )
+        .dropdown_menu(move |menu, _, _| {
                 let config_click = config_path.clone();
                 let this_config = this.clone();
                 let menu = menu.item(
@@ -126,7 +128,7 @@ impl Shell {
                     .flex_shrink_0()
                     .items_center()
                     .gap(metrics.spacing_sm())
-                    .child(
+                    .child(with_hand(
                         KitButton::new("settings-discard")
                             .small()
                             .ghost()
@@ -134,8 +136,8 @@ impl Shell {
                             .on_click(cx.listener(|shell, _, window, cx| {
                                 shell.close_settings(window, cx);
                             })),
-                    )
-                    .child(
+                    ))
+                    .child(with_hand(
                         KitButton::new("settings-save")
                             .small()
                             .primary()
@@ -144,7 +146,7 @@ impl Shell {
                             .on_click(cx.listener(|shell, _, _, cx| {
                                 shell.save_settings(cx);
                             })),
-                    ),
+                    )),
             )
             .into_any_element()
     }
@@ -168,7 +170,7 @@ impl Shell {
             .flex()
             .justify_end()
             .gap(metrics.spacing_sm())
-            .child(
+            .child(with_hand(
                 KitButton::new("settings-defaults-cancel")
                     .small()
                     .ghost()
@@ -180,8 +182,8 @@ impl Shell {
                         window.focus(&shell.settings_focus, cx);
                         cx.notify();
                     })),
-            )
-            .child(
+            ))
+            .child(with_hand(
                 KitButton::new("settings-defaults-confirm")
                     .small()
                     .danger()
@@ -193,7 +195,7 @@ impl Shell {
                         window.focus(&shell.settings_focus, cx);
                         shell.preview_settings(cx);
                     })),
-            );
+            ));
         Some(
             Modal::new("settings-defaults-modal", "Restaurar valores por defecto")
                 .description("Esta acción afecta al borrador; no se escribe hasta Guardar.")
@@ -228,7 +230,7 @@ impl Shell {
             .flex()
             .justify_end()
             .gap(metrics.spacing_sm())
-            .child(
+            .child(with_hand(
                 KitButton::new("settings-profile-delete-cancel")
                     .small()
                     .ghost()
@@ -240,8 +242,8 @@ impl Shell {
                         window.focus(&shell.settings_focus, cx);
                         cx.notify();
                     })),
-            )
-            .child(
+            ))
+            .child(with_hand(
                 KitButton::new("settings-profile-delete-confirm")
                     .small()
                     .danger()
@@ -250,7 +252,7 @@ impl Shell {
                         shell.confirm_delete_profile(cx);
                         window.focus(&shell.settings_focus, cx);
                     })),
-            );
+            ));
         Some(
             Modal::new("settings-delete-modal", "Eliminar perfil")
                 .width(metrics.font_size * 32.0)

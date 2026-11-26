@@ -176,7 +176,8 @@ pub(crate) fn attach(
                         .update(move |window, cx| {
                             window.refresh();
                             let _ = window.draw(cx);
-                            capture::capture(window, &shots_dir, &name, clip)
+                            let ui_scale = axf_ui::theme::metrics(cx).scale;
+                            capture::capture(window, &shots_dir, &name, clip, ui_scale)
                         })
                         .unwrap_or_else(|error| {
                             Err(anyhow::anyhow!("ventana no disponible: {error}"))

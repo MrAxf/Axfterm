@@ -26,15 +26,15 @@ impl Shell {
                     .text_color(ui.text)
                     .child(message),
             )
-            .child(
+            .child(with_hand(
                 KitButton::new("settings-conflict-reload")
                     .small()
                     .label("Recargar")
                     .on_click(cx.listener(|shell, _, _, cx| {
                         shell.reload_settings_from_disk(cx);
                     })),
-            )
-            .child(
+            ))
+            .child(with_hand(
                 KitButton::new("settings-conflict-keep")
                     .small()
                     .ghost()
@@ -45,8 +45,8 @@ impl Shell {
                         }
                         cx.notify();
                     })),
-            )
-            .child(
+            ))
+            .child(with_hand(
                 KitButton::new("settings-conflict-overwrite")
                     .small()
                     .danger()
@@ -57,7 +57,7 @@ impl Shell {
                         }
                         shell.save_settings(cx);
                     })),
-            )
+            ))
             .into_any_element()
     }
 
@@ -84,16 +84,16 @@ impl Shell {
         } else {
             body_width
         };
-        let choices = RadioGroup::horizontal("settings-appearance")
-            .child("Sistema")
-            .child("Claro")
-            .child("Oscuro")
-            .selected_index(Some(match appearance {
-                axf_config::Appearance::System => 0,
-                axf_config::Appearance::Light => 1,
-                axf_config::Appearance::Dark => 2,
-            }))
-            .on_change(cx.listener(|shell, index: &usize, _, cx| {
+        let appearance_index = match appearance {
+            axf_config::Appearance::System => 0,
+            axf_config::Appearance::Light => 1,
+            axf_config::Appearance::Dark => 2,
+        };
+        let choices = SegmentedControl::new("settings-appearance")
+            .options(["Sistema", "Claro", "Oscuro"])
+            .selected(appearance_index)
+            .size(ControlSize::Sm)
+            .on_select(cx.listener(|shell, index: &usize, _, cx| {
                 let appearance = match index {
                     0 => axf_config::Appearance::System,
                     1 => axf_config::Appearance::Light,
@@ -207,7 +207,8 @@ impl Shell {
                 })
                 .cursor_pointer()
                 .when(!selected, move |this| {
-                    this.hover(move |this| this.bg(ui.surface_raised))
+                    this.hover(move |this| this.bg(ui.surface_hover))
+                        .active(move |this| this.bg(ui.surface_active))
                 })
                 .on_click(cx.listener(move |shell, _, _, cx| {
                     shell.select_settings_theme(&click_name, dark, cx);

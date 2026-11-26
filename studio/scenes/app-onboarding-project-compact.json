@@ -1,0 +1,12 @@
+{
+  "name": "app.onboarding.project.compact",
+  "steps": [
+    { "cmd": "theme", "args": ["Axfterm Studio Custom"] },
+    { "cmd": "variant", "args": ["dark"] },
+    { "cmd": "size", "args": ["1024x720"] },
+    { "cmd": "scale", "args": ["1.25"] },
+    { "cmd": "workspace", "args": ["projects"] },
+    { "cmd": "open", "args": ["app.workspace"] },
+    { "cmd": "shot", "args": ["app-onboarding-project-compact"] }
+  ]
+}

@@ -45,7 +45,12 @@ impl Shell {
                             .text_color(ui.muted)
                             .child("Fuente de la interfaz"),
                     )
-                    .child(Select::new(select).small().w_full())
+                    .child(
+                        SelectField::new(select)
+                            .size(ControlSize::Sm)
+                            .full_width()
+                            .accessibility_label("Fuente de la interfaz"),
+                    )
                     .child(
                         div()
                             .min_w_0()
@@ -73,7 +78,12 @@ impl Shell {
                             .text_color(ui.muted)
                             .child("Fuente de la terminal"),
                     )
-                    .child(Select::new(select).small().w_full())
+                    .child(
+                        SelectField::new(select)
+                            .size(ControlSize::Sm)
+                            .full_width()
+                            .accessibility_label("Fuente de la terminal"),
+                    )
                     .child(
                         div()
                             .min_w_0()

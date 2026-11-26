@@ -88,8 +88,10 @@ impl Shell {
                         .rounded(metrics.radius_sm())
                         .when(active, |this| this.bg(ui.selection))
                         .when(!active, move |this| {
-                            this.hover(move |this| this.bg(ui.surface_raised.opacity(0.6)))
+                            this.hover(move |this| this.bg(ui.surface_hover))
+                                .active(move |this| this.bg(ui.surface_active))
                         })
+                        .cursor_pointer()
                         .on_click(cx.listener(move |shell, _, window, cx| {
                             shell.palette_click(row, window, cx);
                         }))
@@ -155,54 +157,42 @@ impl Shell {
                 .vertical_scrollbar(&scroll)
                 .into_any_element()
         };
-        let mode_control = ToggleGroup::new("palette-mode")
-            .small()
-            .segmented()
-            .single()
-            .child(
-                KitToggle::new("palette-mode-commands")
-                    .label("Comandos")
-                    .checked(mode == PaletteMode::Commands)
-                    .tooltip("Cambiar a comandos (Ctrl+Tab)"),
-            )
-            .child(
-                KitToggle::new("palette-mode-search")
-                    .label("Búsqueda")
-                    .checked(mode == PaletteMode::Search)
-                    .tooltip("Cambiar a búsqueda (Ctrl+Tab)"),
-            )
-            .on_click(cx.listener(|shell, checks: &Vec<bool>, window, cx| {
-                let mode = if checks.get(1).copied().unwrap_or(false) {
+        let mode_control = SegmentedControl::new("palette-mode")
+            .options([
+                SegmentOption::new("Comandos").tooltip("Cambiar a comandos (Ctrl+Tab)"),
+                SegmentOption::new("Búsqueda").tooltip("Cambiar a búsqueda (Ctrl+Tab)"),
+            ])
+            .selected(if mode == PaletteMode::Search { 1 } else { 0 })
+            .size(ControlSize::Sm)
+            .on_select(cx.listener(|shell, index: &usize, window, cx| {
+                let mode = if *index == 1 {
                     PaletteMode::Search
                 } else {
                     PaletteMode::Commands
                 };
                 shell.palette_set_mode(mode, window, cx);
             }));
-        let mut filter_control = ToggleGroup::new("palette-filter")
-            .small()
-            .segmented()
-            .single()
-            .child(
-                KitToggle::new("palette-filter-all")
-                    .label("Todo")
-                    .checked(filter.is_none())
-                    .tooltip("Todo (Ctrl+1)"),
-            );
+        let mut filter_options = vec![SegmentOption::new("Todo").tooltip("Todo (Ctrl+1)")];
         for (index, kind) in PaletteKind::SEARCH_FILTERS.into_iter().enumerate() {
-            filter_control = filter_control.child(
-                KitToggle::new(("palette-filter", kind.order()))
-                    .label(kind.filter_label())
-                    .checked(filter == Some(kind))
+            filter_options.push(
+                SegmentOption::new(kind.filter_label())
                     .tooltip(format!("{} (Ctrl+{})", kind.filter_label(), index + 2)),
             );
         }
-        let filter_control =
-            filter_control.on_click(cx.listener(|shell, checks: &Vec<bool>, window, cx| {
-                let filter = checks
+        let selected_filter = filter
+            .and_then(|filter| {
+                PaletteKind::SEARCH_FILTERS
                     .iter()
-                    .position(|checked| *checked)
-                    .and_then(|index| index.checked_sub(1))
+                    .position(|kind| *kind == filter)
+            })
+            .map_or(0, |index| index + 1);
+        let filter_control = SegmentedControl::new("palette-filter")
+            .options(filter_options)
+            .selected(selected_filter)
+            .size(ControlSize::Sm)
+            .on_select(cx.listener(|shell, index: &usize, window, cx| {
+                let filter = index
+                    .checked_sub(1)
                     .and_then(|index| PaletteKind::SEARCH_FILTERS.get(index).copied());
                 shell.palette_set_filter(filter, window, cx);
             }));
@@ -216,7 +206,7 @@ impl Shell {
             .child(
                 div().w_full().min_w_0().child(
                     TextField::new(input)
-                        .size(ControlSize::Md)
+                        .size(ControlSize::Sm)
                         .prefix_icon(icons::SEARCH)
                         .cleanable(true)
                         .aria_label("Buscar en Axfterm"),

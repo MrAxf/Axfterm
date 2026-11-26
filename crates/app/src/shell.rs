@@ -45,6 +45,8 @@ include!("shell_parts/35_launch_agent.rs");
 include!("shell_parts/36_sidebar_footer.rs");
 #[cfg(feature = "studio")]
 include!("shell_parts/25_studio_surface.rs");
+#[cfg(feature = "studio")]
+include!("shell_parts/25b_studio_projects.rs");
 #[cfg(test)]
 mod tests {
     include!("shell_parts/tests/part_01.rs");

@@ -50,8 +50,9 @@ impl Shell {
                             ),
                     )
                     .child(
-                        Switch::new("settings-agents-enabled")
+                        SwitchField::new("settings-agents-enabled")
                             .checked(enabled)
+                            .accessibility_label("Detectar agentes")
                             .on_click(cx.listener(|shell, checked, _, cx| {
                                 if let Some(settings) = &mut shell.settings {
                                     settings.set_agents_enabled(*checked);
@@ -145,10 +146,11 @@ impl Shell {
             .flex()
             .items_center()
             .justify_center()
-            .size(metrics.control_height_xs())
+            .size(metrics.control_height_sm())
             .rounded(metrics.radius_sm())
             .cursor_pointer()
-            .hover(move |this| this.bg(ui.surface_raised))
+            .hover(move |this| this.bg(ui.surface_hover))
+            .active(move |this| this.bg(ui.surface_active))
             .on_click(cx.listener(move |shell, _, _, cx| {
                 shell.settings_step(field, -1.0, cx);
             }))
@@ -168,10 +170,11 @@ impl Shell {
             .flex()
             .items_center()
             .justify_center()
-            .size(metrics.control_height_xs())
+            .size(metrics.control_height_sm())
             .rounded(metrics.radius_sm())
             .cursor_pointer()
-            .hover(move |this| this.bg(ui.surface_raised))
+            .hover(move |this| this.bg(ui.surface_hover))
+            .active(move |this| this.bg(ui.surface_active))
             .on_click(cx.listener(move |shell, _, _, cx| {
                 shell.settings_step(field, 1.0, cx);
             }))
@@ -295,8 +298,10 @@ fn switch_row(
                 ),
         )
         .child(
-            Switch::new(id).checked(checked).on_click(cx.listener(
-                move |shell, checked, _, cx| {
+            SwitchField::new(id)
+                .checked(checked)
+                .accessibility_label(label)
+                .on_click(cx.listener(move |shell, checked, _, cx| {
                     if let Some(settings) = &mut shell.settings {
                         set(settings, *checked);
                     }
@@ -340,7 +345,12 @@ fn preference_row(
                 div()
                     .w(metrics.font_size * 13.0)
                     .min_w_0()
-                    .child(Select::new(select).small().w_full()),
+                    .child(
+                        SelectField::new(select)
+                            .size(ControlSize::Sm)
+                            .full_width()
+                            .accessibility_label("Perfil preferido"),
+                    ),
             )
         })
         .into_any_element()

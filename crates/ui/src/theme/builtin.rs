@@ -144,6 +144,51 @@ mod tests {
     }
 
     #[test]
+    fn builtin_interaction_surfaces_are_distinct_and_readable() {
+        for entry in BUILTIN_THEMES {
+            let theme = builtin(entry.name).expect("built-in parsea");
+            assert_ne!(
+                theme.ui.surface_hover, theme.ui.surface_raised,
+                "{}: hover y superficie elevada no pueden coincidir",
+                entry.name
+            );
+            assert_ne!(
+                theme.ui.accent_hover, theme.ui.accent,
+                "{}: hover de acento no puede coincidir con el acento",
+                entry.name
+            );
+            assert_ne!(
+                theme.ui.switch_off, theme.ui.accent,
+                "{}: el switch apagado no puede usar el acento",
+                entry.name
+            );
+
+            let text = Rgb::from(theme.ui.text);
+            for (label, surface) in [
+                ("surface_hover", theme.ui.surface_hover),
+                ("surface_active", theme.ui.surface_active),
+            ] {
+                assert!(
+                    text.contrast(Rgb::from(surface)) >= 4.5,
+                    "{}: texto sobre {label}",
+                    entry.name
+                );
+            }
+            let accent_text = Rgb::from(theme.ui.accent_text);
+            for (label, surface) in [
+                ("accent_hover", theme.ui.accent_hover),
+                ("accent_active", theme.ui.accent_active),
+            ] {
+                assert!(
+                    accent_text.contrast(Rgb::from(surface)) >= 4.5,
+                    "{}: texto de acento sobre {label}",
+                    entry.name
+                );
+            }
+        }
+    }
+
+    #[test]
     fn builtin_selected_text_remains_readable_on_ui_surfaces() {
         for entry in BUILTIN_THEMES {
             let theme = builtin(entry.name).expect("built-in parsea");

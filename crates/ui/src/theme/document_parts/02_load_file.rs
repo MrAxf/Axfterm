@@ -83,6 +83,31 @@ fn resolve(document: ThemeDocument, source: &str, label: &str) -> Result<Theme, 
         .as_deref()
         .map(|value| parse_color(value, "surface_raised", source, &mut problems))
         .unwrap_or_else(|| surface.map(|color| color.lighten(0.06)));
+    let surface_hover = document
+        .ui
+        .surface_hover
+        .as_deref()
+        .and_then(|value| parse_color(value, "surface_hover", source, &mut problems));
+    let surface_active = document
+        .ui
+        .surface_active
+        .as_deref()
+        .and_then(|value| parse_color(value, "surface_active", source, &mut problems));
+    let accent_hover = document
+        .ui
+        .accent_hover
+        .as_deref()
+        .and_then(|value| parse_color(value, "accent_hover", source, &mut problems));
+    let accent_active = document
+        .ui
+        .accent_active
+        .as_deref()
+        .and_then(|value| parse_color(value, "accent_active", source, &mut problems));
+    let switch_off = document
+        .ui
+        .switch_off
+        .as_deref()
+        .and_then(|value| parse_color(value, "switch_off", source, &mut problems));
     let border_strong = document
         .ui
         .border_strong
@@ -178,17 +203,39 @@ fn resolve(document: ThemeDocument, source: &str, label: &str) -> Result<Theme, 
         label: label.to_string(),
         problems: "faltan colores obligatorios".into(),
     })?;
+    let surface_color = surface.unwrap_or(background);
+    let raised = surface_raised.unwrap_or_else(|| surface_color.lighten(0.06));
+    let text_color = text.unwrap_or(Rgb::rgb(255, 255, 255));
+    let muted_color = muted.unwrap_or(Rgb::rgb(160, 160, 160));
+    let accent_color = accent.unwrap_or(Rgb::rgb(97, 175, 239));
     let ui = UiTokens {
         background: background.to_hsla(),
-        surface: surface.unwrap_or(background).to_hsla(),
-        surface_raised: surface_raised.unwrap_or(background.lighten(0.06)).to_hsla(),
+        surface: surface_color.to_hsla(),
+        surface_raised: raised.to_hsla(),
+        surface_hover: surface_hover
+            .unwrap_or_else(|| raised.mix(text_color, 0.06))
+            .to_hsla(),
+        surface_active: surface_active
+            .unwrap_or_else(|| raised.mix(text_color, 0.12))
+            .to_hsla(),
+        accent_hover: accent_hover
+            .unwrap_or_else(|| accent_color.mix(text_color, 0.10))
+            .to_hsla(),
+        accent_active: accent_active
+            .unwrap_or_else(|| accent_color.mix(text_color, 0.18))
+            .to_hsla(),
+        switch_off: switch_off
+            .unwrap_or_else(|| muted_color.mix(surface_color, 0.45))
+            .to_hsla(),
         border: border.unwrap_or(background.lighten(0.15)).to_hsla(),
         border_strong: border_strong.unwrap_or(background.lighten(0.25)).to_hsla(),
-        text: text.unwrap_or(Rgb::rgb(255, 255, 255)).to_hsla(),
-        muted: muted.unwrap_or(Rgb::rgb(160, 160, 160)).to_hsla(),
+        text: text_color.to_hsla(),
+        muted: muted_color.to_hsla(),
         subtle: subtle.unwrap_or(Rgb::rgb(120, 120, 120)).to_hsla(),
-        accent: accent.unwrap_or(Rgb::rgb(97, 175, 239)).to_hsla(),
-        accent_text: accent_text.unwrap_or(Rgb::rgb(0, 0, 0)).to_hsla(),
+        accent: accent_color.to_hsla(),
+        accent_text: accent_text
+            .unwrap_or_else(|| accent_color.readable_text())
+            .to_hsla(),
         danger: danger.unwrap_or(Rgb::rgb(224, 108, 117)).to_hsla(),
         danger_text: danger
             .unwrap_or(Rgb::rgb(224, 108, 117))
@@ -204,13 +251,15 @@ fn resolve(document: ThemeDocument, source: &str, label: &str) -> Result<Theme, 
             .unwrap_or(Rgb::rgb(152, 195, 121))
             .readable_text()
             .to_hsla(),
-        info: info.unwrap_or(Rgb::rgb(97, 175, 239)).to_hsla(),
+        info: info.unwrap_or(accent_color).to_hsla(),
         info_text: info
-            .unwrap_or(Rgb::rgb(97, 175, 239))
+            .unwrap_or(accent_color)
             .readable_text()
             .to_hsla(),
-        selection: selection.unwrap_or(Rgb::rgba(97, 175, 239, 96)).to_hsla(),
-        focus: focus.unwrap_or(Rgb::rgb(97, 175, 239)).to_hsla(),
+        selection: selection
+            .unwrap_or(Rgb::rgba(accent_color.r, accent_color.g, accent_color.b, 96))
+            .to_hsla(),
+        focus: focus.unwrap_or(accent_color).to_hsla(),
         overlay: Rgb::rgba(0, 0, 0, 150).to_hsla(),
     };
 

@@ -289,9 +289,14 @@ impl Shell {
             ui.text
         };
         let hover = if style.danger {
-            ui.danger.opacity(0.16)
+            axf_ui::components::Tone::Danger.hover(ui)
         } else {
-            ui.surface_raised
+            ui.surface_hover
+        };
+        let pressed = if style.danger {
+            axf_ui::components::Tone::Danger.active(ui)
+        } else {
+            ui.surface_active
         };
         let activate = Rc::new(activate);
         let key: ElementId = id.into();
@@ -306,13 +311,14 @@ impl Shell {
         .size(metrics.control_height_sm())
         .rounded(metrics.radius_sm())
         .tooltip(text_tooltip(tooltip))
-        .child(Icon::new(icon).size(IconSize::Sm).color(color));
+        .child(Icon::new(icon).size(IconSize::Md).color(color));
         if style.enabled {
             let click = activate.clone();
             let key = activate;
             element = element
                 .cursor_pointer()
                 .hover(move |this| this.bg(hover))
+                .active(move |this| this.bg(pressed))
                 .on_click(move |_, window, cx| click(window, cx))
                 .on_key_down(move |event: &KeyDownEvent, window, cx| {
                     if matches!(event.keystroke.key.as_str(), "enter" | "space") {
@@ -339,7 +345,7 @@ impl Shell {
             .max_w(width)
             .min_w_0()
             .gap(metrics.spacing_xs())
-            .child(
+            .child(with_hand(
                 KitButton::new("settings-profile-add")
                     .small()
                     .primary()
@@ -347,8 +353,8 @@ impl Shell {
                     .on_click(cx.listener(|shell, _, window, cx| {
                         shell.open_new_profile(window, cx);
                     })),
-            )
-            .child(
+            ))
+            .child(with_hand(
                 KitButton::new("settings-profile-detect")
                     .small()
                     .ghost()
@@ -357,7 +363,7 @@ impl Shell {
                     .on_click(cx.listener(|shell, _, _, cx| {
                         shell.start_detect(cx);
                     })),
-            )
+            ))
             .into_any_element()
     }
 
@@ -416,7 +422,7 @@ impl Shell {
                         div()
                             .flex()
                             .gap(metrics.spacing_xs())
-                            .child(
+                            .child(with_hand(
                                 KitButton::new("settings-profile-detect-add")
                                     .small()
                                     .primary()
@@ -424,8 +430,8 @@ impl Shell {
                                     .on_click(cx.listener(|shell, _, _, cx| {
                                         shell.merge_detected(cx);
                                     })),
-                            )
-                            .child(
+                            ))
+                            .child(with_hand(
                                 KitButton::new("settings-profile-detect-discard")
                                     .small()
                                     .ghost()
@@ -436,7 +442,7 @@ impl Shell {
                                         }
                                         cx.notify();
                                     })),
-                            ),
+                            )),
                     );
                 }
                 DetectState::Idle => {}

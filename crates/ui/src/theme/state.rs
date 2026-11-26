@@ -11,7 +11,7 @@ use crate::gpui::{App, Global, Pixels, SharedString, px};
 use crate::metrics::UiMetrics;
 
 use super::builtin;
-use super::color::hsla_hex;
+use super::color::{Rgb, hsla_hex};
 use super::document::{Theme, ThemeVariant};
 
 /// Todo lo que necesita un componente para pintarse con el tema activo.
@@ -98,6 +98,12 @@ fn color(value: crate::gpui::Hsla) -> Option<SharedString> {
     Some(SharedString::from(hsla_hex(value)))
 }
 
+/// Mezcla un color con el texto del tema para producir hover/pressed sin
+/// depender de que el tema declare cada variante.
+fn tinted(base: crate::gpui::Hsla, tint: crate::gpui::Hsla, amount: f32) -> Option<SharedString> {
+    color(Rgb::from(base).mix(Rgb::from(tint), amount).to_hsla())
+}
+
 /// Proyecta el tema propio sobre gpui-kit para que sus componentes (input,
 /// menú, diálogo, scrollbar) usen los mismos tokens.
 pub fn apply_gpui(cx: &mut App, state: &ThemeState) {
@@ -113,41 +119,53 @@ pub fn apply_gpui(cx: &mut App, state: &ThemeState) {
     colors.selection = color(ui.selection);
     colors.caret = color(ui.focus);
 
-    colors.accent = color(ui.surface_raised);
+    colors.accent = color(ui.surface_hover);
     colors.accent_foreground = color(ui.text);
     colors.primary = color(ui.accent);
     colors.primary_foreground = color(ui.accent_text);
-    colors.primary_hover = color(ui.accent);
-    colors.primary_active = color(ui.accent);
-    colors.secondary = color(ui.surface);
+    colors.primary_hover = color(ui.accent_hover);
+    colors.primary_active = color(ui.accent_active);
+    colors.secondary = color(ui.surface_raised);
     colors.secondary_foreground = color(ui.text);
-    colors.secondary_hover = color(ui.surface_raised);
-    colors.secondary_active = color(ui.surface_raised);
+    colors.secondary_hover = color(ui.surface_hover);
+    colors.secondary_active = color(ui.surface_active);
+    colors.button = color(ui.surface_raised);
+    colors.button_foreground = color(ui.text);
+    colors.button_hover = color(ui.surface_hover);
+    colors.button_active = color(ui.surface_active);
+    colors.button_primary = color(ui.accent);
+    colors.button_primary_foreground = color(ui.accent_text);
+    colors.button_primary_hover = color(ui.accent_hover);
+    colors.button_primary_active = color(ui.accent_active);
+    colors.button_secondary = color(ui.surface_raised);
+    colors.button_secondary_foreground = color(ui.text);
+    colors.button_secondary_hover = color(ui.surface_hover);
+    colors.button_secondary_active = color(ui.surface_active);
     colors.muted = color(ui.surface);
     colors.muted_foreground = color(ui.muted);
 
     colors.danger = color(ui.danger);
     colors.danger_foreground = color(ui.danger_text);
-    colors.danger_hover = color(ui.danger);
-    colors.danger_active = color(ui.danger);
+    colors.danger_hover = tinted(ui.danger, ui.text, 0.10);
+    colors.danger_active = tinted(ui.danger, ui.text, 0.18);
     colors.warning = color(ui.warning);
     colors.warning_foreground = color(ui.warning_text);
-    colors.warning_hover = color(ui.warning);
-    colors.warning_active = color(ui.warning);
+    colors.warning_hover = tinted(ui.warning, ui.text, 0.10);
+    colors.warning_active = tinted(ui.warning, ui.text, 0.18);
     colors.success = color(ui.success);
     colors.success_foreground = color(ui.success_text);
-    colors.success_hover = color(ui.success);
-    colors.success_active = color(ui.success);
+    colors.success_hover = tinted(ui.success, ui.text, 0.10);
+    colors.success_active = tinted(ui.success, ui.text, 0.18);
     colors.info = color(ui.info);
     colors.info_foreground = color(ui.info_text);
-    colors.info_hover = color(ui.info);
-    colors.info_active = color(ui.info);
+    colors.info_hover = tinted(ui.info, ui.text, 0.10);
+    colors.info_active = tinted(ui.info, ui.text, 0.18);
 
     colors.popover = color(ui.surface_raised);
     colors.popover_foreground = color(ui.text);
     colors.sidebar = color(ui.surface);
     colors.sidebar_foreground = color(ui.text);
-    colors.sidebar_accent = color(ui.surface_raised);
+    colors.sidebar_accent = color(ui.surface_hover);
     colors.sidebar_accent_foreground = color(ui.text);
     colors.sidebar_border = color(ui.border);
     colors.sidebar_primary = color(ui.accent);
@@ -174,15 +192,15 @@ pub fn apply_gpui(cx: &mut App, state: &ThemeState) {
     colors.description_list_label_foreground = color(ui.muted);
 
     colors.list = color(ui.surface);
-    colors.list_hover = color(ui.surface_raised);
-    colors.list_active = color(ui.surface_raised);
+    colors.list_hover = color(ui.surface_hover);
+    colors.list_active = color(ui.surface_active);
     colors.list_active_border = color(ui.accent);
     colors.list_even = color(ui.surface);
     colors.list_head = color(ui.surface_raised);
     colors.list_highlight_foreground = color(ui.text);
     colors.table = color(ui.surface);
-    colors.table_hover = color(ui.surface_raised);
-    colors.table_active = color(ui.surface_raised);
+    colors.table_hover = color(ui.surface_hover);
+    colors.table_active = color(ui.surface_active);
     colors.table_active_border = color(ui.accent);
     colors.table_even = color(ui.surface);
     colors.table_head = color(ui.surface_raised);
@@ -197,12 +215,12 @@ pub fn apply_gpui(cx: &mut App, state: &ThemeState) {
     colors.slider_bar = color(ui.accent);
     colors.slider_thumb = color(ui.accent);
     colors.progress_bar = color(ui.accent);
-    colors.switch = color(ui.accent);
+    colors.switch = color(ui.switch_off);
     colors.switch_thumb = color(ui.text);
     colors.skeleton = color(ui.surface_raised);
     colors.link = color(ui.accent);
-    colors.link_hover = color(ui.accent);
-    colors.link_active = color(ui.accent);
+    colors.link_hover = color(ui.accent_hover);
+    colors.link_active = color(ui.accent_active);
     colors.drop_target = color(ui.accent);
     colors.drag_border = color(ui.focus);
     colors.overlay = color(ui.overlay);

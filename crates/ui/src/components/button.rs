@@ -5,7 +5,7 @@ use std::rc::Rc;
 use crate::gpui::prelude::FluentBuilder as _;
 use crate::gpui::{
     App, ClickEvent, InteractiveElement as _, IntoElement, ParentElement, RenderOnce, Role,
-    SharedString, StatefulInteractiveElement as _, Styled, Window, div, transparent_black,
+    SharedString, StatefulInteractiveElement as _, Styled, Window, div, relative,
 };
 use crate::theme;
 
@@ -41,6 +41,8 @@ pub struct Button {
     focused: bool,
     shortcut: Option<SharedString>,
     full_width: bool,
+    align_start: bool,
+    padding_x: Option<crate::gpui::Pixels>,
     disabled: bool,
     tooltip: Option<SharedString>,
     on_click: Option<ClickHandler>,
@@ -55,10 +57,12 @@ impl Button {
             icon: None,
             tone: Tone::Neutral,
             variant: ButtonVariant::Filled,
-            size: ControlSize::Md,
+            size: ControlSize::Sm,
             focused: false,
             shortcut: None,
             full_width: false,
+            align_start: false,
+            padding_x: None,
             disabled: false,
             tooltip: None,
             on_click: None,
@@ -137,6 +141,18 @@ impl Button {
         self
     }
 
+    /// Alinea el contenido al inicio; útil en acciones de ancho completo.
+    pub fn align_start(mut self) -> Self {
+        self.align_start = true;
+        self
+    }
+
+    /// Sobrescribe el padding horizontal del tamaño.
+    pub fn padding_x(mut self, padding: crate::gpui::Pixels) -> Self {
+        self.padding_x = Some(padding);
+        self
+    }
+
     /// Deshabilita la acción y apaga el contraste.
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
@@ -166,14 +182,17 @@ impl RenderOnce for Button {
         let metrics = state.metrics;
         let (mut background, mut foreground, mut border) = match self.variant {
             ButtonVariant::Filled => match self.tone {
-                Tone::Neutral => (ui.surface_raised, ui.text, None),
+                Tone::Neutral => (ui.surface_raised, ui.text, Some(ui.border)),
                 tone => (tone.color(ui), tone.text(ui), None),
             },
-            ButtonVariant::Outline => (
-                crate::gpui::transparent_black(),
-                self.tone.color(ui),
-                Some(self.tone.color(ui)),
-            ),
+            ButtonVariant::Outline => match self.tone {
+                Tone::Neutral => (crate::gpui::transparent_black(), ui.text, Some(ui.border)),
+                tone => (
+                    crate::gpui::transparent_black(),
+                    tone.color(ui),
+                    Some(tone.color(ui)),
+                ),
+            },
             ButtonVariant::Ghost => (crate::gpui::transparent_black(), ui.text, None),
         };
         if self.disabled {
@@ -182,9 +201,20 @@ impl RenderOnce for Button {
             border = border.map(|border| border.opacity(0.55));
         }
         let hover = match self.variant {
-            ButtonVariant::Filled => background.opacity(0.88),
-            ButtonVariant::Outline => self.tone.color(ui).opacity(0.12),
-            ButtonVariant::Ghost => ui.surface_raised,
+            ButtonVariant::Filled => self.tone.hover(ui),
+            ButtonVariant::Outline => match self.tone {
+                Tone::Neutral => ui.surface_hover,
+                tone => tone.color(ui).opacity(0.14),
+            },
+            ButtonVariant::Ghost => ui.surface_hover,
+        };
+        let pressed = match self.variant {
+            ButtonVariant::Filled => self.tone.active(ui),
+            ButtonVariant::Outline => match self.tone {
+                Tone::Neutral => ui.surface_active,
+                tone => tone.color(ui).opacity(0.20),
+            },
+            ButtonVariant::Ghost => ui.surface_active,
         };
         let on_click = self.on_click.clone();
         let icon_color = if self.disabled {
@@ -195,12 +225,7 @@ impl RenderOnce for Button {
                 _ => self.tone.color(ui),
             }
         };
-        let icon_size = match self.size {
-            ControlSize::Xs => IconSize::Xs,
-            ControlSize::Sm => IconSize::Sm,
-            ControlSize::Md => IconSize::Md,
-            ControlSize::Lg => IconSize::Lg,
-        };
+        let icon_size = IconSize::Custom(self.size.icon(metrics));
         let label = div()
             .min_w_0()
             .overflow_hidden()
@@ -211,24 +236,34 @@ impl RenderOnce for Button {
             .flex()
             .items_center()
             .min_w_0()
-            .gap(metrics.spacing_xxs());
+            .gap(self.size.icon_gap(metrics));
         if let Some(icon) = self.icon {
             leading = leading.child(Icon::new(icon).size(icon_size).color(icon_color));
         }
         leading = leading.child(label);
 
+        let border_color = if self.focused {
+            ui.focus
+        } else {
+            border.unwrap_or_else(crate::gpui::transparent_black)
+        };
         let mut element = div()
             .id(self.id.clone())
             .flex()
             .items_center()
             .justify_center()
-            .gap(metrics.spacing_xxs())
+            .gap(self.size.icon_gap(metrics))
             .h(self.size.height(metrics))
-            .px(self.size.padding_x(metrics))
+            .px(self
+                .padding_x
+                .unwrap_or_else(|| self.size.padding_x(metrics)))
             .rounded(metrics.radius_md())
+            .border_1()
+            .border_color(border_color)
             .bg(background)
             .text_color(foreground)
             .text_size(metrics.font_size * self.size.text_scale())
+            .line_height(relative(1.25))
             .role(Role::Button)
             .aria_label(self.label.clone())
             .when_some(self.shortcut.clone(), |this, shortcut| {
@@ -238,15 +273,16 @@ impl RenderOnce for Button {
                 this.aria_description(description)
             })
             .when(self.full_width, |this| this.w_full())
-            .when_some(border, |this, border| this.border_1().border_color(border))
-            .when(self.focused, |this| this.border_1().border_color(ui.focus))
             .when(self.disabled, |this| this.opacity(0.62))
             .when_some(self.tooltip.clone(), |this, text| {
                 this.tooltip(tooltip::text_tooltip(text))
             });
 
         if !self.disabled {
-            element = element.cursor_pointer().hover(move |this| this.bg(hover));
+            element = element
+                .cursor_pointer()
+                .hover(move |this| this.bg(hover))
+                .active(move |this| this.bg(pressed));
         }
 
         if let Some(shortcut) = self.shortcut.clone() {
@@ -254,6 +290,8 @@ impl RenderOnce for Button {
                 .justify_between()
                 .child(leading.flex_1())
                 .child(Kbd::new(shortcut));
+        } else if self.align_start {
+            element = element.justify_start().child(leading);
         } else {
             element = element.child(leading);
         }
@@ -261,163 +299,6 @@ impl RenderOnce for Button {
         if !self.disabled
             && let Some(handler) = on_click
         {
-            element = element.on_click(move |event, window, cx| handler(event, window, cx));
-        }
-        element
-    }
-}
-
-/// Botón cuadrado solo con icono.
-#[derive(IntoElement)]
-#[expect(
-    missing_debug_implementations,
-    reason = "components con callbacks no derivan Debug"
-)]
-pub struct IconButton {
-    id: SharedString,
-    icon: &'static str,
-    tooltip: Option<SharedString>,
-    tone: Tone,
-    variant: ButtonVariant,
-    size: ControlSize,
-    size_px: Option<crate::gpui::Pixels>,
-    icon_size: Option<IconSize>,
-    focused: bool,
-    aria_label: Option<SharedString>,
-    on_click: Option<ClickHandler>,
-}
-
-impl IconButton {
-    /// Crea un icon-button.
-    pub fn new(id: impl Into<SharedString>, icon: &'static str) -> Self {
-        Self {
-            id: id.into(),
-            icon,
-            tooltip: None,
-            tone: Tone::Neutral,
-            variant: ButtonVariant::Ghost,
-            size: ControlSize::Sm,
-            size_px: None,
-            icon_size: None,
-            focused: false,
-            aria_label: None,
-            on_click: None,
-        }
-    }
-
-    /// Tono del icono.
-    pub fn tone(mut self, tone: Tone) -> Self {
-        self.tone = tone;
-        self
-    }
-
-    /// Variante visual.
-    pub fn variant(mut self, variant: ButtonVariant) -> Self {
-        self.variant = variant;
-        self
-    }
-
-    /// Acción secundaria, con el mismo cuerpo que un botón relleno.
-    pub fn secondary(self) -> Self {
-        self.variant(ButtonVariant::Filled)
-    }
-
-    /// Tamaño.
-    pub fn size(mut self, size: ControlSize) -> Self {
-        self.size = size;
-        self
-    }
-
-    /// Lado fijo en píxeles, independiente del tamaño de la fuente.
-    ///
-    /// Para chrome de ventana que debe seguir las medidas del SO.
-    pub fn size_px(mut self, size: crate::gpui::Pixels) -> Self {
-        self.size_px = Some(size);
-        self
-    }
-
-    /// Tamaño del icono, independiente del área pulsable.
-    pub fn icon_size(mut self, size: IconSize) -> Self {
-        self.icon_size = Some(size);
-        self
-    }
-
-    /// Tooltip nativo.
-    pub fn tooltip(mut self, text: impl Into<SharedString>) -> Self {
-        self.tooltip = Some(text.into());
-        self
-    }
-
-    /// Foco visible.
-    pub fn focused(mut self, focused: bool) -> Self {
-        self.focused = focused;
-        self
-    }
-
-    /// Nombre accesible; si falta, se usa el texto del tooltip.
-    pub fn aria_label(mut self, label: impl Into<SharedString>) -> Self {
-        self.aria_label = Some(label.into());
-        self
-    }
-
-    /// Acción al pulsar.
-    pub fn on_click(
-        mut self,
-        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
-    ) -> Self {
-        self.on_click = Some(Rc::new(handler));
-        self
-    }
-}
-
-impl RenderOnce for IconButton {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let state = theme::state(cx);
-        let ui = state.theme.ui;
-        let metrics = state.metrics;
-        let accessibility_label = self.aria_label.clone().or_else(|| self.tooltip.clone());
-        let color = match self.tone {
-            Tone::Neutral => ui.text,
-            tone => tone.color(ui),
-        };
-        let (background, border) = match self.variant {
-            ButtonVariant::Filled => (ui.surface_raised, None),
-            ButtonVariant::Outline => (transparent_black(), Some(self.tone.color(ui))),
-            ButtonVariant::Ghost => (transparent_black(), None),
-        };
-        let hover = match self.variant {
-            ButtonVariant::Filled => background.opacity(0.88),
-            ButtonVariant::Outline => self.tone.color(ui).opacity(0.12),
-            ButtonVariant::Ghost => ui.surface_raised,
-        };
-        let radius = match self.variant {
-            ButtonVariant::Ghost => metrics.radius_sm(),
-            ButtonVariant::Filled | ButtonVariant::Outline => metrics.radius_md(),
-        };
-        let on_click = self.on_click.clone();
-        let mut element = div()
-            .id(self.id.clone())
-            .flex()
-            .items_center()
-            .justify_center()
-            .size(self.size_px.unwrap_or_else(|| self.size.height(metrics)))
-            .rounded(radius)
-            .bg(background)
-            .when_some(border, |this, border| this.border_1().border_color(border))
-            .role(Role::Button)
-            .when_some(accessibility_label, |this, label| this.aria_label(label))
-            .cursor_pointer()
-            .hover(move |this| this.bg(hover))
-            .when(self.focused, |this| this.border_1().border_color(ui.focus))
-            .child(
-                Icon::new(self.icon)
-                    .size(self.icon_size.unwrap_or_else(|| self.size.icon_size()))
-                    .color(color),
-            );
-        if let Some(tooltip) = self.tooltip.clone() {
-            element = element.tooltip(tooltip::text_tooltip(tooltip));
-        }
-        if let Some(handler) = on_click {
             element = element.on_click(move |event, window, cx| handler(event, window, cx));
         }
         element

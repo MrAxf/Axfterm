@@ -1,0 +1,12 @@
+{
+  "name": "app.onboarding.project",
+  "steps": [
+    { "cmd": "theme", "args": ["One Dark"] },
+    { "cmd": "variant", "args": ["dark"] },
+    { "cmd": "size", "args": ["1440x900"] },
+    { "cmd": "scale", "args": ["1"] },
+    { "cmd": "workspace", "args": ["projects"] },
+    { "cmd": "open", "args": ["app.workspace"] },
+    { "cmd": "shot", "args": ["app-onboarding-project"] }
+  ]
+}

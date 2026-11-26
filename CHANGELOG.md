@@ -4,6 +4,43 @@ Todas las fechas usan el calendario local del proyecto. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado
 semántico.
 
+## [0.3.0] — 2026-11-26
+
+### Cambiado
+
+- Escala única de controles en `rem`: `Xs` 1,25, `Sm` 1,5 (por defecto) y `Md`
+  2,0. Botones, campos y selectores propios y de gpui-kit comparten altura,
+  texto, icono y padding.
+- La bienvenida y las acciones principales de la sidebar usan `Md`; formularios,
+  paleta, WSL y steppers usan `Sm`.
+- Los botones con acción + menú se agrupan en una sola silueta con divisoria y
+  estado abierto.
+- Un único `SegmentedControl` sustituye el segmentado propio de la sidebar, los
+  toggles de la paleta y los radios de Apariencia.
+- El switch usa `SwitchField` con geometría en `rem` y estados propios.
+- La sidebar proyecta su ancho con el tamaño de fuente activo y deja de truncar
+  «Nueva terminal» al subir la escala.
+- La bienvenida con proyecto sin terminales usa dos botones de kit `Md` en la
+  misma fila y con la misma altura.
+
+### Corregido
+
+- Hover y pulsado visibles en botones primarios, secundarios, ghost y menús
+  desplegables, incluidos los que viven sobre superficies elevadas.
+- El cursor de mano cubre todos los controles accionables; menús, campos y
+  chrome de ventana conservan la flecha nativa y el divisor usa cursor de
+  redimensionado.
+- Las filas, pestañas, tarjetas, rail y steppers usan `surface_hover` y
+  `surface_active` en lugar de opacidades de `surface_raised`.
+- La acción «Nueva terminal» de la sidebar se alinea con «Buscar…» en lugar de
+  centrar su icono y su texto.
+- Studio reinicia la escala por escena y el manifiesto registra `ui_scale`, para
+  que una captura normal no herede la escala 1,25 de otra.
+- Los switches apagados usan una pista neutra y los encendidos el acento; ya no
+  comparten fondo.
+- El foco de botones e icon-buttons ya no cambia su geometría.
+- Los campos y botones de una misma fila miden lo mismo.
+
 ## [0.2.0] — 2026-11-25
 
 ### Añadido

@@ -138,6 +138,9 @@ try {
         }
         $steps = @($sceneData.PSObject.Properties['steps'].Value)
         Write-Host "==> escena $sceneName" -ForegroundColor Cyan
+        # La escala de UI es estado global: cada escena parte de 1.0 salvo que
+        # pida otra cosa en sus pasos.
+        & $devtools scale 1 | Out-Null
         foreach ($step in $steps) {
             $arguments = @($step.PSObject.Properties['cmd'].Value)
             $stepArgs = $step.PSObject.Properties['args']
@@ -157,6 +160,7 @@ try {
                     width = $result.shot.width
                     height = $result.shot.height
                     scale = $result.shot.scale
+                    ui_scale = $result.shot.ui_scale
                 }
             }
         }

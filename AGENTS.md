@@ -40,7 +40,12 @@ MIT/Apache-2.0. Mantener `NOTICE` actualizado.
 1. La UI y la terminal comparten tema. No hay colores literales fuera de
    `crates/ui/theme/`.
 2. Todo tamaño (espaciados, alturas, radios, iconos) se deriva del tamaño base
-   de la fuente. No hay píxeles mágicos fuera de `metrics.rs`.
+   de la fuente. No hay píxeles mágicos fuera de `metrics.rs`. Los controles
+   usan solo tres alturas en `rem`: `Xs` (1,25), `Sm` (1,5, por defecto) y `Md`
+   (2), equivalentes a `XSmall`, `Small` y `Medium` de gpui-kit. La sidebar
+   guarda su ancho en la base de 14 px y lo proyecta con el tamaño de fuente
+   activo; los segmentados usan `SegmentedControl` y los switches
+   `SwitchField`.
 3. El teclado manda: toda acción es alcanzable sin ratón y con combinaciones
    configurables.
 4. El foco decide: con una terminal enfocada, una tecla sin binding va al PTY,

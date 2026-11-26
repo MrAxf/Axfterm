@@ -15,12 +15,15 @@ pub(super) fn capture(
     shots_dir: &Path,
     name: &str,
     clip: Option<Clip>,
+    ui_scale: f32,
 ) -> anyhow::Result<ShotInfo> {
     let image = window.render_to_image()?;
     let scale = window.scale_factor();
     let (width, height) = image.dimensions();
     let raw = image.into_raw();
-    write_png(shots_dir, name, width, height, scale, raw, clip)
+    let mut shot = write_png(shots_dir, name, width, height, scale, raw, clip)?;
+    shot.ui_scale = ui_scale;
+    Ok(shot)
 }
 
 fn write_png(
@@ -65,6 +68,7 @@ fn write_png(
         logical_width,
         logical_height,
         scale,
+        ui_scale: 1.0,
     })
 }
 

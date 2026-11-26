@@ -3,7 +3,7 @@
 use crate::gpui::component::Sizable as _;
 use crate::gpui::component::input::{Input, InputState};
 use crate::gpui::prelude::FluentBuilder as _;
-use crate::gpui::{App, Entity, IntoElement, RenderOnce, Window};
+use crate::gpui::{App, Entity, IntoElement, RenderOnce, Styled as _, Window};
 use crate::theme;
 
 use super::ControlSize;
@@ -18,6 +18,7 @@ pub struct TextField {
     cleanable: bool,
     prefix_icon: Option<&'static str>,
     aria_label: Option<&'static str>,
+    full_width: bool,
 }
 
 impl TextField {
@@ -30,6 +31,7 @@ impl TextField {
             cleanable: false,
             prefix_icon: None,
             aria_label: None,
+            full_width: false,
         }
     }
 
@@ -62,21 +64,25 @@ impl TextField {
         self.aria_label = Some(label);
         self
     }
+
+    /// Ocupa todo el ancho disponible.
+    pub fn full_width(mut self) -> Self {
+        self.full_width = true;
+        self
+    }
 }
 
 impl RenderOnce for TextField {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let ui = theme::state(cx).theme.ui;
-        let input = Input::new(&self.state)
+        Input::new(&self.state)
             .appearance(self.appearance)
             .cleanable(self.cleanable)
+            .with_size(self.size.kit_size())
+            .when(self.full_width, |input| input.w_full())
             .when_some(self.aria_label, |input, label| input.aria_label(label))
             .when_some(self.prefix_icon, |input, path| {
                 input.prefix(Icon::new(path).size(IconSize::Sm).color(ui.muted))
-            });
-        match self.size {
-            ControlSize::Xs | ControlSize::Sm => input.xsmall(),
-            ControlSize::Md | ControlSize::Lg => input.small(),
-        }
+            })
     }
 }

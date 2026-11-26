@@ -127,10 +127,10 @@ impl RenderOnce for Menu {
                         .px(metrics.spacing_sm())
                         .rounded(metrics.radius_sm())
                         .cursor_pointer()
-                        .text_size(metrics.font_size * 0.8125)
+                        .text_size(metrics.font_size * 0.875)
                         .text_color(if checked { ui.accent } else { ui.text })
-                        .when(checked, |this| this.bg(ui.surface))
-                        .hover(|this| this.bg(ui.surface));
+                        .when(checked, |this| this.bg(ui.surface_hover))
+                        .hover(|this| this.bg(ui.surface_hover));
                     if let Some(icon) = item.icon {
                         row = row.child(Icon::new(icon).size(IconSize::Sm).color(if checked {
                             ui.accent

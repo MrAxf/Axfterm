@@ -49,8 +49,15 @@ sources = []
   sigue en vivo cuando el SO cambia de apariencia. Si el tema activo no tiene
   pareja, se usa el tema por defecto de esa variante.
 - Todos los tamaños de la UI derivan de `ui.font_size × ui.scale` en
-  `crates/ui/src/metrics.rs`. El DPI del monitor se aplica al redondear
+  `crates/ui/src/metrics.rs`. La escala usa `rem` para que zoom y DPI conserven
+  las relaciones. Los controles solo usan tres alturas: `Xs` (1,25 rem), `Sm`
+  (1,5 rem, por defecto) y `Md` (2 rem). El hueco icono‑texto es 0,25 rem en
+  `Xs`/`Sm` y 0,5 rem en `Md`. El DPI del monitor se aplica al redondear
   hairlines y se refresca al mover la ventana entre monitores.
+- La sidebar guarda su ancho en la base histórica de 14 px y lo proyecta con el
+  tamaño de fuente activo, con un tope del 45 % del viewport. Los segmentados
+  usan `SegmentedControl` y los switches `SwitchField`; ambos escalan y tienen
+  hover, pulsado y foco propios.
 - `terminal.line_height = 1.0` conserva la altura natural del glifo (la que
   mantiene contiguas las cajas de una TUI). Un valor mayor añade aire sin
   romper la rejilla.
@@ -71,6 +78,11 @@ variant = "dark"            # "dark" | "light"
 background = "#1e2127"
 surface = "#21242b"         # opcional: sidebar, barras
 surface_raised = "#282c34"  # opcional: popovers, tarjetas
+surface_hover = "#333844"   # opcional: hover de filas, botones y menús
+surface_active = "#3b414e"  # opcional: pulsado/seleccionado
+accent_hover = "#6bb5f1"    # opcional: hover de acciones primarias
+accent_active = "#76bcf4"   # opcional: pulsado de acciones primarias
+switch_off = "#535964"      # opcional: pista del switch apagado
 border = "#3a3f4b"
 border_strong = "#4b5260"   # opcional: scrollbar, separadores
 text = "#abb2bf"
@@ -170,5 +182,9 @@ y `crates/ui/examples/gallery.rs` pinta todos los componentes con
   `Detenido`).
 - El foco visible usa el token `focus` en pestañas, paneles y controles; los
   divisores y el borde del panel enfocado lo heredan.
+- El cursor de mano identifica las superficies accionables (botones, filas,
+  pestañas, segmentados, switches y tarjetas). Los menús desplegables, los
+  campos de texto y el chrome de ventana conservan la flecha nativa; el divisor
+  de paneles usa el cursor de redimensionado.
 - `crates/ui/examples/gallery.rs` permite revisar la UI a dos densidades
   (`AXFTERM_GALLERY_FONT=12` y `16`) y con los seis temas.

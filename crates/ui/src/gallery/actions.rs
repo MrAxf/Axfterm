@@ -2,7 +2,7 @@
 
 use super::helpers::{card, note, section};
 use super::section_root;
-use crate::components::{Button, ButtonVariant, ControlSize, IconButton, Kbd, Toggle, Tone};
+use crate::components::{Button, ButtonVariant, ControlSize, IconButton, Kbd, SwitchField, Tone};
 use crate::gpui::{Context, IntoElement, ParentElement, Styled, Window, div, px};
 use crate::icons;
 use crate::theme;
@@ -61,9 +61,8 @@ pub(super) fn render(
         .items_center()
         .gap(metrics.spacing_sm())
         .child(Button::new("gallery-xs", "Xs").xsmall())
-        .child(Button::new("gallery-sm", "Small").small())
-        .child(Button::new("gallery-md", "Medium"))
-        .child(Button::new("gallery-lg", "Large").size(ControlSize::Lg))
+        .child(Button::new("gallery-sm", "Small"))
+        .child(Button::new("gallery-md", "Medium").size(ControlSize::Md))
         .child(Button::new("gallery-shortcut", "Con atajo").shortcut("Ctrl+K"))
         .child(
             Button::new("gallery-focused", "Foco")
@@ -82,11 +81,6 @@ pub(super) fn render(
             IconButton::new("gallery-ib-md", icons::PALETTE)
                 .size(ControlSize::Md)
                 .tooltip("Tema"),
-        )
-        .child(
-            IconButton::new("gallery-ib-lg", icons::SETTINGS)
-                .size(ControlSize::Lg)
-                .tooltip("Ajustes"),
         )
         .child(
             IconButton::new("gallery-ib-filled", icons::PLUS)
@@ -113,7 +107,8 @@ pub(super) fn render(
         .items_center()
         .gap(metrics.spacing_lg())
         .child(
-            Toggle::new("gallery-toggle-on", true)
+            SwitchField::new("gallery-toggle-on")
+                .checked(true)
                 .label("Activado")
                 .on_click(cx.listener(|gallery, checked, _, cx| {
                     gallery.toggle = *checked;
@@ -121,7 +116,8 @@ pub(super) fn render(
                 })),
         )
         .child(
-            Toggle::new("gallery-toggle-off", false)
+            SwitchField::new("gallery-toggle-off")
+                .checked(false)
                 .label("Desactivado")
                 .on_click(cx.listener(|gallery, checked, _, cx| {
                     gallery.toggle = *checked;
@@ -129,7 +125,8 @@ pub(super) fn render(
                 })),
         )
         .child(
-            Toggle::new("gallery-toggle-live", gallery.toggle)
+            SwitchField::new("gallery-toggle-live")
+                .checked(gallery.toggle)
                 .label("Estado vivo")
                 .on_click(cx.listener(|gallery, checked, _, cx| {
                     gallery.toggle = *checked;
@@ -162,11 +159,12 @@ pub(super) fn render(
                 .flex()
                 .gap(metrics.spacing_lg())
                 .items_start()
-                .child(div().flex_1().child(section("Toggles", toggles, cx)))
+                .child(div().flex_1().child(section("Switches", toggles, cx)))
                 .child(div().w(px(300.0)).child(card("Atajos", keys, cx))),
         )
         .child(note(
-            "Todo botón usa ControlSize para altura, padding, tipografía e icono.",
+            "ControlSize comparte altura, texto, icono y padding con Size de gpui-kit: \
+             Xs/XSmall, Sm/Small y Md/Medium.",
             cx,
         ))
 }

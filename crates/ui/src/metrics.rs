@@ -45,6 +45,27 @@ mod tests {
     }
 
     #[test]
+    fn control_sizes_follow_the_gpui_kit_rem_scale() {
+        let metrics = UiMetrics::scaled(14.0, 1.0, 1.0);
+        assert_eq!(metrics.control_height_xs(), px(17.5));
+        assert_eq!(metrics.control_height_sm(), px(21.0));
+        assert_eq!(metrics.control_height_md(), px(28.0));
+        assert_eq!(metrics.control_icon_xs(), px(10.5));
+        assert_eq!(metrics.control_icon_sm(), px(12.25));
+        assert_eq!(metrics.control_icon_md(), px(14.0));
+        assert_eq!(metrics.control_padding_md(), px(8.75));
+        assert_eq!(metrics.control_icon_gap_sm(), px(3.5));
+        assert_eq!(metrics.control_icon_gap_md(), px(7.0));
+
+        let scaled = UiMetrics::scaled(20.0, 1.25, 1.0);
+        assert_eq!(scaled.control_height_sm(), px(20.0 * 1.25 * 1.5));
+        assert_eq!(scaled.control_height_md(), px(20.0 * 1.25 * 2.0));
+        assert_eq!(scaled.control_icon_gap_sm(), px(20.0 * 1.25 * 0.25));
+        assert_eq!(scaled.control_icon_gap_md(), px(20.0 * 1.25 * 0.5));
+        assert_eq!(scaled.sidebar_width(240.0), px(240.0 * 20.0 * 1.25 / 14.0));
+    }
+
+    #[test]
     fn tab_widths_compress_from_a_fixed_max_to_a_min() {
         let metrics = UiMetrics::scaled(12.0, 1.0, 1.0);
         assert_eq!(metrics.tab_width(), px(16.0 * 12.0));
@@ -68,7 +89,7 @@ mod tests {
         assert_eq!(small.sidebar_tab_height(), px(36.0));
         assert_eq!(small.sidebar_tab_icon(), px(18.0));
         assert_eq!(small.sidebar_icon_lane(), px(21.0));
-        assert_eq!(small.sidebar_actions_compact_width(), px(252.0));
+        assert_eq!(small.sidebar_actions_compact_width(), px(288.0));
 
         let large = UiMetrics::scaled(18.0, 1.0, 1.0);
         assert!(large.sidebar_tab_height() > small.sidebar_tab_height());

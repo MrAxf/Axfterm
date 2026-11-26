@@ -132,7 +132,7 @@ impl RenderOnce for Tab {
             ui.surface_raised.opacity(0.55)
         };
         let hover_group = format!("{}-hover", self.id);
-        let hover_background = ui.surface_raised.opacity(0.35);
+        let hover_background = ui.surface_hover;
         let icon_color = if focused { ui.accent } else { ui.muted };
         let text_color = if active && focused { ui.text } else { ui.muted };
         let icon_source = self
@@ -155,11 +155,13 @@ impl RenderOnce for Tab {
             .px(metrics.spacing_sm())
             .rounded_t(metrics.radius_md())
             .overflow_hidden()
+            .cursor_pointer()
             .text_color(text_color)
             .when(self.full_width, |this| this.w_full())
             .when(active, |this| this.bg(active_background))
             .when(!active, |this| {
                 this.hover(move |this| this.bg(hover_background))
+                    .active(move |this| this.bg(ui.surface_active))
             })
             .when_some(icon_source, |this, source| {
                 this.child(
@@ -215,8 +217,7 @@ impl RenderOnce for Tab {
                 SharedString::from(format!("{}-close", self.id)),
                 crate::icons::CLOSE,
             )
-            .size(ControlSize::Xs)
-            .icon_size(IconSize::Md)
+            .size(ControlSize::Sm)
             .tooltip("Cerrar pestaña");
             if let Some(handler) = on_close {
                 close = close.on_click(move |event, window, cx| {

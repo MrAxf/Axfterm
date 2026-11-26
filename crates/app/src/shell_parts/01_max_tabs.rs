@@ -33,22 +33,20 @@ use axf_terminal::{
 };
 use axf_ui::components::{
     Button, ButtonVariant, ControlSize, EmptyState, Icon, IconButton, IconSize, Kbd, Modal,
-    ProfileIcon, ProfileIconSource, Tab as TabView, TabStatus, TextField, Toast, text_tooltip,
+    ProfileIcon, ProfileIconSource, SegmentOption, SegmentedControl, SelectField, SplitButton,
+    SwitchField, Tab as TabView, TabStatus, TextField, Toast, text_tooltip, with_hand,
 };
 use axf_ui::fonts::{MONO_PREFERRED, UI_PREFERRED};
 use axf_ui::gpui::base::FocusTrapElement as _;
-use axf_ui::gpui::component::button::{
-    Button as KitButton, ButtonVariants as _, DropdownButton, Toggle as KitToggle, ToggleGroup,
-};
+use axf_ui::gpui::component::button::{Button as KitButton, ButtonVariants as _};
+use axf_ui::gpui::component::Icon as KitIcon;
 use axf_ui::gpui::component::input::{InputEvent, InputState};
 use axf_ui::gpui::component::menu::{
     ContextMenuExt as _, DropdownMenu as _, PopupMenu, PopupMenuItem,
 };
-use axf_ui::gpui::component::radio::RadioGroup;
 use axf_ui::gpui::component::scroll::ScrollableElement as _;
-use axf_ui::gpui::component::select::{Select, SelectEvent, SelectState};
+use axf_ui::gpui::component::select::{SelectEvent, SelectState};
 use axf_ui::gpui::component::slider::{Slider, SliderEvent, SliderState};
-use axf_ui::gpui::component::switch::Switch;
 use axf_ui::gpui::component::{
     ActiveTheme, Disableable as _, ElementExt as _, Sizable as _, WindowExt as _,
 };

@@ -14,7 +14,11 @@ impl Shell {
 
         let distro_row = {
             let content = if let Some(select) = &state.distro_select {
-                Select::new(select).small().w_full().into_any_element()
+                SelectField::new(select)
+                    .size(ControlSize::Sm)
+                    .full_width()
+                    .accessibility_label("Distribución")
+                    .into_any_element()
             } else if let Some(error) = &state.error {
                 div()
                     .text_size(metrics.font_size * 0.8125)
@@ -44,7 +48,11 @@ impl Shell {
                     .child(error.clone())
                     .into_any_element()
             } else if let Some(select) = &state.profile_select {
-                Select::new(select).small().w_full().into_any_element()
+                SelectField::new(select)
+                    .size(ControlSize::Sm)
+                    .full_width()
+                    .accessibility_label("Terminal")
+                    .into_any_element()
             } else {
                 div()
                     .text_size(metrics.font_size * 0.8125)
@@ -61,38 +69,56 @@ impl Shell {
         };
 
         let path_row = {
-            let subir = Button::new("wsl-up", "Subir")
-                .small()
-                .ghost()
-                .disabled(state.distro.is_none())
-                .on_click(cx.listener(|shell, _, window, cx| {
-                    let path = shell
-                        .wsl_open
-                        .as_ref()
-                        .map(|state| parent_posix(&state.path))
-                        .unwrap_or_else(|| "/".into());
-                    shell.navigate_wsl(path, window, cx);
-                }));
-            let inicio = Button::new("wsl-home", "Inicio")
-                .small()
-                .ghost()
-                .disabled(state.distro.is_none())
-                .on_click(cx.listener(|shell, _, window, cx| {
-                    if let Some(home) = shell
-                        .wsl_open
-                        .as_ref()
-                        .and_then(|state| state.home.clone())
-                    {
-                        shell.navigate_wsl(home, window, cx);
-                    }
-                }));
-            let ir = Button::new("wsl-go", "Ir")
-                .small()
-                .secondary()
-                .disabled(state.distro.is_none())
-                .on_click(cx.listener(|shell, _, window, cx| {
-                    shell.wsl_navigate_from_input(window, cx);
-                }));
+            let subir = div()
+                .rounded(metrics.radius_md())
+                .hover(move |this| this.bg(ui.surface_hover))
+                .child(with_hand(
+                    KitButton::new("wsl-up")
+                        .small()
+                        .outline()
+                        .label("Subir")
+                        .disabled(state.distro.is_none())
+                        .on_click(cx.listener(|shell, _, window, cx| {
+                            let path = shell
+                                .wsl_open
+                                .as_ref()
+                                .map(|state| parent_posix(&state.path))
+                                .unwrap_or_else(|| "/".into());
+                            shell.navigate_wsl(path, window, cx);
+                        })),
+                ));
+            let inicio = div()
+                .rounded(metrics.radius_md())
+                .hover(move |this| this.bg(ui.surface_hover))
+                .child(with_hand(
+                    KitButton::new("wsl-home")
+                        .small()
+                        .outline()
+                        .label("Inicio")
+                        .disabled(state.distro.is_none())
+                        .on_click(cx.listener(|shell, _, window, cx| {
+                            if let Some(home) = shell
+                                .wsl_open
+                                .as_ref()
+                                .and_then(|state| state.home.clone())
+                            {
+                                shell.navigate_wsl(home, window, cx);
+                            }
+                        })),
+                ));
+            let ir = div()
+                .rounded(metrics.radius_md())
+                .hover(move |this| this.bg(ui.surface_hover))
+                .child(with_hand(
+                    KitButton::new("wsl-go")
+                        .small()
+                        .outline()
+                        .label("Ir")
+                        .disabled(state.distro.is_none())
+                        .on_click(cx.listener(|shell, _, window, cx| {
+                            shell.wsl_navigate_from_input(window, cx);
+                        })),
+                ));
             div()
                 .flex()
                 .flex_col()
@@ -104,10 +130,12 @@ impl Shell {
                         .items_center()
                         .gap(metrics.spacing_xs())
                         .child(
-                            div()
-                                .flex_1()
-                                .min_w_0()
-                                .child(Input::new(&state.path_input).small().w_full()),
+                            div().flex_1().min_w_0().child(
+                                TextField::new(state.path_input.clone())
+                                    .size(ControlSize::Sm)
+                                    .full_width()
+                                    .aria_label("Carpeta"),
+                            ),
                         )
                         .child(subir)
                         .child(inicio)
@@ -154,23 +182,25 @@ impl Shell {
             .items_center()
             .justify_end()
             .gap(metrics.spacing_sm())
-            .child(
-                Button::new("wsl-cancel", "Cancelar")
+            .child(with_hand(
+                KitButton::new("wsl-cancel")
                     .small()
                     .ghost()
+                    .label("Cancelar")
                     .on_click(cx.listener(|shell, _, window, cx| {
                         shell.close_wsl_modal(window, cx);
                     })),
-            )
-            .child(
-                Button::new("wsl-open", "Abrir")
-                .small()
-                .primary()
-                .disabled(!can_open)
-                .on_click(cx.listener(|shell, _, window, cx| {
-                    shell.open_wsl_current(window, cx);
-                })),
-            );
+            ))
+            .child(with_hand(
+                KitButton::new("wsl-open")
+                    .small()
+                    .primary()
+                    .label("Abrir")
+                    .disabled(!can_open)
+                    .on_click(cx.listener(|shell, _, window, cx| {
+                        shell.open_wsl_current(window, cx);
+                    })),
+            ));
 
         let modal = Modal::new("wsl-open-modal", "Abrir proyecto en WSL")
             .width(metrics.font_size * 52.0)
